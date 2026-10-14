@@ -1088,15 +1088,18 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// lastSeenInterval is how stale users.last_seen_at may get before requireAuth writes it again:
-// it counts active users for cost per active user (IMPLEMENTATION.md §5.7), which needs the
-// day, not the request, so an account costs one write a day rather than one per request.
-const lastSeenInterval = 24 * time.Hour
-
 // lastSeenDue reports whether a request at now should write users.last_seen_at, given its
-// current value (nil when never written).
+// current value (nil when never written): when it isn't yet written on now's UTC day. It counts
+// active accounts per day (IMPLEMENTATION.md §4.32), which needs the day, not the request, so an
+// account costs one write a day rather than one per request. A day, not 24 hours: someone who
+// comes back daily a little earlier each time would otherwise go a day with no write.
 func lastSeenDue(lastSeen *time.Time, now time.Time) bool {
-	return lastSeen == nil || now.Sub(*lastSeen) >= lastSeenInterval
+	if lastSeen == nil {
+		return true
+	}
+	y1, m1, d1 := lastSeen.UTC().Date()
+	y2, m2, d2 := now.UTC().Date()
+	return y1 != y2 || m1 != m2 || d1 != d2
 }
 
 // requireVerified wraps requireAuth with docs/ROADMAP.md's email-verification gate: a real

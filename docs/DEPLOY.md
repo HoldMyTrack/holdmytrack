@@ -406,12 +406,12 @@ apt-config dump | grep Automatic-Reboot
 Grafana Cloud's free tier holds the deployment's logs and metrics, with dashboards and alerts on them. One collector on the server, the `alloy` service (`ops/alloy/config.alloy`), feeds it:
 
 - **Logs** from every container in the stack, labeled `service` (`api`, `worker`, `db`, `web`, …), plus `level` for `api`'s and `worker`'s JSON lines. Before anything leaves the server, `internal/mail`'s lines (which name the recipient) and Postgres's `DETAIL` lines (which can quote an email address) are dropped, and every IP address in Caddy's logs is replaced with `redacted`.
-- **The app's metrics** from `api` and `worker` (`GET /metrics` on port 9100, on the Docker network only): requests by route and status class with their timings, recovered panics, finished jobs by kind, outcome and failure code, and the queue's runnable jobs and the oldest one's age, by kind.
+- **The app's metrics** from `api` and `worker` (`GET /metrics` on port 9100, on the Docker network only): requests by route and status class with their timings, recovered panics, finished jobs by kind, outcome and failure code, and the queue's runnable jobs and the oldest one's age, by kind. `api` also reports the newest daily statistics snapshot as `holdmytrack_stat{key=…}`, one series per key (`IMPLEMENTATION.md` §4.32), which the dashboard's **Service** row shows; Postgres's `daily_stats` is the lasting record of those numbers.
 - **The host's metrics**: CPU, memory, swap, disk, network and OOM kills (`node_vmstat_oom_kill`).
 - **Postgres's metrics**, database-wide: connections, size, locks, transactions.
 - **Backup freshness**: `backup.sh --nightly` and `restore-drill.sh` write the time of their last successful run to `BACKUP_DIR/metrics/` (`holdmytrack_backup_last_success_timestamp_seconds`, `holdmytrack_restore_drill_last_success_timestamp_seconds`), and every `backup.sh` run the time its reference dump in the bucket was taken (`holdmytrack_backup_reference_timestamp_seconds`), which the dashboard's Last backup tile shows beside the nightly one.
 
-Every series and stream carries `deployment="<your-domain>"`. The stack sends about 1,400 metric series, against the free tier's 10,000. Alloy itself uses about 70 MB of memory and is capped at 400 MB.
+Every series and stream carries `deployment="<your-domain>"`. The stack sends about 1,400 metric series, plus at most a few hundred `holdmytrack_stat` ones, against the free tier's 10,000. Alloy itself uses about 70 MB of memory and is capped at 400 MB.
 
 **Set it up.**
 

@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -154,6 +155,65 @@ func (c *queueCollector) Collect(ch chan<- prometheus.Metric) {
 		r := byKind[kind]
 		ch <- prometheus.MustNewConstMetric(c.jobs, prometheus.GaugeValue, float64(r.count), kind)
 		ch <- prometheus.MustNewConstMetric(c.oldest, prometheus.GaugeValue, r.age, kind)
+	}
+}
+
+// statsCollector reports the newest day of daily_stats (internal/stats, IMPLEMENTATION.md
+// §4.32) as one gauge per key, so the dashboard can show the service's numbers. Grafana keeps
+// them about 14 days; daily_stats is the record. The keys are the catalogue's, folded small
+// country groups included, so the series stay a bounded set. `serve` registers it, like
+// queueCollector, so the series isn't sent twice.
+type statsCollector struct {
+	db   querier
+	log  *slog.Logger
+	stat *prometheus.Desc
+}
+
+// querier is the one method statsCollector needs: the pool, or a test's transaction.
+type querier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
+
+// RegisterStats adds the holdmytrack_stat gauges to Registry.
+func RegisterStats(pool *pgxpool.Pool, log *slog.Logger) {
+	Registry.MustRegister(newStatsCollector(pool, log))
+}
+
+func newStatsCollector(db querier, log *slog.Logger) *statsCollector {
+	return &statsCollector{
+		db:  db,
+		log: log,
+		stat: prometheus.NewDesc("holdmytrack_stat",
+			"The newest daily statistics snapshot's values, by key.", []string{"key"}, nil),
+	}
+}
+
+func (c *statsCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- c.stat
+}
+
+func (c *statsCollector) Collect(ch chan<- prometheus.Metric) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	// The primary key (day, key) serves both the max and the day's rows.
+	rows, err := c.db.Query(ctx, `
+		SELECT key, value FROM daily_stats WHERE day = (SELECT max(day) FROM daily_stats)`)
+	if err != nil {
+		c.log.Error("metrics: read daily stats", "err", err)
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var key string
+		var value float64
+		if err := rows.Scan(&key, &value); err != nil {
+			c.log.Error("metrics: read daily stats", "err", err)
+			return
+		}
+		ch <- prometheus.MustNewConstMetric(c.stat, prometheus.GaugeValue, value, key)
+	}
+	if err := rows.Err(); err != nil {
+		c.log.Error("metrics: read daily stats", "err", err)
 	}
 }
 

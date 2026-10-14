@@ -10,7 +10,7 @@ The schema lives in `services/server/migrations/`, and the migrations are the au
 
 ### 3.1 `users`
 
-**No `tier` column.** There are no tiers; every account has every feature (`VISION.md` §6.2, ADR-0031). §4.10's no-signup demo is a real row in this same table, recognized by its fixed id (`httpapi.DemoCustomerUserID`) rather than a column. External sign-in identities live in §3.17's `user_identities`, not here (ADR-0015), so `password_hash` is NULL for an account that signs in only through one. `last_seen_at` is what counts an account as active for cost per active user (§5.7). What NULL means: `country` unset (the first-run gate, §4.12), `locale` "automatic" (Accept-Language, §4.21). `map_version` is §4.2.6's tile cache key and only ever goes up, so a key once used never names different content. `is_admin` is written only by the `set-admin` subcommand (§4.20). `deleted_at` marks an account its owner deleted, for the few minutes until the worker's sweep removes the row and its cascade takes everything else (§4.28).
+**No `tier` column.** There are no tiers; every account has every feature (`VISION.md` §6.2, ADR-0031). §4.10's no-signup demo is a real row in this same table, recognized by its fixed id (`httpapi.DemoCustomerUserID`) rather than a column. External sign-in identities live in §3.17's `user_identities`, not here (ADR-0015), so `password_hash` is NULL for an account that signs in only through one. `last_seen_at` is what counts an account as active (§4.32), written on its first authenticated request of each UTC day (§5.7). What NULL means: `country` unset (the first-run gate, §4.12), `locale` "automatic" (Accept-Language, §4.21). `map_version` is §4.2.6's tile cache key and only ever goes up, so a key once used never names different content. `is_admin` is written only by the `set-admin` subcommand (§4.20). `deleted_at` marks an account its owner deleted, for the few minutes until the worker's sweep removes the row and its cascade takes everything else (§4.28).
 
 ### 3.2 `connections` — Path 1 OAuth state
 
@@ -145,6 +145,10 @@ The Country and Region tiles' outlines, each already transformed and clipped to 
 ### 3.27 `bike_paths`
 
 Bike paths, Shared paths and Mountain bike trails (§4.24, FR-4.13): OpenStreetMap's cycleways, bike-designated paths and singletrack, the same for every account, filled by `import-bike-paths` and **upserted on `osm_id`**, one row per OSM way. `kind` is `cycleway`, `shared` or `mtb`, as `bikepaths.Kind` sorts them. **The line is stored in Web Mercator (3857)**, the tiles' own projection, so a tile clips, simplifies and measures it with nothing to reproject per request. Nothing refers to a row, so a planet import deletes the ways it didn't see (by `last_seen_import`) rather than retiring them as Spots does (§3.20).
+
+### 3.28 `daily_stats`
+
+Service statistics (§4.32): one row per UTC day and stat, written once by the worker's daily snapshot and never updated. **No account id and no foreign key, by design**: every value is an aggregate across accounts. **A stat is a key, not a column** (`activities_by_source.upload`), so adding one needs no migration.
 
 ## 4. Core Technical Workflows
 
@@ -947,6 +951,20 @@ Outdoor places from OpenStreetMap, on the web and in the Android app over the sa
 - `format: uuid` is the handlers' own pattern, any hex UUID, not kin-openapi's RFC 4122 one, which would refuse ids with other version bits.
 - The file's `servers` entry is for readers; the router can't match a relative one, so the check cuts the `/v1` prefix itself. A path outside `/v1` (tiles, pages) is never checked.
 
+### 4.32 Service statistics
+
+**A daily snapshot, because what it measures can't be rebuilt later.** How many accounts existed on a past day, or were active in the 30 days before it, isn't in the data afterwards: `users.last_seen_at` holds only the latest visit, and a deleted account's row is gone. So once per UTC day the worker (`internal/stats`, from `runSweeps`) runs a catalogue of queries for the day that just ended and stores each value in §3.28's `daily_stats`. Grafana's metrics (§5.8) cover requests and jobs for operations but keep about 14 days, so Postgres is the record and Grafana a recent view of it.
+
+**When.** The worker checks hourly, and once at start, whether the newest stored day is older than yesterday (UTC); if so it takes yesterday. A missed day isn't backfilled, since its state values can't be read after the fact: the gap stays in the data. Everything for a day is written in one transaction, under a try-advisory lock, with `ON CONFLICT DO NOTHING`, so a second worker process skips it, a retry can't write twice, and a failed query leaves nothing for the next hourly run to trip over.
+
+**State and flow.** A state value (`accounts`, `activities`, `storage_bytes.*`, the percentiles) is read as it stands when the snapshot runs, normally in the first hour after midnight, which stands for the end of the day closely enough. A flow value (`signups`, `activities_added`, `story_sends`) counts rows whose timestamp falls in the day, so it's exact as long as the row still exists the next day. Finished jobs count by `finished_at`; pending ones as they stand. **Active** for `active_Nd` means `last_seen_at` on or after the start of the day N−1 days before; a first visit in the minutes between midnight and the snapshot counts for the day before too, a small overcount accepted.
+
+**Deletions are derived, not stored.** A deleted account's row is purged within minutes (§4.28), so a count taken the next day would miss it. When read, `deletions(D) = accounts(D−1) + signups(D) − accounts(D)`, exact whenever both days have a snapshot: an account created and deleted within D is missing from both.
+
+**Aggregates only, and small groups folded.** No value names or follows an account, and the demo account is left out of all of them. A value grouped by country (Settings' country, or the countries an activity crosses) whose group stands for fewer than 5 accounts is added into that stat's `other` key before it's stored, so no stored number describes one person; it's the accounts behind a value that decide, not the value itself (`activities_by_country` folds by its accounts, not its activities). Source, locale and sign-in method aren't folded: their groups are few and fixed. A photo's files are shared by every copy of the Story it was sent in (§4.23), so photo bytes count each `image_key` once.
+
+**Read back two ways.** `api` reports the newest day as one `holdmytrack_stat` gauge per key, for the dashboard (`docs/DEPLOY.md` §13); only `api` registers it, so the series isn't sent twice, and the keys are the catalogue's, folded, so the series stay a bounded set. Anything older, such as a month of `active_30d` for cost per active user, is read with the `stats` subcommand (`docs/DEVELOPMENT.md`), which prints a day's values or a key's series as a table.
+
 ## 5. Engineering Risks & Mitigations
 
 ### 5.1 Ingest path risk, per path
@@ -1006,7 +1024,7 @@ Being free means costs scale with users while donations scale with goodwill (`VI
 * **Per-point streams aren't stored.** No feature reads per-point time, elevation or distance, and ingest can derive them from the raw payload when one does. Storage still only grows, since an account keeps what it brought until its owner deletes it (`VISION.md` §4.3); the photo cap (§4.27) bounds the line that grows with use, so one account can't become a material share of the bill.
 * **Raw payloads are needed, and the most sensitive thing held (§7).** They are what a `reprivacy` job and a track edit re-parse from, since `activities` keeps only the simplified track, so they're kept as long as their activity. How long that should be is reviewed after the public launch (`docs/ROADMAP.md`'s "Ongoing"): an expired payload would leave its activity unable to be re-clipped or edited.
 * **Rate limits and a spend cap are required.** A free product has no natural throttle, and a front-page day is a cost event with no matching revenue event. The app's limits (`httpapi/rate_limits.go`) are per account, except on the demo account, which every visitor shares and which is counted per address instead, or the first heavy visitor would use up everyone's demo. Tiles are counted per minute, not per hour, with a ceiling far above use: a pan, and still more a high-resolution export, fetches tiles in bursts, and one refused tile fails a whole export. Being in memory, the counts are per `api` process and restart with it, which suits a ceiling against abuse; what's still missing is a ceiling on what everyone together spends, `docs/ROADMAP.md`'s R2 budget.
-* **Cost per active user is measured from day one**: Milestone 2's exit gate is judged by it (`VISION.md` §5), and it can't be reconstructed afterwards. An account is active when it makes any authenticated request; `users.last_seen_at` is written at most once a day, so the count costs one write per account per day. The demo account is never stamped, being shared by every visitor.
+* **Cost per active user is measured from day one**: Milestone 2's exit gate is judged by it (`VISION.md` §5), and it can't be reconstructed afterwards, so the active count is kept in §4.32's daily snapshot. An account is active when it makes any authenticated request; `users.last_seen_at` is written on an account's first authenticated request of each UTC day, so the count costs one write per account per day and no daily visitor is missed. The demo account is never stamped, being shared by every visitor.
 
 ### 5.8 Minimal deployment topology
 

@@ -19,6 +19,7 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/metrics"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/stats"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storycopy"
 )
@@ -62,6 +63,11 @@ type job struct {
 
 // exportSweepInterval is how often expired exports are removed (export_job.go).
 const exportSweepInterval = time.Hour
+
+// statsInterval is how often the worker checks whether yesterday's statistics snapshot is
+// still owed (internal/stats). Hourly, so a worker that was down at midnight takes it soon
+// after it's back, and a run that failed is retried within the hour.
+const statsInterval = time.Hour
 
 // Run polls until ctx is cancelled. Each job is claimed in its own short transaction (FOR
 // UPDATE SKIP LOCKED, then locked_at stamped), run outside it, and marked done/failed after.
@@ -159,6 +165,8 @@ func runSweeps(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, lo
 	defer heatmapCapTicker.Stop()
 	exportSweepTicker := time.NewTicker(exportSweepInterval)
 	defer exportSweepTicker.Stop()
+	statsTicker := time.NewTicker(statsInterval)
+	defer statsTicker.Stop()
 
 	// A ticker's first tick is a whole interval away, so the daily sweeps also run once at
 	// start: a worker restarted more often than daily (every deploy) would otherwise never
@@ -172,6 +180,7 @@ func runSweeps(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, lo
 	if err := sweepExports(ctx, pool, store, log); err != nil {
 		log.Error("export sweep error", "err", err)
 	}
+	takeStats(ctx, pool, log)
 
 	for {
 		select {
@@ -193,7 +202,21 @@ func runSweeps(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, lo
 			if err := recomputeHeatmapCaps(ctx, pool, log); err != nil {
 				log.Error("heatmap cap error", "err", err)
 			}
+		case <-statsTicker.C:
+			takeStats(ctx, pool, log)
 		}
+	}
+}
+
+// takeStats takes yesterday's statistics snapshot if it's still owed.
+func takeStats(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) {
+	day, n, err := stats.TakeDue(ctx, pool, time.Now())
+	if err != nil {
+		log.Error("stats snapshot error", "err", err)
+		return
+	}
+	if n > 0 {
+		log.Info("stats snapshot taken", "day", day.Format(time.DateOnly), "values", n)
 	}
 }
 

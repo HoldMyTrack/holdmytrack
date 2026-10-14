@@ -34,7 +34,7 @@ Several national authorities, including the UK ICO and the French CNIL, also lis
 
 HoldMyTrack keeps the outdoor activities a user chooses to bring in and draws them as private maps and stats: one map of everywhere they went, Fog of War, Stories and Spots. Nothing is shown to anyone but the account holder.
 
-**Purposes:** run the service the user signed up for, and keep it working and secure. There is no advertising, analytics, profiling or data sale.
+**Purposes:** run the service the user signed up for, and keep it working and secure. There is no advertising, analytics, profiling or data sale. To measure what the service costs per active user, it keeps a daily count of its own data across all accounts (`IMPLEMENTATION.md` §4.32), which describes no one and is built only from data it already holds to run.
 
 **Data subjects:** registered users aged 16 and over. Third parties appear only incidentally, as faces in a user's photos or as the recipient's email address when a Story copy is sent.
 
@@ -61,6 +61,7 @@ HoldMyTrack keeps the outdoor activities a user chooses to bring in and draws th
 | Spot captures (place and time, not position) | Android app | Database | Until deleted |
 | Import records | System | Database | Until the account is deleted |
 | Server logs with account ids, no tracks or emails | System | Server, then Grafana Cloud (US) | Rotated on the server; 14 days at Grafana |
+| Daily service statistics: counts, sums and percentiles across all accounts, never one account's; country groups under 5 accounts folded into one | System | Database; the newest day also at Grafana Cloud (US) | Indefinitely; 14 days at Grafana |
 | Nightly backups: database dump, originals, photos, avatars | System | Cloudflare R2 | Up to 8 weeks after deletion; newest 3 dumps also on the server |
 | Data download archive | User's request | Cloudflare R2 | 7 days |
 
@@ -144,7 +145,7 @@ After the measures already in place, R1 and R3–R6 drop to low. R7 and R8 stay 
 | R2 | Originals sit in a private R2 bucket, never publicly addressable. Exports and Story copies are built from clipped tracks, never from originals. | A decision on how long originals are kept, after launch (`docs/ROADMAP.md`, "Ongoing"); a check that the bucket has no public access | Medium |
 | R3 | The tile and API endpoints take the user from the session, never from a parameter. Server tests check handlers against the API contract. | A test that asserts one account cannot read another's activities, tiles or photos, if one does not exist | Low |
 | R4 | bcrypt password hashes. HttpOnly, SameSite=Lax session cookie for up to 30 days. Sign-in rate limits. Email verification. Google and Facebook sign-in. | Optional second factor; not needed for launch | Low |
-| R5 | The admin panel shows activity lists, never tracks. Admin rights can be set only from the server's own command line. | An audit log, needed once an admin can see or change a track | Low |
+| R5 | The admin panel shows activity lists, never tracks. Admin rights can be set only from the server's own command line. The daily statistics hold no account-level rows, and a country group under 5 accounts is folded into one, so no stored number points at one person. | An audit log, needed once an admin can see or change a track | Low |
 | R6 | Exports leave out Private locations and draw only clipped tracks. A Story copy needs the recipient to accept it and carries the sender's Private locations. The policy warns that a copy is the recipient's. | — | Low |
 | R7 | Transfers rely on the processors' Standard Contractual Clauses or EU–US Data Privacy Framework certification, stated in the privacy policy. | EU-region hosting for EU users (`docs/ROADMAP.md` Phase 6), or a transfer impact assessment that justifies staying in the US | Medium |
 | R8 | Processors are named in the privacy policy. Logs are scrubbed of tracks, places, names, emails and IP addresses before they reach Grafana. | Signed or accepted DPAs with DigitalOcean, Cloudflare and Grafana Labs on file; the email provider chosen, named and under a DPA | Medium |
