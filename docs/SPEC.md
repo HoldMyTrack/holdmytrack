@@ -190,7 +190,7 @@ The JSON endpoints in this section are refused (`403`) the same way when a brows
 6. **A demo account** sees the page with every field and button disabled and a note that the shared demo account can't be changed, linking to "Create your own account" (FR-2.3); a save or avatar change submitted anyway is refused (`403`).
 7. **A native client** reads the lists this page offers from `GET /v1/account/settings/options` — every Country (code and name in the request's language), every Timezone grouped by region (with the region's name in that language, and the account's own zone always included), and every Language — and saves through the API endpoints above. The Android app's Settings screen is built on it (`apps/android/docs/SPEC.md` FR-1.5).
 8. **Theme** (FR-4.12): below Save, a System / Light / Dark toggle. It belongs to the browser, not the account — not part of Save, not disabled for a demo — and a click applies it at once.
-9. **Download your data** (FR-1.12) and **Delete account** (FR-1.11): last on the page, in that order, a real account only.
+9. **Account limits** (FR-1.13), **Download your data** (FR-1.12) and **Delete account** (FR-1.11): last on the page, in that order, a real account only.
 
 **Outputs**: The account's current Avatar, Name, Country, Timezone, and Language (`locale` in `GET /v1/auth/me`, `""` for automatic), always reflecting the last successful save (or the account's defaults, if never changed) — reloading the app never reverts to something stale.
 
@@ -325,6 +325,18 @@ A new account made this way is unverified, like one made on the web; the Android
 6. It can be downloaded for 7 days, then is deleted. Deleting the account deletes it too.
 7. **On the web**, the Settings page (FR-1.7) has a **Download your data** section (`#download-data`), above Delete account: what the copy holds, linking to Help's `#download-data` (FR-10.2), and **Request a download**, which posts `POST /settings/export` and comes back to the section. While it's prepared the section says so and names the address the email goes to; once ready it lists each archive — its file name, a download link, its size — with the total and the last day to download, and offers **Request a new one**; if it failed it says so, with the request button. A demo session doesn't see the section.
 
+### FR-1.13 Account limits
+
+**Description**: Every account can keep up to 50,000 activities and 5 GB of original files — the files uploaded or synced, as they arrived. The limits are the same for every account and sit far above what a person records; they stop a runaway import (ADR-0043).
+
+**Preconditions**: A real account. The demo account has none, since it can't add anything.
+
+**Behavior**:
+1. An activity counts from the moment it's sent: an import still waiting to be processed counts as if it had landed. An original shared by the pieces of a split activity (FR-5.17) counts once.
+2. At a limit, only adding stops: an upload (FR-3.1), a phone sync (FR-3.6) and accepting a copy of a Story (FR-14.7) are refused with a message naming the limit. Viewing, editing, deleting, Stories, photos and downloading the data (FR-1.12) work as before. Nothing is deleted or hidden to make room; deleting activities frees it.
+3. Requests sent at the same moment are checked each on its own, so together they can go a little over a limit. A Story copy accepted below the limits is made whole, even if that takes the account past them.
+4. The Settings page (FR-1.7) has an **Account limits** section (`#account-limits`), in the Android app's Settings too: how many activities the account holds and how much its original files take up, each of its limit — "1,240 of 50,000 activities · 310 MB of 5 GB of original files" — and a line saying the limits are the same for everyone and that deleting activities makes room.
+
 ## 4. FR-2 — No-Signup Demo
 
 ### FR-2.1 Start a demo
@@ -393,6 +405,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 - File too large, or malformed request → `413 Request Entity Too Large`.
 - More than 100 upload requests from one account in an hour (refused and already-imported files count too) → `429 Too Many Requests` before the file is read, with a message naming the limit; the file shows as failed with that message, and later files of the batch fail the same way until the hour is up. The count restarts when the server does.
 - Empty file → `400 Bad Request`.
+- The account is at its activity or storage limit (FR-1.13), counting this file → `409 Conflict` with a message naming the limit; the file shows as failed with it.
 - Unparseable/corrupt file content → the background job fails; the Sync page (FR-3.9) shows it "Failed" with a reason, the header's Sync item carries a red dot until that page has been opened (FR-3.9), and no `Activity` is created.
 - A file whose points carry no timestamps at all (a planned route rather than a recorded activity) → the background job fails the same way, with a reason saying the file has no timestamps. Points without a timestamp inside an otherwise timed track are dropped, not failed on.
 
@@ -440,7 +453,7 @@ All upload functionality requires an active session (demo or registered — FR-1
 
 **Outputs**: One new `Activity` per ticked candidate the server takes; a line on the sheet with how many were added and how many the account already had, and each refusal with its reason; and a persistent history via the same `GET /v1/uploads` FR-3.4 already describes — a Health Connect sync and a file upload are the same kind of ingest job, not two separate histories.
 
-**Error cases**: More than 60 sync requests from one account in an hour → `429 Too Many Requests` before the request is read, with a message naming the limit, which the run stops on and shows like any other refusal; the count restarts when the server does. Server unreachable while sending — the run stops and says so, and whatever wasn't confirmed stays listed and ticked; anything sent before the failure is known to the server at the next Load. Server unreachable while asking what it has — the read keeps what the last one found, with the reason shown. A session kept from an earlier read that's gone from Health Connect by the time it's sent is refused, with the reason.
+**Error cases**: What doesn't fit under the account's limits (FR-1.13), in the order sent, is rejected one by one with a message naming the limit, and stays on the phone; what fits is taken. More than 60 sync requests from one account in an hour → `429 Too Many Requests` before the request is read, with a message naming the limit, which the run stops on and shows like any other refusal; the count restarts when the server does. Server unreachable while sending — the run stops and says so, and whatever wasn't confirmed stays listed and ticked; anything sent before the failure is known to the server at the next Load. Server unreachable while asking what it has — the read keeps what the last one found, with the reason shown. A session kept from an earlier read that's gone from Health Connect by the time it's sent is refused, with the reason.
 
 **Not yet built**: the iOS/HealthKit half of Path 2 — no iOS app exists yet (`apps/ios` is a placeholder). `apps/android/docs/ROADMAP.md` is the authority on Android's own remaining work (UI design, Play Store compliance).
 
@@ -1313,6 +1326,7 @@ A Story is a hand-picked, private set of the account's activities — a hike, a 
 - An `email` that isn't a bare address → `400` with a message in the request's language (FR-13.1).
 - More than 30 sends in an hour from one account → `429` with a message in the request's language.
 - Accepting or declining a copy that isn't waiting for the account → `404`.
+- Accepting while the account is at its activity or storage limit (FR-1.13) → `409` with a message naming the limit; the copy stays in the inbox.
 
 ### FR-14.8 The copy
 

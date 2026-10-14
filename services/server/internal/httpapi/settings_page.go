@@ -43,6 +43,9 @@ type settingsForm struct {
 	DeleteError string
 	// Export is Download your data's state (FR-1.12), with its sizes and date already worded.
 	Export settingsExport
+	// Usage is what the account holds against its limits (FR-1.13), already worded; "" when it
+	// couldn't be read.
+	Usage string
 }
 
 // settingsExport is the account's latest export as the page shows it.
@@ -90,6 +93,11 @@ func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, status i
 		form.Notice = l.T(form.NoticeKey)
 	}
 	if !acct.info.isDemo {
+		if u, err := readUsage(r.Context(), s.pool, acct.info.userID); err != nil {
+			s.log.Error("settings: usage failed", "err", err)
+		} else {
+			form.Usage = usageLine(l, u)
+		}
 		form.Export.State = "none"
 		if st, err := s.latestExport(r.Context(), acct.info.userID); err != nil {
 			s.log.Error("settings: export status failed", "err", err)

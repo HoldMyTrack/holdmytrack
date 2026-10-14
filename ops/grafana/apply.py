@@ -90,6 +90,17 @@ RULES = [
          expr=f'(time() - max(holdmytrack_backup_last_success_timestamp_seconds{{{D}}})) or vector({NEVER})',
          op=">", threshold=26 * 3600, for_="10m", nodata="Alerting",
          summary="{{ if ge $values.A.Value 1e9 }}There's no record of a successful backup.sh run{{ else }}The last successful backup.sh run was {{ humanizeDuration $values.A.Value }} ago{{ end }}. See /var/log/holdmytrack-backup.log."),
+    # The daily statistics' heaviest account (IMPLEMENTATION.md §4.32) against the per-account
+    # limits (ADR-0043, httpapi/account_limits.go, which these thresholds halve): a real person
+    # nearing one is noticed long before they reach it. No data is fine: the snapshot is daily.
+    dict(uid="hmt-account-activities", title="An account holds half the activity limit",
+         expr=f'max(holdmytrack_stat{{{D}, key="activities_per_account.max"}})',
+         op=">", threshold=25000, for_="0m", nodata="OK",
+         summary="The heaviest account holds {{ $values.A.Value }} activities, of the 50,000 every account can keep. A script, or a real person to raise the limit for (ADR-0043)?"),
+    dict(uid="hmt-account-originals", title="An account holds half the storage limit",
+         expr=f'max(holdmytrack_stat{{{D}, key="original_bytes_per_account.max"}})',
+         op=">", threshold=2.5e9, for_="0m", nodata="OK",
+         summary="The heaviest account's original files take up {{ humanize $values.A.Value }}B, of the 5 GB every account can keep. A script, or a real person to raise the limit for (ADR-0043)?"),
     dict(uid="hmt-drill-stale", title="Restore drill overdue",
          expr=f'(time() - max(holdmytrack_restore_drill_last_success_timestamp_seconds{{{D}}})) or vector({NEVER})',
          op=">", threshold=33 * 86400, for_="1h", nodata="Alerting",

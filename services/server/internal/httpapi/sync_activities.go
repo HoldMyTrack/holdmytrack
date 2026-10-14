@@ -129,6 +129,25 @@ func (s *Server) handleSyncActivities(w http.ResponseWriter, r *http.Request) {
 		items = append(items, item)
 		slots = append(slots, i)
 	}
+	// What the account's limits (account_limits.go) have no room for is rejected one by one,
+	// so the phone keeps it and offers it again.
+	usage, err := readUsage(ctx, s.pool, userID)
+	if err != nil {
+		s.log.Error("sync: read usage failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	sizes := make([]int64, len(items))
+	for k, it := range items {
+		sizes[k] = int64(len(it.Data))
+	}
+	if fit, refused := fitWithinLimits(usage, sizes); refused != "" {
+		msg := limitMessage(l, refused)
+		for k := fit; k < len(items); k++ {
+			results[slots[k]] = syncActivityResult{ExternalID: items[k].ExternalID, Status: "rejected", Error: msg}
+		}
+		items, slots = items[:fit], slots[:fit]
+	}
 	enqueued, err := ingest.EnqueueRaw(ctx, s.pool, userID, items)
 	if err != nil {
 		s.log.Error("sync enqueue failed", "err", err, "activities", len(items))

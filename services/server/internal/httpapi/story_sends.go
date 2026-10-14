@@ -213,8 +213,12 @@ func takeStorySend(ctx context.Context, tx pgx.Tx, userID, sendID string) (strin
 
 // handleAcceptStorySend serves `POST /v1/story-sends/{id}/accept`: the copy leaves the inbox and
 // a `story_copy` job is queued for it in the same transaction. `202`: the Story arrives once the
-// job has run.
+// job has run. An account at its limits (account_limits.go) is refused, and the copy stays in its
+// inbox until there's room; a copy accepted below them is made whole, even past them.
 func (s *Server) handleAcceptStorySend(w http.ResponseWriter, r *http.Request) {
+	if s.refuseOverLimit(w, r, userIDFromContext(r.Context()), 0) {
+		return
+	}
 	s.answerStorySend(w, r, func(ctx context.Context, tx pgx.Tx, userID, storyID string) error {
 		return storycopy.Enqueue(ctx, tx, storycopy.Job{StoryID: storyID, RecipientID: userID}, 0)
 	}, http.StatusAccepted)

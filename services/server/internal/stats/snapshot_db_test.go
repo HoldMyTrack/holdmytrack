@@ -178,6 +178,9 @@ func TestTake(t *testing.T) {
 			t.Errorf("%s: went up by %v, want %v", key, got, want)
 		}
 	}
+	if after["original_bytes_per_account.max"] < 2000 {
+		t.Errorf("original_bytes_per_account.max %v, want at least the 2000 seeded", after["original_bytes_per_account.max"])
+	}
 	if got := after["storage_bytes.masks"] - before["storage_bytes.masks"]; got < 50 || got > 60 {
 		t.Errorf("storage_bytes.masks went up by %v, want a 50-byte mask's stored size", got)
 	}
