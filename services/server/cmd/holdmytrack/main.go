@@ -52,7 +52,7 @@ func main() {
 	slog.SetDefault(log)
 
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: holdmytrack <serve|work|migrate|seed-demo-customer|export-demo-activities|seed-admin-boundaries|seed-timezones|rerender-coverage|backfill-recorded-spans|import-spots|import-bike-paths|set-admin|stats>")
+		fmt.Fprintln(os.Stderr, "usage: holdmytrack <serve|work|migrate|seed-demo-customer|export-demo-activities|seed-admin-boundaries|seed-timezones|rerender-coverage|backfill-recorded-spans|backfill-object-bytes|import-spots|import-bike-paths|set-admin|stats>")
 		os.Exit(2)
 	}
 
@@ -239,6 +239,22 @@ func main() {
 			log.Error("rerender-coverage", "err", err)
 			os.Exit(1)
 		}
+
+	case "backfill-object-bytes":
+		// One-off, on deploying migration 0039 (docs/DEPLOY.md): fills the sizes of originals
+		// and Fog/Heatmap tiles stored before they were recorded, from listings of the bucket.
+		// Idempotent. See internal/stats.BackfillObjectBytes's doc comment.
+		store, err := storage.New(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Bucket)
+		if err != nil {
+			log.Error("storage", "err", err)
+			os.Exit(1)
+		}
+		n, err := stats.BackfillObjectBytes(ctx, pool, store, log)
+		if err != nil {
+			log.Error("backfill-object-bytes", "err", err, "filled", n)
+			os.Exit(1)
+		}
+		log.Info("backfill-object-bytes: done", "filled", n)
 
 	case "backfill-recorded-spans":
 		// One-off, on deploying migration 0033 (docs/DEPLOY.md): fills each older activity's

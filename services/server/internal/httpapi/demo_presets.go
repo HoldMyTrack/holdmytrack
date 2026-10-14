@@ -280,6 +280,7 @@ func SeedDemoCustomer(ctx context.Context, pool *pgxpool.Pool, store *storage.St
 			SourceDetail:  filename,
 			ExternalID:    externalID,
 			RawPayloadKey: rawKey,
+			RawBytes:      int64(len(b)),
 			ActivityType:  entry.Type,
 		}
 		result, err := ingest.Process(ctx, pool, store, job)

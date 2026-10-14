@@ -224,6 +224,7 @@ func copyActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.Store,
 		SourceDetail:  export.Slug(label) + ".gpx",
 		ExternalID:    src.origin,
 		RawPayloadKey: rawKey,
+		RawBytes:      int64(gpx.Len()),
 		ActivityType:  src.activityType,
 	})
 	if err != nil {

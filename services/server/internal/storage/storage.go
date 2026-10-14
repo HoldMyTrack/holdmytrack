@@ -142,3 +142,20 @@ func (s *Store) RemoveByPrefixExcept(ctx context.Context, prefix string, keep fu
 	}
 	return firstErr
 }
+
+// List calls fn with every object under prefix and its size, in key order. A listing returns
+// 1,000 objects per request, so it is the cheap way to learn many objects' sizes at once (the
+// one-off backfill-object-bytes). An error from fn stops it.
+func (s *Store) List(ctx context.Context, prefix string, fn func(key string, size int64) error) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel() // stops the listing goroutine when fn returns early
+	for obj := range s.client.ListObjects(ctx, s.bucket, minio.ListObjectsOptions{Prefix: prefix, Recursive: true}) {
+		if obj.Err != nil {
+			return fmt.Errorf("storage: list %s: %w", prefix, obj.Err)
+		}
+		if err := fn(obj.Key, obj.Size); err != nil {
+			return err
+		}
+	}
+	return ctx.Err()
+}

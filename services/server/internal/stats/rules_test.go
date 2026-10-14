@@ -68,3 +68,25 @@ func TestKeyFor(t *testing.T) {
 		}
 	}
 }
+
+func TestParseTileKey(t *testing.T) {
+	const u = "0b9a8c52-6f1e-4c4e-9a43-2f7a1c3e5d10"
+	for _, tc := range []struct {
+		key  string
+		want tileKey
+		ok   bool
+	}{
+		{"fog/" + u + "/14/8800/5370.png", tileKey{u, 14, 8800, 5370}, true},
+		{"heatmap/" + u + "/0/0/0.png", tileKey{u, 0, 0, 0}, true},
+		{"fog/" + u + "/14/8800/5370.webp", tileKey{}, false},
+		{"fog/" + u + "/14/8800.png", tileKey{}, false},
+		{"fog/not-a-user/14/1/2.png", tileKey{}, false},
+		{"fog/" + u + "/14/-1/2.png", tileKey{}, false},
+		{"raw/" + u + "/14/1/2.png", tileKey{}, false},
+	} {
+		got, ok := parseTileKey(tc.key)
+		if ok != tc.ok || got != tc.want {
+			t.Errorf("parseTileKey(%q) = %+v, %v; want %+v, %v", tc.key, got, ok, tc.want, tc.ok)
+		}
+	}
+}
