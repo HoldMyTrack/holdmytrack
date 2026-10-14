@@ -216,7 +216,7 @@ The product moves through three milestones (ADR-0031):
 Within the milestones, the unconditional ingest path ships first and the ones that depend on other companies' permission come later. `docs/ROADMAP.md` carries each milestone's step-by-step detail.
 
 ### 5.1 Validation — *no application code*
-Settle what the plan rests on before building on it: whether Samsung route access is what it appears to be (§4.1; HealthKit's is checked when the iOS app is built, §5.3), and whether "free, funded by its users" reads as credible (§8.3). The funding page stands before launch, not after — the ask is much weaker retrofitted (§6.1).
+Settle what the plan rests on before building on it: whether HealthKit's route access is what it appears to be, checked when the iOS app is built (§4.1, §5.3), and whether "free, funded by its users" reads as credible (§8.3). The funding page stands before launch, not after — the ask is much weaker retrofitted (§6.1).
 
 ### 5.2 Upload + Map
 The product on the web, on the one ingest path that needs nobody's permission: file upload (Path 3, §4.1), the map in all its modes, the no-signup demo (§8.2), accounts, the activity graph, export, Stories and Spots (§4.2). Path 3 comes first so that the first usable version waits on no one's approval.
