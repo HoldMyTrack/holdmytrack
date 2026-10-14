@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -34,6 +35,7 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mapstyle"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/metrics"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/spots"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/stats"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/worker"
@@ -50,7 +52,7 @@ func main() {
 	slog.SetDefault(log)
 
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: holdmytrack <serve|work|migrate|seed-demo-customer|export-demo-activities|seed-admin-boundaries|seed-timezones|rerender-coverage|backfill-recorded-spans|import-spots|import-bike-paths|set-admin>")
+		fmt.Fprintln(os.Stderr, "usage: holdmytrack <serve|work|migrate|seed-demo-customer|export-demo-activities|seed-admin-boundaries|seed-timezones|rerender-coverage|backfill-recorded-spans|import-spots|import-bike-paths|set-admin|stats>")
 		os.Exit(2)
 	}
 
@@ -421,6 +423,19 @@ func main() {
 			os.Exit(1)
 		}
 		log.Info("set-admin: done", "email", os.Args[2], "admin", admin)
+
+	case "stats":
+		// Prints the daily service statistics (IMPLEMENTATION.md §4.32): the newest day's,
+		// one day's, or a key's series. Only reads, except --take (docs/DEVELOPMENT.md).
+		err := stats.RunCLI(ctx, pool, os.Args[2:], os.Stdout, time.Now())
+		if errors.Is(err, stats.ErrUsage) {
+			fmt.Fprintln(os.Stderr, stats.Usage)
+			os.Exit(2)
+		}
+		if err != nil {
+			log.Error("stats", "err", err)
+			os.Exit(1)
+		}
 
 	default:
 		fmt.Fprintf(os.Stderr, "unknown subcommand %q; want serve, work, migrate, seed-demo-customer, export-demo-activities, seed-admin-boundaries, import-spots, or set-admin\n", os.Args[1])

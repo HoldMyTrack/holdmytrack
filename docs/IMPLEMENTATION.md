@@ -963,7 +963,7 @@ Outdoor places from OpenStreetMap, on the web and in the Android app over the sa
 
 **Aggregates only, and small groups folded.** No value names or follows an account, and the demo account is left out of all of them. A value grouped by country (Settings' country, or the countries an activity crosses) whose group stands for fewer than 5 accounts is added into that stat's `other` key before it's stored, so no stored number describes one person; it's the accounts behind a value that decide, not the value itself (`activities_by_country` folds by its accounts, not its activities). Source, locale and sign-in method aren't folded: their groups are few and fixed. A photo's files are shared by every copy of the Story it was sent in (§4.23), so photo bytes count each `image_key` once.
 
-**Read back.** `api` reports the newest day as one `holdmytrack_stat` gauge per key, for the dashboard (`docs/DEPLOY.md` §13); only `api` registers it, so the series isn't sent twice, and the keys are the catalogue's, folded, so the series stay a bounded set.
+**Read back two ways.** `api` reports the newest day as one `holdmytrack_stat` gauge per key, for the dashboard (`docs/DEPLOY.md` §13); only `api` registers it, so the series isn't sent twice, and the keys are the catalogue's, folded, so the series stay a bounded set. Anything older, such as a month of `active_30d` for cost per active user, is read with the `stats` subcommand (`docs/DEVELOPMENT.md`), which prints a day's values or a key's series as a table.
 
 ## 5. Engineering Risks & Mitigations
 
