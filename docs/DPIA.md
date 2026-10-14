@@ -4,7 +4,7 @@ Last updated: 2026-10-13.
 
 ## Summary
 
-HoldMyTrack can launch publicly once the five pre-launch actions in section 7 are done. No risk stays high after the measures in place, so prior consultation with a supervisory authority (GDPR Art. 36) is not needed. Four risks stay medium, from three gaps: no expiry for original uploads or dormant accounts, no EU-region hosting, and processor agreements not yet on file.
+HoldMyTrack can launch publicly once the five pre-launch actions in section 7 are done. No risk stays high after the measures in place, so prior consultation with a supervisory authority (GDPR Art. 36) is not needed. Four risks stay medium: two from gaps still to close, no EU-region hosting and processor agreements not yet on file, and two by decision, since original uploads and dormant accounts' data are kept until the user deletes them.
 
 **Status:** draft for the controller's review. It was written from the product's own documents and its published privacy policy (`/privacy`, last updated 12 October 2026), not from an audit of the running system.
 
@@ -98,7 +98,7 @@ No Article 9 special-category data is processed. Heart rate and other body data 
 - **Logs leave the server scrubbed.** Tracks, places, names, emails and IP addresses are removed first.
 - **No analytics, advertising or tracking pixels.**
 
-**The one retention that goes beyond what the map needs** is the original, unclipped upload. It exists so that tracks can be rebuilt after an edit or a Private location change. That is a real user benefit, but it means points inside Private locations stay stored, which is the main risk in section 5. A retention limit is planned (`docs/ROADMAP.md` Phase 5).
+**The one retention that goes beyond what the map needs** is the original, unclipped upload. It exists so that tracks can be rebuilt after an edit or a Private location change. That is a real user benefit, but it means points inside Private locations stay stored, which is the main risk in section 5. How long they are kept is to be reviewed soon after the public launch (`docs/ROADMAP.md`, "Ongoing").
 
 ## 4. Data subjects' rights
 
@@ -136,19 +136,19 @@ The ratings follow the ICO template. **Likelihood** is remote, possible or proba
 
 ## 6. Measures and residual risk
 
-After the measures already in place, R1 and R3–R6 drop to low. R2, R7, R8 and R9 stay medium until the actions in section 7 are done.
+After the measures already in place, R1 and R3–R6 drop to low. R7 and R8 stay medium until the actions in section 7 are done. R2 and R9 stay medium by decision: HoldMyTrack keeps what a user brings until they delete it, with no dormancy policy, and keeps original uploads so that tracks can be rebuilt (section 3).
 
 | # | Measures in place | Still missing | Residual |
 | --- | --- | --- | --- |
 | R1 | Private locations applied at ingest, before tracks or tiles are stored (ADR-0002). TLS everywhere through Caddy. Separate R2 token for backups, with no access to the app bucket. No public profiles, so there is nothing to scrape. | Confirmation that the VPS disk, database and both R2 buckets are encrypted at rest, and who holds server access | Low |
-| R2 | Originals sit in a private R2 bucket, never publicly addressable. Exports and Story copies are built from clipped tracks, never from originals. | An expiry for originals (`docs/ROADMAP.md` Phase 5); a check that the bucket has no public access | Medium |
+| R2 | Originals sit in a private R2 bucket, never publicly addressable. Exports and Story copies are built from clipped tracks, never from originals. | A decision on how long originals are kept, after launch (`docs/ROADMAP.md`, "Ongoing"); a check that the bucket has no public access | Medium |
 | R3 | The tile and API endpoints take the user from the session, never from a parameter. Server tests check handlers against the API contract. | A test that asserts one account cannot read another's activities, tiles or photos, if one does not exist | Low |
 | R4 | bcrypt password hashes. HttpOnly, SameSite=Lax session cookie for up to 30 days. Sign-in rate limits. Email verification. Google and Facebook sign-in. | Optional second factor; not needed for launch | Low |
 | R5 | The admin panel shows activity lists, never tracks. Admin rights can be set only from the server's own command line. | An audit log, needed once an admin can see or change a track | Low |
 | R6 | Exports leave out Private locations and draw only clipped tracks. A Story copy needs the recipient to accept it and carries the sender's Private locations. The policy warns that a copy is the recipient's. | — | Low |
 | R7 | Transfers rely on the processors' Standard Contractual Clauses or EU–US Data Privacy Framework certification, stated in the privacy policy. | EU-region hosting for EU users (`docs/ROADMAP.md` Phase 6), or a transfer impact assessment that justifies staying in the US | Medium |
 | R8 | Processors are named in the privacy policy. Logs are scrubbed of tracks, places, names, emails and IP addresses before they reach Grafana. | Signed or accepted DPAs with DigitalOcean, Cloudflare and Grafana Labs on file; the email provider chosen, named and under a DPA | Medium |
-| R9 | Deletion is complete within minutes and reaches backups within 8 weeks. Download archives expire after 7 days. Grafana logs expire after 14 days. | A dormancy policy for inactive accounts (`docs/ROADMAP.md` Phase 5) | Medium |
+| R9 | Deletion is complete within minutes and reaches backups within 8 weeks. Download archives expire after 7 days. Grafana logs expire after 14 days. | — (no dormancy policy: an account's data is kept until its owner deletes it, `VISION.md` §4.3) | Medium |
 
 No residual risk is high, so prior consultation with a supervisory authority (Art. 36) is not required.
 
@@ -166,7 +166,7 @@ Five actions gate the public launch; the rest can follow it.
 
 **Soon after:**
 
-- [ ] Set an expiry for original uploads and a dormancy policy for inactive accounts (R2, R9; `docs/ROADMAP.md` Phase 5).
+- [ ] Review how long original uploads are kept (R2; `docs/ROADMAP.md`, "Ongoing").
 - [ ] Add or confirm a test that one account cannot read another's activities, tiles or photos (R3).
 - [ ] Re-check that the cookies and browser storage the site sets still match the Cookies list on `/privacy`.
 - [ ] Align `VISION.md` §7 with the privacy policy's lawful basis (section 3).

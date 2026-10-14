@@ -262,7 +262,7 @@ var errFewPointsAfterEdit = errors.New("fewer than 2 points survive the edit")
 
 // reprocessActivity re-derives one activity from its raw payload: parse, clip against the
 // account's current Private locations, apply a track edit, then update metrics, trajectory,
-// streams, masks and regions, and mark every tile it touched before or after dirty. A piece of
+// masks and regions, and mark every tile it touched before or after dirty. A piece of
 // a split (§4.7.8) is narrowed to its range before the edit is applied. It neither
 // renders those tiles nor clears edit_pending — its callers decide when (§4.7.7's edit_track
 // does both straight away; a `reprivacy` job once for the whole batch).
@@ -381,19 +381,6 @@ func reprocessActivity(ctx context.Context, pool *pgxpool.Pool, store *storage.S
 		recStart, recEnd,
 	); err != nil {
 		return fmt.Errorf("update activity: %w", err)
-	}
-	if points == nil {
-		if _, err := tx.Exec(ctx, `DELETE FROM activity_streams WHERE activity_id = $1`, activityID); err != nil {
-			return fmt.Errorf("delete streams: %w", err)
-		}
-	} else if _, err := tx.Exec(ctx, `
-		INSERT INTO activity_streams (activity_id, point_count, elapsed_s, elevation_m, dist_m)
-		VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (activity_id) DO UPDATE SET
-			point_count = EXCLUDED.point_count, elapsed_s = EXCLUDED.elapsed_s,
-			elevation_m = EXCLUDED.elevation_m, dist_m = EXCLUDED.dist_m
-	`, activityID, len(points), pp.elapsedS, pp.elevM, pp.distM); err != nil {
-		return fmt.Errorf("update streams: %w", err)
 	}
 	// Country/Region matches are insert-only (geo.MatchActivity), so a reprocess that removed
 	// the only part of a track inside some region has to clear the old matches first.

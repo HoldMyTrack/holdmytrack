@@ -65,12 +65,10 @@ Connecting the app to third-party services.
 
 An engineering requirement, can land alongside any of the above (`IMPLEMENTATION.md` §5.7).
 
-- [ ] Retention/dormancy policy: tier `activity_streams` to cold storage or drop it after N months of inactivity (`users.last_seen_at`), keeping summaries and fog rasters so the map still renders; warn by email first; recoverable by re-upload. Activity photos (`photos/{userID}/`, ADR-0024) are the other per-user line that only grows; decide whether a dormant account keeps them, keeps the thumbnails only, or loses them after the warning.
-- [ ] Raw payload expiry schedule (object storage) — note this caps how far back a `reprivacy` job (a Private location change) can reach; document the tradeoff wherever it's implemented.
 - [ ] Per-user quotas (activity count, total points) — bounds one pathological account's cost.
 - [ ] Rate limits on upload, export, and tile requests (the auth endpoints already have `fixedWindowLimiter` — reuse it), plus a CDN/object-store spend cap.
 - [ ] Conditional reads for `GET /v1/spots/captures` — the web map reads the whole list again on every window focus and tab return (`SPEC.md` FR-15.2), so an `ETag` built from the account's capture count and latest `captured_at`, answered with `304 Not Modified` when it matches `If-None-Match`, keeps the repeat reads bodyless; the Android app's reads get the same for free. Preferred over a `?since=` cursor, which only sees new rows and misses a capture that cascades away with its spot.
-- [ ] Cost-per-active-user measurement from day one — with monthly donations and the share of active users who give, the numbers Milestone 2's exit gate and the Milestone 3 decision are made from (`VISION.md` §5, §6).
+- [ ] Cost-per-active-user measurement from day one — with monthly donations and the share of active users who give, the numbers Milestone 2's exit gate and the Milestone 3 decision are made from (`VISION.md` §5, §6). An active user is one whose `users.last_seen_at` falls in the period (`IMPLEMENTATION.md` §5.7).
 
 ---
 
@@ -101,5 +99,6 @@ Public pages, followers and the rest (`VISION.md` §5.7, §5.8). No steps are li
 - [ ] Check the Russian translation — run the Android app in Russian on a real device, and have a native speaker review the Russian across the web, the server's pages and emails, and the app (`IMPLEMENTATION.md` §4.21).
 - [ ] Split `apps/web/src/map/MapView.tsx` by feature when the next feature touches it, the part that feature needs first: its state rules — Story mode, the Pending poll, track editing, selection and focus — into a reducer or a few custom hooks, under `verify:map` and the unit tests.
 - [ ] Split the Android app's `MapFragment.kt` by feature when the next feature touches it, the part that feature needs first: the session and first-run check, Story mode, View on map, the notice panel, camera framing, photo markers — pure logic out first, with unit tests as `panel/PanelState` has, the UI wiring last.
+- [ ] Review how long original uploads are kept, soon after the public launch, once real accounts show what they cost: today they're kept until the activity is deleted. They're the most sensitive thing held (`DPIA.md` R2) and likely the largest per-activity storage line, and an expired one can no longer be re-clipped after a Private location change, rebuilt by a track edit, or exported as the original (`IMPLEMENTATION.md` §5.7).
 - [ ] Re-measure the funding-model assumptions (`VISION.md` §4.3, §6.3) against real usage once any real users exist, rather than assuming the estimates hold — they feed Milestone 2's exit gate.
 - [ ] The iOS app (`VISION.md` §5.3), likely after the public launch, with no date set: first confirm `HKWorkoutRoute` access with a throwaway app (`VISION.md` §4.1); then HealthKit sync, with `HKWorkoutRoute` for full GPS geometry, on the payload and the pick-what-to-send design Android settled (`SPEC.md` FR-3.6), and the site's own pages in a `WKWebView` for Settings, Profile, the Sync page and About (ADR-0042); then in-app GPS recording, on the Android build's wire shape and `source` convention (`SPEC.md` FR-3.8, ADR-0007).

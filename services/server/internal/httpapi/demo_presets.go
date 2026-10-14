@@ -468,7 +468,7 @@ func seedDemoStories(ctx context.Context, pool *pgxpool.Pool, userID string, sto
 
 // resetDemoCustomer deletes every activity the demo account has, with everything derived from
 // them, so the seed that follows starts from nothing. The DB side cascades from activities
-// (streams, tile masks, country/region matches, photos); fog_tiles is per user, not per activity, so
+// (tile masks, country/region matches, photos); fog_tiles is per user, not per activity, so
 // it's deleted explicitly — ingest recreates each row a new activity touches, and a row left
 // behind would keep a tile only the old history reached. Object storage has no foreign keys,
 // so its prefixes are swept first, logging a failure and carrying on.
