@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"testing"
 	"time"
 )
@@ -83,5 +84,57 @@ func TestSpotCaptures(t *testing.T) {
 	var left int
 	if err := d.pool.QueryRow(ctx, `SELECT count(*) FROM spot_captures WHERE spot_id = $1`, id).Scan(&left); err != nil || left != 0 {
 		t.Errorf("captures after the account is deleted: %d (%v), want 0", left, err)
+	}
+}
+
+func TestCapturesSince(t *testing.T) {
+	if got, err := capturesSince(""); got != nil || err != nil {
+		t.Errorf("absent: %v, %v; want the whole list", got, err)
+	}
+	got, err := capturesSince("2026-10-14T09:30:05.123456Z")
+	if err != nil || !got.Equal(time.Date(2026, 10, 14, 9, 30, 5, 123456000, time.UTC)) {
+		t.Errorf("a time: %v, %v", got, err)
+	}
+	if _, err := capturesSince("yesterday"); err == nil {
+		t.Error("not a time: accepted")
+	}
+}
+
+// With since, only the captures at or after it come back: the newest one the client already
+// has, and anything newer.
+func TestSpotCapturesSince(t *testing.T) {
+	d := newDBTest(t)
+	ctx := context.Background()
+	me := d.newAccount(false)
+	base := time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)
+	var ids []int64
+	for i := range 3 {
+		var id int64
+		if err := d.pool.QueryRow(ctx, `
+			INSERT INTO spots (category, name, geom, osm_type, osm_id)
+			VALUES ('viewpoint', 'Test View', ST_Multi(ST_Buffer(ST_SetSRID(ST_MakePoint(-41.5, -41.5), 4326)::geography, 30)::geometry), 'node', $1)
+			RETURNING id`, time.Now().UnixNano()+int64(i)).Scan(&id); err != nil {
+			t.Fatalf("create spot: %v", err)
+		}
+		t.Cleanup(func() { d.pool.Exec(context.Background(), `DELETE FROM spots WHERE id = $1`, id) })
+		if _, err := d.pool.Exec(ctx, `INSERT INTO spot_captures (user_id, spot_id, captured_at) VALUES ($1, $2, $3)`,
+			me.id, id, base.Add(time.Duration(i)*time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, id)
+	}
+
+	var all, newer spotCapturesResponse
+	d.decode(d.do(me, "GET", "/v1/spots/captures", nil), http.StatusOK, &all)
+	if len(all.Captures) != 3 || all.Captures[0].SpotID != ids[2] {
+		t.Fatalf("whole list: %+v", all.Captures)
+	}
+	since := url.QueryEscape(base.Add(time.Hour).Format(time.RFC3339Nano))
+	d.decode(d.do(me, "GET", "/v1/spots/captures?since="+since, nil), http.StatusOK, &newer)
+	if len(newer.Captures) != 2 || newer.Captures[0].SpotID != ids[2] || newer.Captures[1].SpotID != ids[1] {
+		t.Fatalf("since the second: %+v, want the second and third", newer.Captures)
+	}
+	if rec := d.do(me, "GET", "/v1/spots/captures?since=yesterday", nil); rec.Code != http.StatusBadRequest {
+		t.Errorf("a since that isn't a time: status %d, want 400", rec.Code)
 	}
 }

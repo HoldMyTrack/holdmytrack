@@ -64,6 +64,8 @@ import dev.holdmytrack.android.map.PhotoPopup
 import dev.holdmytrack.android.map.ShowInArea
 import dev.holdmytrack.android.map.SpotPopup
 import dev.holdmytrack.android.map.ZoomLevelNotice
+import dev.holdmytrack.android.map.capturesSince
+import dev.holdmytrack.android.map.mergeCaptures
 import dev.holdmytrack.android.net.Activity
 import dev.holdmytrack.android.net.Photo
 import dev.holdmytrack.android.net.ApiException
@@ -1016,7 +1018,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             // Last, so the places are over everything else, labels included.
             MapSpots.attach(loaded, requireContext(), shownSpots(MapSpots.get(requireContext())))
             overlaysAttached = true
-            loadSpotCaptures()
+            loadSpotCaptures(onlyNew = false)
             captureMode.onStyleAttached()
             renderTrackMetrics()
             // A new style has none of the circles; draw them again if the editor has the map.
@@ -1031,11 +1033,15 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /** The account's captured spots (`docs/SPEC.md` FR-15.6), for the badges and the popup —
-     *  when the overlays attach and on every return to the app. Kept as they were on a failure. */
-    private fun loadSpotCaptures() {
-        HoldMyTrackApi.spotCaptures { result ->
-            val captures = result.getOrNull() ?: return@spotCaptures
-            MapSpots.setCaptured(style?.takeIf { overlaysAttached }, captures.associate { it.spotId to it.capturedAt })
+     *  all of them when the overlays attach, and on every return to the app only what's new
+     *  since the newest the map has ([capturesSince]), usually nothing. Kept as they were on a
+     *  failure. */
+    private fun loadSpotCaptures(onlyNew: Boolean) {
+        val since = if (onlyNew) capturesSince(MapSpots.captured) else null
+        HoldMyTrackApi.spotCaptures(since) { result ->
+            val fresh = result.getOrNull()?.associate { it.spotId to it.capturedAt } ?: return@spotCaptures
+            val captures = if (since != null) mergeCaptures(MapSpots.captured, fresh) else fresh
+            MapSpots.setCaptured(style?.takeIf { overlaysAttached }, captures)
             spotPopup.renderCaptured()
         }
     }
@@ -2226,7 +2232,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         daysStale = true
         syncSession()
         if (overlaysAttached) {
-            loadSpotCaptures()
+            loadSpotCaptures(onlyNew = true)
             // Back from elsewhere (the web, Sync): new tiles if the version moved, and the notice
             // if the account's coverage is still being worked on.
             checkTileVersion()

@@ -1029,9 +1029,12 @@ object HoldMyTrackApi {
         }, onResult)
     }
 
-    /** `GET /v1/spots/captures` — every place the account has captured, newest first. */
-    fun spotCaptures(onResult: (Result<List<SpotCapture>>) -> Unit) {
-        call(Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/spots/captures").build(), { text ->
+    /** `GET /v1/spots/captures` — every place the account has captured, newest first; with
+     *  [since], only those captured at or after it. */
+    fun spotCaptures(since: Instant?, onResult: (Result<List<SpotCapture>>) -> Unit) {
+        val url = (BuildConfig.API_BASE_URL + API_V1 + "/spots/captures").toHttpUrl().newBuilder()
+        if (since != null) url.addQueryParameter("since", since.toString())
+        call(Request.Builder().url(url.build()).build(), { text ->
             val rows = JSONObject(text).optJSONArray("captures") ?: JSONArray()
             List(rows.length()) { parseSpotCapture(rows.getJSONObject(it)) }
         }, onResult)

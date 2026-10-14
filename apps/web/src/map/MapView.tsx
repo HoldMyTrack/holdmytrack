@@ -14,6 +14,7 @@ import { loadOverlays, saveOverlays, type Overlays } from './overlays';
 import { raisePathLayers } from './paths';
 import { usePhotoMarkers, type PhotoMarkerItem, type PhotoMarkerOverlay } from './photos';
 import { setSatelliteVisible } from './satellite';
+import { capturesSince, mergeSpotCaptures } from './spotCaptures';
 import { ensureSpotsLayer, setSpotClickHandler, setSpotsCaptured, setSpotsVisible, type Spot, type SpotCategory } from './spots';
 import { labelInsertionPoint } from './layers';
 import { buildStyle, isDarkBase, type Flavor } from './style';
@@ -820,14 +821,24 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   }, []);
   // Captures are made on the phone, so they're read again whenever the page comes back into view
   // or the window gets focus back — a browser left open on a desktop stays visible throughout.
+  // The page's first read takes the whole list; each later one only what's new since the newest
+  // the map has (spotCaptures.ts), usually nothing.
   useEffect(() => {
     let controller: AbortController | null = null;
+    let known: readonly SpotCapture[] | null = null;
     const load = () => {
       controller?.abort();
       controller = new AbortController();
-      getSpotCaptures(controller.signal).then(setSpotCaptures, () => {
-        // Not loaded (offline, or aborted): the badges stay as they were.
-      });
+      const since = known ? capturesSince(known) : undefined;
+      getSpotCaptures(controller.signal, since).then(
+        (fresh) => {
+          known = known ? mergeSpotCaptures(known, fresh) : fresh;
+          setSpotCaptures(known);
+        },
+        () => {
+          // Not loaded (offline, or aborted): the badges stay as they were.
+        },
+      );
     };
     const onVisible = () => {
       if (document.visibilityState === 'visible') load();
