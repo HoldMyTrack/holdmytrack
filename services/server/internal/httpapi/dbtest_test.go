@@ -166,23 +166,30 @@ func (d *dbTest) newActivity(owner account, a testActivity) string {
 // it isn't nil.
 func (d *dbTest) do(as account, method, path string, body any) *httptest.ResponseRecorder {
 	d.t.Helper()
-	var b []byte
-	if body != nil {
-		var err error
-		if b, err = json.Marshal(body); err != nil {
-			d.t.Fatalf("encode body: %v", err)
-		}
+	if body == nil {
+		return d.send(as, method, path, "", nil)
 	}
-	req := httptest.NewRequest(method, path, bytes.NewReader(b))
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
+	b, err := json.Marshal(body)
+	if err != nil {
+		d.t.Fatalf("encode body: %v", err)
+	}
+	return d.send(as, method, path, "application/json", b)
+}
+
+// send is do for a body that isn't JSON, such as a multipart upload: body is sent as it is,
+// with contentType, and the exchange is checked against the contract the same way.
+func (d *dbTest) send(as account, method, path, contentType string, body []byte) *httptest.ResponseRecorder {
+	d.t.Helper()
+	req := httptest.NewRequest(method, path, bytes.NewReader(body))
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
 	}
 	if as.session != "" {
 		req.Header.Set("Authorization", bearerPrefix+as.session)
 	}
 	rec := httptest.NewRecorder()
 	d.srv.ServeHTTP(rec, req)
-	checkContract(d.t, req, b, rec)
+	checkContract(d.t, req, body, rec)
 	return rec
 }
 

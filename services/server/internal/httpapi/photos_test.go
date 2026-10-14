@@ -48,12 +48,7 @@ func (d *dbTest) uploadPhoto(as account, file, thumb []byte, fields map[string]s
 		part.Write(data)
 	}
 	mw.Close()
-	req := httptest.NewRequest("POST", "/v1/photos", &body)
-	req.Header.Set("Content-Type", mw.FormDataContentType())
-	req.Header.Set("Authorization", bearerPrefix+as.session)
-	rec := httptest.NewRecorder()
-	d.srv.ServeHTTP(rec, req)
-	return rec
+	return d.send(as, "POST", "/v1/photos", mw.FormDataContentType(), body.Bytes())
 }
 
 func near(a *float64, b float64) bool { return a != nil && math.Abs(*a-b) < 1e-6 }

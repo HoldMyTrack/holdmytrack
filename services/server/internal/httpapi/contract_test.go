@@ -18,9 +18,9 @@ import (
 )
 
 // The API contract, api/openapi.yaml, is enforced here rather than by generating handlers from
-// it: dbTest.do checks every exchange a test makes on a path the file describes, so a handler
-// whose real JSON stops matching the contract fails its own tests. A path the file doesn't
-// describe yet goes unchecked.
+// it: dbTest.do and dbTest.send check every exchange a test makes on a path the file describes,
+// so a handler whose real JSON stops matching the contract fails its own tests. A path the file
+// doesn't describe yet goes unchecked.
 
 const contractPath = "../../api/openapi.yaml"
 

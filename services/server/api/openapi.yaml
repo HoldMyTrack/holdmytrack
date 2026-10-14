@@ -15,22 +15,10 @@ paths:
     get:
       summary: The signed-in account's activities, newest first, unpaginated
       parameters:
-        - name: from
-          in: query
-          description: Local start date, inclusive.
-          schema: { type: string, format: date }
-        - name: to
-          in: query
-          description: Local start date, inclusive.
-          schema: { type: string, format: date }
-        - name: types
-          in: query
-          description: Comma-separated activity types.
-          schema: { type: string }
-        - name: story
-          in: query
-          description: One Story's activities only.
-          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/FilterFrom"
+        - $ref: "#/components/parameters/FilterTo"
+        - $ref: "#/components/parameters/FilterTypes"
+        - $ref: "#/components/parameters/FilterStory"
       responses:
         "200":
           description: The activities
@@ -47,6 +35,445 @@ paths:
         "400": { $ref: "#/components/responses/PlainError" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/NotVerified" }
+  /activities/upload:
+    post:
+      summary: Upload one activity file; parsing happens in a job
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: A .gpx, .tcx or .fit file; the extension decides.
+      responses:
+        "200":
+          description: This exact file was imported already
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UploadResult" }
+        "202":
+          description: Queued for import; GET /activities/status/{external_id} says how it went
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UploadResult" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/OverLimit" }
+        "413": { $ref: "#/components/responses/PlainError" }
+        "415": { $ref: "#/components/responses/PlainError" }
+        "429": { $ref: "#/components/responses/PlainError" }
+        "503": { $ref: "#/components/responses/DailyCapacity" }
+  /activities/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ActivityID"
+    patch:
+      summary: Change an activity's type, name and description (a full replace)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [activity_type]
+              properties:
+                activity_type:
+                  type: string
+                  description: Trimmed; blank or longer than 50 bytes is a 400.
+                name:
+                  type: string
+                  description: Trimmed; missing or empty clears it. Longer than 200 bytes is a 400.
+                description:
+                  type: string
+                  description: Trimmed; missing or empty clears it. Longer than 2000 bytes is a 400.
+      responses:
+        "200":
+          description: The activity as saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ActivityRow" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/PlainError" }
+    delete:
+      summary: Delete an activity, its photos and its stored file
+      responses:
+        "204":
+          description: Deleted
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/PlainError" }
+  /activities/overlaps:
+    post:
+      summary: Which of these time spans the account already has an activity overlapping
+      description: Lets a client leave out what it would import twice before sending it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                spans:
+                  type: array
+                  nullable: true
+                  maxItems: 5000
+                  items:
+                    type: object
+                    required: [key]
+                    properties:
+                      key:
+                        type: string
+                        minLength: 1
+                        maxLength: 256
+                        description: The client's own name for the span, echoed back on an overlap.
+                      start: { type: string, format: date-time }
+                      end: { type: string, format: date-time }
+      responses:
+        "200":
+          description: The overlaps
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [overlaps]
+                additionalProperties: false
+                properties:
+                  overlaps:
+                    type: array
+                    items:
+                      type: object
+                      required: [key, activity_id, name, activity_type, started_at, timezone]
+                      additionalProperties: false
+                      properties:
+                        key: { type: string }
+                        activity_id: { type: string, format: uuid }
+                        name: { type: string }
+                        activity_type: { type: string }
+                        started_at: { type: string, format: date-time }
+                        timezone: { type: string, nullable: true }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+  /activities/summary:
+    get:
+      summary: Totals over the activities the filter selects
+      parameters:
+        - $ref: "#/components/parameters/FilterFrom"
+        - $ref: "#/components/parameters/FilterTo"
+        - $ref: "#/components/parameters/FilterTypes"
+        - $ref: "#/components/parameters/FilterStory"
+      responses:
+        "200":
+          description: The totals
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count, distance_meters, duration_seconds, elevation_gain_m]
+                additionalProperties: false
+                properties:
+                  count: { type: integer }
+                  distance_meters: { type: number }
+                  duration_seconds: { type: integer }
+                  elevation_gain_m: { type: number }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+  /activities/histogram:
+    get:
+      summary: Per-day totals, by a page of activity days or by a calendar window
+      description: >-
+        With days, the most recent days that have an activity (before `before`, when given);
+        otherwise every day with one in from–to, which default to the 12 months up to today.
+        Buckets are in ascending date order either way. No type filter; story narrows it to one Story.
+      parameters:
+        - name: days
+          in: query
+          description: Activity-day mode, at most this many days (capped by the server).
+          schema: { type: integer, minimum: 1 }
+        - name: before
+          in: query
+          description: Activity-day mode, only days strictly before this local date.
+          schema: { type: string, format: date }
+        - $ref: "#/components/parameters/FilterFrom"
+        - $ref: "#/components/parameters/FilterTo"
+        - $ref: "#/components/parameters/FilterStory"
+      responses:
+        "200":
+          description: The buckets
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [bucket, from, to, buckets]
+                additionalProperties: false
+                properties:
+                  bucket: { type: string, enum: [day] }
+                  from:
+                    type: string
+                    description: The window, inclusive; in activity-day mode the first returned day, empty when none was.
+                  to:
+                    type: string
+                    description: The window, inclusive; in activity-day mode the last returned day, empty when none was.
+                  buckets:
+                    type: array
+                    items:
+                      type: object
+                      required: [date, count, distance_meters]
+                      additionalProperties: false
+                      properties:
+                        date: { type: string, format: date }
+                        count: { type: integer }
+                        distance_meters: { type: number }
+                  earliest:
+                    type: string
+                    format: date
+                    description: The local day of the first activity at all (in the Story, with story); missing when there is none.
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+  /activities/graph-stats:
+    get:
+      summary: The activity graph's cards, for one year and for all time
+      parameters:
+        - name: year
+          in: query
+          description: Defaults to the current year in the account's zone.
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: The statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [year, year_stats, all_time]
+                additionalProperties: false
+                properties:
+                  year: { type: integer }
+                  year_stats: { $ref: "#/components/schemas/ActivityStatsBlock" }
+                  all_time: { $ref: "#/components/schemas/ActivityStatsBlock" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+  /activities/trends:
+    get:
+      summary: Totals per week or month, every period in the window included
+      parameters:
+        - name: bucket
+          in: query
+          schema: { type: string, enum: [week, month], default: week }
+        - name: from
+          in: query
+          description: Local date, inclusive; defaults to 12 months before to.
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          description: Local date, inclusive; defaults to today.
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: The periods, oldest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [bucket, from, to, periods]
+                additionalProperties: false
+                properties:
+                  bucket: { type: string, enum: [week, month] }
+                  from: { type: string, format: date }
+                  to: { type: string, format: date }
+                  periods:
+                    type: array
+                    items:
+                      type: object
+                      required: [period_start, count, distance_meters, moving_seconds, elevation_gain_m]
+                      additionalProperties: false
+                      properties:
+                        period_start: { type: string, format: date }
+                        count: { type: integer }
+                        distance_meters: { type: number }
+                        moving_seconds: { type: integer }
+                        elevation_gain_m: { type: number }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+  /activities/status/{external_id}:
+    parameters:
+      - name: external_id
+        in: path
+        required: true
+        description: What the upload answered with.
+        schema: { type: string }
+    get:
+      summary: How the caller's latest import of this file went
+      responses:
+        "200":
+          description: Its state
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                additionalProperties: false
+                properties:
+                  status:
+                    type: string
+                    description: processing, done, failed, or unknown when the caller never uploaded it.
+                  error:
+                    type: string
+                    description: Why it failed, in the request's language; only with failed.
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+  /activities/track-metrics/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ActivityID"
+    get:
+      summary: The stored track's points with their speed, for the speed chart
+      responses:
+        "200":
+          description: The points, in order
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [activity_id, points]
+                additionalProperties: false
+                properties:
+                  activity_id: { type: string, format: uuid }
+                  points:
+                    type: array
+                    items:
+                      type: object
+                      required: [lon, lat, speed_mps, time_s]
+                      additionalProperties: false
+                      properties:
+                        lon: { type: number }
+                        lat: { type: number }
+                        speed_mps: { type: number }
+                        time_s:
+                          type: integer
+                          description: Unix seconds.
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+        "404": { $ref: "#/components/responses/PlainError" }
+  /activities/track-points/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ActivityID"
+    get:
+      summary: Every point the activity was processed from, clipped by Private locations, and the user's edit of them
+      responses:
+        "200":
+          description: The points and the edit
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [points, edit]
+                additionalProperties: false
+                properties:
+                  points:
+                    type: array
+                    description: "[lon, lat, t], t in unix milliseconds."
+                    items:
+                      type: array
+                      minItems: 3
+                      maxItems: 3
+                      items: { type: number }
+                  edit:
+                    allOf:
+                      - { $ref: "#/components/schemas/TrackEdit" }
+                    nullable: true
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+        "404": { $ref: "#/components/responses/PlainError" }
+        "409": { $ref: "#/components/responses/PlainError" }
+        "429": { $ref: "#/components/responses/PlainError" }
+        "503": { $ref: "#/components/responses/DailyCapacity" }
+  /activities/track-edit/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ActivityID"
+    post:
+      summary: Replace the activity's track edit, optionally splitting it; reprocessed in a job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                edit:
+                  description: The complete new edit, not a delta; null or empty resets to the original track.
+                  allOf:
+                    - { $ref: "#/components/schemas/TrackEdit" }
+                  nullable: true
+                split_at:
+                  type: integer
+                  nullable: true
+                  description: Also split the activity at this point (unix milliseconds).
+                allow_hidden:
+                  type: boolean
+                  description: Go ahead with a split that leaves a piece entirely inside Private locations.
+      responses:
+        "202":
+          description: Queued; the activity reads pending until it's done
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/PlainError" }
+        "409": { $ref: "#/components/responses/PlainError" }
+        "422":
+          description: The split would leave a piece with no track; resend with allow_hidden once the user agrees
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error, message]
+                additionalProperties: false
+                properties:
+                  error: { type: string, enum: [split_hides_part] }
+                  message: { type: string }
+  /activities/track-merge:
+    post:
+      summary: Join adjacent pieces of one split back into one activity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  nullable: true
+                  maxItems: 100
+                  items: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The activity they became, which reads pending until its track is rebuilt, and the ids now gone
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, removed]
+                additionalProperties: false
+                properties:
+                  id: { type: string, format: uuid }
+                  removed:
+                    type: array
+                    items: { type: string, format: uuid }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/PlainError" }
   /private-locations:
     get:
       summary: The signed-in account's Private locations, oldest first
@@ -302,11 +729,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/PlainError" }
-        "409":
-          description: The account is at its activity or storage limit; the copy stays waiting
-          content:
-            text/plain:
-              schema: { type: string }
+        "409": { $ref: "#/components/responses/OverLimit" }
         "503": { $ref: "#/components/responses/DailyCapacity" }
   /story-sends/{id}:
     parameters:
@@ -321,6 +744,32 @@ paths:
         "404": { $ref: "#/components/responses/PlainError" }
 components:
   parameters:
+    FilterFrom:
+      name: from
+      in: query
+      description: Local start date, inclusive.
+      schema: { type: string, format: date }
+    FilterTo:
+      name: to
+      in: query
+      description: Local start date, inclusive.
+      schema: { type: string, format: date }
+    FilterTypes:
+      name: types
+      in: query
+      description: Comma-separated activity types.
+      schema: { type: string }
+    FilterStory:
+      name: story
+      in: query
+      description: One Story's activities only.
+      schema: { type: string, format: uuid }
+    ActivityID:
+      name: id
+      in: path
+      required: true
+      # Not format: uuid — a malformed id is a 404 from the handler, not a request error.
+      schema: { type: string }
     StoryID:
       name: id
       in: path
@@ -359,6 +808,11 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/CodedError" }
+    OverLimit:
+      description: The account is at its activity or storage limit
+      content:
+        text/plain:
+          schema: { type: string }
     DailyCapacity:
       description: The service has reached its daily capacity; try again after Retry-After
       headers:
@@ -508,3 +962,53 @@ components:
                   distance_meters: { type: number }
                   moving_seconds: { type: integer }
                   elapsed_seconds: { type: integer }
+    UploadResult:
+      type: object
+      required: [status, external_id, filename]
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [enqueued, already_processed] }
+        external_id:
+          type: string
+          description: The file's SHA-256, what GET /activities/status/{external_id} takes.
+        filename: { type: string }
+    ActivityStatsBlock:
+      type: object
+      required: [count, distance_meters, active_days, longest_streak_days]
+      additionalProperties: false
+      properties:
+        count: { type: integer }
+        distance_meters: { type: number }
+        active_days: { type: integer }
+        longest_streak_days: { type: integer }
+    TrackEdit:
+      type: object
+      description: Points are addressed by their timestamp, in unix milliseconds.
+      additionalProperties: false
+      properties:
+        keep:
+          type: array
+          description: "[first, last]: only the points in this range are kept."
+          minItems: 2
+          maxItems: 2
+          items: { type: integer }
+        remove:
+          type: array
+          description: "[first, last] ranges of points removed."
+          items:
+            type: array
+            minItems: 2
+            maxItems: 2
+            items: { type: integer }
+        drop:
+          type: array
+          description: Single points removed.
+          items: { type: integer }
+        move:
+          type: object
+          description: Moved points, keyed by timestamp, to [lon, lat].
+          additionalProperties:
+            type: array
+            minItems: 2
+            maxItems: 2
+            items: { type: number }
