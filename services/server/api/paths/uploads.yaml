@@ -1,0 +1,89 @@
+uploads:
+  get:
+    summary: The account's import history, newest first, a page at a time
+    parameters:
+      - name: limit
+        in: query
+        description: Defaults to 5; anything over 50 is 50.
+        schema: { type: integer, minimum: 1 }
+      - name: offset
+        in: query
+        schema: { type: integer, minimum: 0 }
+      - name: source
+        in: query
+        description: Comma-separated sources (upload, takeout, healthconnect, healthkit, recorded); every source when missing.
+        schema: { type: string }
+    responses:
+      "200":
+        description: The page
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [total, processing, limit, offset, uploads]
+              additionalProperties: false
+              properties:
+                total:
+                  type: integer
+                  description: How many imports the source filter matches.
+                processing:
+                  type: integer
+                  description: How many imports are still running, whatever the source filter.
+                limit: { type: integer }
+                offset: { type: integer }
+                uploads:
+                  type: array
+                  items:
+                    type: object
+                    required: [filename, external_id, source, status, submitted_at]
+                    additionalProperties: false
+                    properties:
+                      filename: { type: string }
+                      external_id: { type: string }
+                      source: { type: string }
+                      status:
+                        type: string
+                        description: processing, done or failed.
+                      error:
+                        type: string
+                        description: Why it failed, in the request's language; only with failed.
+                      submitted_at: { type: string, format: date-time }
+                      finished_at: { type: string, format: date-time }
+                      started_at:
+                        type: string
+                        format: date-time
+                        description: The activity's start, once there is one, like timezone, distance_meters and activity_id.
+                      timezone: { type: string }
+                      distance_meters: { type: number }
+                      activity_id: { type: string, format: uuid }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/NotVerified" }
+uploads_active:
+  get:
+    summary: Imports still running, grouped by batch, and how many failures the account hasn't seen
+    responses:
+      "200":
+        description: The running imports
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [imports, unseen_failures]
+              additionalProperties: false
+              properties:
+                imports:
+                  type: array
+                  items:
+                    type: object
+                    required: [title, source, done, total, submitted_at]
+                    additionalProperties: false
+                    properties:
+                      title: { type: string }
+                      source: { type: string }
+                      done: { type: integer }
+                      total: { type: integer }
+                      submitted_at: { type: string, format: date-time }
+                unseen_failures: { type: integer }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/NotVerified" }

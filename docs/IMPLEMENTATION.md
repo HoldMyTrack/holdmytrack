@@ -220,7 +220,7 @@ flowchart LR
 
 #### 4.0.3 `POST /v1/sync/activities` — Path 2's batched sync endpoint
 
-`internal/httpapi/sync_activities.go`; the wire shape is `openapi.yaml`'s. A batch is not all-or-nothing: each activity gets its own result, so one bad entry doesn't abort the rest.
+`internal/httpapi/sync_activities.go`; the wire shape is `services/server/api/paths/sync.yaml`'s. A batch is not all-or-nothing: each activity gets its own result, so one bad entry doesn't abort the rest.
 
 **Validation guards what the worker can't recover from cleanly.** `activity_type`, `name` and `description` are held to the same bounds `handleUpdateActivity` (§4.7.4) enforces, which matters for §4.0.4, the one client that can send an arbitrary type: an over-long type would otherwise fail as a column-width error deep in the worker instead of a clean rejection. `external_id` is restricted to a safe pattern because it goes into the raw payload's object key and two `VARCHAR(255)` columns: a `/` or `..` would nest or escape the key.
 
@@ -945,16 +945,19 @@ Outdoor places from OpenStreetMap, on the web and in the Android app over the sa
 
 **Shown in the same zone.** Every activity, photo and upload-history row carries `timezone` for the clients to format with. The web passes a zone only when the browser's tz data knows it, so a zone newer than the browser shows the browser's time rather than throwing.
 
-### 4.31 The API contract (`services/server/api/openapi.yaml`)
+### 4.31 The API contract (`services/server/api/`)
 
-**One file states the JSON the server and its clients exchange, and the server's tests hold the server to it.** The web's `api.ts` and Android's `HoldMyTrackApi.kt` each parse responses by hand, so nothing else notices when a handler renames a field, drops one or starts sending `null` where a client expects an array. It describes every `/v1` route, and `TestContractCoversEveryRoute` keeps it that way: it reads every `route(method, path)` call in the package's source and fails on one the file lacks, or an operation no route registers, so a new endpoint can't go unchecked. A change to an endpoint's request or response changes the file in the same change.
+**One contract states the JSON the server and its clients exchange, and the server's tests hold the server to it.** The web's `api.ts` and Android's `HoldMyTrackApi.kt` each parse responses by hand, so nothing else notices when a handler renames a field, drops one or starts sending `null` where a client expects an array. It describes every `/v1` route, and `TestContractCoversEveryRoute` keeps it that way: it reads every `route(method, path)` call in the package's source and fails on one the contract lacks, or an operation no route registers, so a new endpoint can't go unchecked. A change to an endpoint's request or response changes the contract in the same change.
 
-**Enforced by tests, not by generating handlers from it.** Every exchange a database test makes is matched to the file (`contract_test.go`, kin-openapi), as is one a handler test makes through `serveChecked`, and a mismatch fails the test. That checks the bytes sent, which generated Go types can't: a nil slice encoded as `null`, an `omitempty` dropping a required field, a time in another format. It also leaves the handlers as they are. The cost is that only exchanges some test makes are checked. kin-openapi is imported only by test files, so it isn't in the server binary. Traps:
+**Split by area, with `openapi.yaml` as the index.** The root file lists every path, each a `$ref` into the file in `paths/` for its area (named after the handlers' own: `stories.yaml`, `photos.yaml`), and the shapes several areas share live in `components/`. As one file it runs past 2,000 lines, where a single endpoint is hard to find; split, each area's file is a few hundred lines and the index lists every endpoint on one screen.
+
+**Enforced by tests, not by generating handlers from it.** Every exchange a database test makes is matched to the contract (`contract_test.go`, kin-openapi), as is one a handler test makes through `serveChecked`, and a mismatch fails the test. That checks the bytes sent, which generated Go types can't: a nil slice encoded as `null`, an `omitempty` dropping a required field, a time in another format. It also leaves the handlers as they are. The cost is that only exchanges some test makes are checked. kin-openapi is imported only by test files, so it isn't in the server binary. Traps:
 - The request is checked only when the server accepted it: a test that sends a bad body to get its 400 isn't a contract violation.
 - The file has to describe what the Go decoder actually accepts, not what the clients happen to send. `encoding/json` takes a missing field, or `null`, as its zero value, so a field the handler doesn't insist on is optional in the file, and an optional array is `nullable` too.
 - `format: uuid` is the handlers' own pattern, any hex UUID, not kin-openapi's RFC 4122 one, which would refuse ids with other version bits.
-- The cross-origin guard's 403 (§4.19) answers before any operation and isn't in the file, so a test of it can't go through the check.
-- The file's `servers` entry is for readers; the router can't match a relative one, so the check cuts the `/v1` prefix itself. A path outside `/v1` (tiles, pages) is never checked.
+- A `$ref` is relative to the file it's written in: from a path file a shared shape is `../components/schemas.yaml#/Name`, inside `components/schemas.yaml` it's `#/Name`. The loader only follows one into another file when told to (`newContractLoader`).
+- The cross-origin guard's 403 (§4.19) answers before any operation and isn't in the contract, so a test of it can't go through the check.
+- `openapi.yaml`'s `servers` entry is for readers; the router can't match a relative one, so the check cuts the `/v1` prefix itself. A path outside `/v1` (tiles, pages) is never checked.
 
 ### 4.32 Service statistics
 

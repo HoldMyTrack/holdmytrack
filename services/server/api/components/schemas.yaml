@@ -1,0 +1,350 @@
+CodedError:
+  type: object
+  required: [error]
+  additionalProperties: false
+  properties:
+    error:
+      type: string
+      enum: [email_not_verified, demo_read_only]
+    message: { type: string }
+ActivityRow:
+  type: object
+  required: [id, started_at, timezone, activity_type, name, distance_meters, duration_seconds, description, bbox, pending, edited, private, split, stories]
+  additionalProperties: false
+  properties:
+    id: { type: string, format: uuid }
+    started_at: { type: string, format: date-time }
+    timezone:
+      type: string
+      description: The IANA zone it was recorded in; a client shows its times in it.
+    activity_type: { type: string }
+    name: { type: string, nullable: true }
+    distance_meters: { type: number, nullable: true }
+    duration_seconds: { type: integer, nullable: true }
+    description: { type: string, nullable: true }
+    bbox:
+      type: array
+      nullable: true
+      description: "[minLon, minLat, maxLon, maxLat], or null when the activity has no track."
+      minItems: 4
+      maxItems: 4
+      items: { type: number }
+    pending: { type: boolean }
+    edited: { type: boolean }
+    private: { type: boolean }
+    split:
+      type: object
+      nullable: true
+      required: [group, from, to]
+      additionalProperties: false
+      properties:
+        group: { type: string, format: uuid }
+        from: { type: integer, format: int64, nullable: true }
+        to: { type: integer, format: int64, nullable: true }
+    stories:
+      type: array
+      items:
+        type: object
+        required: [id, name]
+        additionalProperties: false
+        properties:
+          id: { type: string, format: uuid }
+          name: { type: string }
+PrivateLocationInput:
+  type: object
+  required: [lon, lat, radius_m]
+  properties:
+    name:
+      type: string
+      maxLength: 100
+      description: Missing or empty leaves the Private location unnamed.
+    lon: { type: number, minimum: -180, maximum: 180 }
+    lat: { type: number, minimum: -85, maximum: 85 }
+    radius_m: { type: integer, minimum: 50, maximum: 2000 }
+PrivateLocation:
+  type: object
+  required: [id, name, lon, lat, radius_m]
+  additionalProperties: false
+  properties:
+    id: { type: string, format: uuid }
+    name: { type: string }
+    lon: { type: number }
+    lat: { type: number }
+    radius_m: { type: integer }
+StoryInput:
+  type: object
+  required: [name]
+  properties:
+    name:
+      type: string
+      description: Trimmed; blank or longer than 200 characters is a 400.
+    description:
+      type: string
+      description: Trimmed; missing or empty leaves the Story without one. Longer than 2000 characters is a 400.
+ActivityIDs:
+  type: array
+  nullable: true
+  maxItems: 10000
+  description: Duplicates are ignored; missing or null adds none.
+  items: { type: string, format: uuid }
+StoryActivitiesInput:
+  type: object
+  required: [activity_ids]
+  properties:
+    activity_ids:
+      type: array
+      minItems: 1
+      maxItems: 10000
+      description: Duplicates are ignored.
+      items: { type: string, format: uuid }
+Story:
+  type: object
+  required: [id, name, description, created_at, updated_at, from, activity_ids, stats]
+  additionalProperties: false
+  properties:
+    id: { type: string, format: uuid }
+    name: { type: string }
+    description: { type: string, nullable: true }
+    created_at: { type: string, format: date-time }
+    updated_at: { type: string, format: date-time }
+    from:
+      type: string
+      nullable: true
+      description: Who sent the copy this Story came from, while the Story it was copied from still exists; null for the account's own.
+    activity_ids:
+      type: array
+      description: Every member, oldest activity first.
+      items: { type: string, format: uuid }
+    stats:
+      type: object
+      description: Joint statistics over every member, with no date bound.
+      required: [count, distance_meters, moving_seconds, elapsed_seconds, by_type]
+      additionalProperties: false
+      properties:
+        count: { type: integer }
+        distance_meters: { type: number }
+        moving_seconds: { type: integer }
+        elapsed_seconds: { type: integer }
+        by_type:
+          type: array
+          description: The same per activity type, most frequent first.
+          items:
+            type: object
+            required: [activity_type, count, distance_meters, moving_seconds, elapsed_seconds]
+            additionalProperties: false
+            properties:
+              activity_type: { type: string }
+              count: { type: integer }
+              distance_meters: { type: number }
+              moving_seconds: { type: integer }
+              elapsed_seconds: { type: integer }
+UploadResult:
+  type: object
+  required: [status, external_id, filename]
+  additionalProperties: false
+  properties:
+    status: { type: string, enum: [enqueued, already_processed] }
+    external_id:
+      type: string
+      description: The file's SHA-256, what GET /activities/status/{external_id} takes.
+    filename: { type: string }
+ActivityStatsBlock:
+  type: object
+  required: [count, distance_meters, active_days, longest_streak_days]
+  additionalProperties: false
+  properties:
+    count: { type: integer }
+    distance_meters: { type: number }
+    active_days: { type: integer }
+    longest_streak_days: { type: integer }
+TrackEdit:
+  type: object
+  description: Points are addressed by their timestamp, in unix milliseconds.
+  additionalProperties: false
+  properties:
+    keep:
+      type: array
+      description: "[first, last]: only the points in this range are kept."
+      minItems: 2
+      maxItems: 2
+      items: { type: integer }
+    remove:
+      type: array
+      description: "[first, last] ranges of points removed."
+      items:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items: { type: integer }
+    drop:
+      type: array
+      description: Single points removed.
+      items: { type: integer }
+    move:
+      type: object
+      description: Moved points, keyed by timestamp, to [lon, lat].
+      additionalProperties:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items: { type: number }
+Photo:
+  type: object
+  required: [id, activity_id, taken_at, route_at, timezone, lon, lat, caption, width, height, url, thumb_url]
+  additionalProperties: false
+  properties:
+    id: { type: string, format: uuid }
+    activity_id: { type: string, format: uuid }
+    taken_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the camera says it was taken; null when it didn't say.
+    route_at:
+      type: string
+      format: date-time
+      description: Its moment on the track, which places it there.
+    timezone:
+      type: string
+      description: The activity's IANA zone; a client shows the photo's times in it.
+    lon:
+      type: number
+      nullable: true
+      description: Its position on the track at route_at; null when the activity has no track.
+    lat: { type: number, nullable: true }
+    caption: { type: string, nullable: true }
+    width: { type: integer }
+    height: { type: integer }
+    url:
+      type: string
+      description: The image, a path under the API.
+    thumb_url: { type: string }
+PhotoNeedsPlace:
+  type: object
+  required: [error, message]
+  additionalProperties: false
+  properties:
+    error: { type: string, enum: [photo_needs_place] }
+    message: { type: string }
+Credentials:
+  type: object
+  properties:
+    email: { type: string }
+    password:
+      type: string
+      description: A password shorter than the minimum or longer than the maximum is a 400.
+    timezone:
+      type: string
+      description: The browser's IANA zone, for a new account; anything invalid falls back to UTC.
+Account:
+  type: object
+  required: [email, isDemo, email_verified, display_name, country, avatar_url, timezone, locale]
+  additionalProperties: false
+  properties:
+    email:
+      type: string
+      description: Empty for the demo.
+    isDemo: { type: boolean }
+    email_verified:
+      type: boolean
+      description: Always true for the demo.
+    display_name:
+      type: string
+      description: Empty when unset, like country and avatar_url.
+    country: { type: string }
+    avatar_url: { type: string }
+    timezone: { type: string }
+    locale:
+      type: string
+      description: Empty for automatic.
+AccountWithSession:
+  type: object
+  required: [session_token, email, isDemo, email_verified, display_name, country, avatar_url, timezone, locale]
+  additionalProperties: false
+  description: The Account, and the session's token.
+  properties:
+    session_token:
+      type: string
+      description: The session cookie's value, for a client with no cookie jar to send as a bearer token.
+    email:
+      type: string
+      description: Empty for the demo.
+    isDemo: { type: boolean }
+    email_verified:
+      type: boolean
+      description: Always true for the demo.
+    display_name:
+      type: string
+      description: Empty when unset, like country and avatar_url.
+    country: { type: string }
+    avatar_url: { type: string }
+    timezone: { type: string }
+    locale:
+      type: string
+      description: Empty for automatic.
+SettingsOption:
+  type: object
+  required: [value, label]
+  additionalProperties: false
+  properties:
+    value: { type: string }
+    label: { type: string }
+ExportStatus:
+  type: object
+  required: [state]
+  additionalProperties: false
+  properties:
+    state: { type: string, enum: [none, preparing, ready, failed] }
+    id: { type: string, format: uuid }
+    requested_at: { type: string, format: date-time }
+    expires_at:
+      type: string
+      format: date-time
+      description: Only when ready, like total_size and parts.
+    total_size: { type: integer }
+    parts:
+      type: array
+      items:
+        type: object
+        required: [n, size, name, url]
+        additionalProperties: false
+        properties:
+          n: { type: integer }
+          size: { type: integer }
+          name:
+            type: string
+            description: The file it downloads as.
+          url:
+            type: string
+            description: Relative to the site.
+SyncSource:
+  type: string
+  enum: [healthconnect, healthkit, recorded]
+SyncExternalID:
+  type: string
+  pattern: "^[A-Za-z0-9_-][A-Za-z0-9._-]{0,199}$"
+  description: The source's own id for the activity.
+Spot:
+  type: object
+  required: [id, category, lon, lat]
+  additionalProperties: false
+  description: A place; each text field is missing when the map data has none.
+  properties:
+    id: { type: integer }
+    category: { type: string, enum: [playground, dog_park, monument, viewpoint, history] }
+    name: { type: string }
+    address: { type: string }
+    description: { type: string }
+    inscription: { type: string }
+    memorial: { type: string }
+    start_date: { type: string }
+    wikipedia: { type: string }
+    lon: { type: number }
+    lat: { type: number }
+SpotCapture:
+  type: object
+  required: [spot_id, captured_at]
+  additionalProperties: false
+  properties:
+    spot_id: { type: integer }
+    captured_at: { type: string, format: date-time }

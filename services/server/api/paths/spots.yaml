@@ -1,0 +1,133 @@
+spots:
+  get:
+    summary: The places in an area, in the chosen categories ("Show in this area")
+    parameters:
+      - name: bbox
+        in: query
+        required: true
+        description: west,south,east,north in degrees; west may be greater than east across the antimeridian.
+        schema: { type: string }
+      - name: categories
+        in: query
+        required: true
+        description: Comma-separated, from playground, dog_park, monument, viewpoint, history.
+        schema: { type: string }
+    responses:
+      "200":
+        description: The places, at most 2,000
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [spots, total]
+              additionalProperties: false
+              properties:
+                spots:
+                  type: array
+                  items: { $ref: "../components/schemas.yaml#/Spot" }
+                total:
+                  type: integer
+                  description: How many the area holds; more than the spots returned when they were cut off.
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/NotVerified" }
+spots_captures:
+  get:
+    summary: Every place the account has captured, newest first
+    parameters:
+      - name: since
+        in: query
+        description: Only captures at or after this time (RFC 3339).
+        schema: { type: string, format: date-time }
+    responses:
+      "200":
+        description: The captures
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [captures]
+              additionalProperties: false
+              properties:
+                captures:
+                  type: array
+                  items: { $ref: "../components/schemas.yaml#/SpotCapture" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/NotVerified" }
+spots_id:
+  parameters:
+    - $ref: "../components/parameters.yaml#/SpotID"
+  get:
+    summary: One place with its whole area and the account's capture of it
+    responses:
+      "200":
+        description: The place
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, category, lon, lat, area]
+              additionalProperties: false
+              properties:
+                id: { type: integer }
+                category: { type: string }
+                name: { type: string }
+                address: { type: string }
+                description: { type: string }
+                inscription: { type: string }
+                memorial: { type: string }
+                start_date: { type: string }
+                wikipedia: { type: string }
+                lon: { type: number }
+                lat: { type: number }
+                area:
+                  type: object
+                  description: A GeoJSON MultiPolygon.
+                captured_at:
+                  type: string
+                  format: date-time
+                  description: Missing when the account hasn't captured it.
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/NotVerified" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }
+spots_id_captures:
+  parameters:
+    - $ref: "../components/parameters.yaml#/SpotID"
+  post:
+    summary: Capture a place from the last position the phone measured inside it
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [lat, lon]
+            properties:
+              lat: { type: number, minimum: -90, maximum: 90 }
+              lon: { type: number, minimum: -180, maximum: 180 }
+    responses:
+      "200":
+        description: Captured already; the first capture's time
+        content:
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/SpotCapture" }
+      "201":
+        description: Captured
+        content:
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/SpotCapture" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/Forbidden" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "410":
+        description: The place is no longer on the map
+        content:
+          text/plain:
+            schema: { type: string }
+      "422":
+        description: The position is outside the place
+        content:
+          text/plain:
+            schema: { type: string }

@@ -1,0 +1,97 @@
+sync_activities:
+  post:
+    summary: Send activities recorded on the device or read from a health service, as points
+    description: Each activity gets its own result; one rejected doesn't stop the rest.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              source: { $ref: "../components/schemas.yaml#/SyncSource" }
+              activities:
+                type: array
+                nullable: true
+                maxItems: 100
+                items:
+                  type: object
+                  properties:
+                    external_id:
+                      type: string
+                      description: The source's own id; one that doesn't match SyncExternalID rejects that activity, not the request.
+                    activity_type: { type: string }
+                    name: { type: string }
+                    description: { type: string }
+                    points:
+                      type: array
+                      nullable: true
+                      items:
+                        type: object
+                        properties:
+                          lat: { type: number }
+                          lon: { type: number }
+                          elevation_m: { type: number, nullable: true }
+                          time: { type: string, format: date-time }
+    responses:
+      "200":
+        description: One result per activity, in the order sent
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [results]
+              additionalProperties: false
+              properties:
+                results:
+                  type: array
+                  items:
+                    type: object
+                    required: [external_id, status]
+                    additionalProperties: false
+                    properties:
+                      external_id: { type: string }
+                      status: { type: string, enum: [enqueued, already_processed, rejected] }
+                      error:
+                        type: string
+                        description: Why it was rejected, in the request's language; only with rejected.
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/Forbidden" }
+      "429": { $ref: "../components/responses.yaml#/PlainError" }
+      "503": { $ref: "../components/responses.yaml#/DailyCapacity" }
+sync_known:
+  post:
+    summary: Which of these external ids the account already has, or is still importing, from a source
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              source: { $ref: "../components/schemas.yaml#/SyncSource" }
+              external_ids:
+                type: array
+                nullable: true
+                maxItems: 5000
+                items: { $ref: "../components/schemas.yaml#/SyncExternalID" }
+    responses:
+      "200":
+        description: The ones it has
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [known, processing]
+              additionalProperties: false
+              properties:
+                known:
+                  type: array
+                  items: { type: string }
+                processing:
+                  type: array
+                  items: { type: string }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/Forbidden" }

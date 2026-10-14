@@ -1,0 +1,202 @@
+stories:
+  get:
+    summary: The signed-in account's Stories, newest first, each with its members and statistics
+    responses:
+      "200":
+        description: The Stories
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stories]
+              additionalProperties: false
+              properties:
+                stories:
+                  type: array
+                  items: { $ref: "../components/schemas.yaml#/Story" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/NotVerified" }
+  post:
+    summary: Create a Story, optionally with its first activities
+    description: Any activity that isn't the caller's own fails the whole request with a 404 and creates nothing.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+              - { $ref: "../components/schemas.yaml#/StoryInput" }
+              - type: object
+                properties:
+                  activity_ids: { $ref: "../components/schemas.yaml#/ActivityIDs" }
+    responses:
+      "201":
+        description: The new Story
+        content:
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/Story" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/Forbidden" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }
+stories_id:
+  parameters:
+    - $ref: "../components/parameters.yaml#/StoryID"
+  get:
+    summary: One of the signed-in account's Stories
+    responses:
+      "200":
+        description: The Story
+        content:
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/Story" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/NotVerified" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }
+  patch:
+    summary: Rename a Story or change its description (a full replace)
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../components/schemas.yaml#/StoryInput" }
+    responses:
+      "200":
+        description: The Story as saved
+        content:
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/Story" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/Forbidden" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }
+  delete:
+    summary: Delete a Story; its activities stay
+    responses:
+      "204":
+        description: Deleted
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/Forbidden" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }
+stories_id_activities:
+  parameters:
+    - $ref: "../components/parameters.yaml#/StoryID"
+  post:
+    summary: Add activities to a Story
+    description: One already in the Story is left as it is; one that isn't the caller's own fails the whole request with a 404 and adds nothing.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../components/schemas.yaml#/StoryActivitiesInput" }
+    responses:
+      "200":
+        description: The Story as saved
+        content:
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/Story" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/Forbidden" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }
+  delete:
+    summary: Take activities out of a Story; an id not in it is ignored, and the activities stay
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../components/schemas.yaml#/StoryActivitiesInput" }
+    responses:
+      "200":
+        description: The Story as saved
+        content:
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/Story" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/Forbidden" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }
+stories_id_send:
+  parameters:
+    - $ref: "../components/parameters.yaml#/StoryID"
+  post:
+    summary: Send a copy of a Story to another account by email address
+    description: 204 whether or not the address belongs to an account that can receive it, so the answer doesn't tell the sender who has an account.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              email: { type: string }
+    responses:
+      "204":
+        description: Sent, or silently not
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/Forbidden" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "429": { $ref: "../components/responses.yaml#/PlainError" }
+story-sends:
+  get:
+    summary: Copies of Stories waiting for the signed-in account, newest first, and accepted ones still being copied
+    responses:
+      "200":
+        description: The waiting and arriving copies
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sends, copying]
+              additionalProperties: false
+              properties:
+                sends:
+                  type: array
+                  items:
+                    type: object
+                    required: [id, story_name, from, sent_at, activity_count]
+                    additionalProperties: false
+                    properties:
+                      id: { type: string, format: uuid }
+                      story_name: { type: string }
+                      from:
+                        type: string
+                        description: The sender's name, or their email address when they've set none.
+                      sent_at: { type: string, format: date-time }
+                      activity_count: { type: integer }
+                copying:
+                  type: array
+                  items:
+                    type: object
+                    required: [story_name, from]
+                    additionalProperties: false
+                    properties:
+                      story_name: { type: string }
+                      from: { type: string }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/NotVerified" }
+story-sends_id_accept:
+  parameters:
+    - $ref: "../components/parameters.yaml#/StorySendID"
+  post:
+    summary: Accept a copy; the Story arrives once its copy job has run
+    responses:
+      "202":
+        description: Accepted, copy queued
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/Forbidden" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }
+      "409": { $ref: "../components/responses.yaml#/OverLimit" }
+      "503": { $ref: "../components/responses.yaml#/DailyCapacity" }
+story-sends_id:
+  parameters:
+    - $ref: "../components/parameters.yaml#/StorySendID"
+  delete:
+    summary: Decline a copy; nothing is copied
+    responses:
+      "204":
+        description: Declined
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/Forbidden" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }

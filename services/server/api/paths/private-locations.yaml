@@ -1,0 +1,66 @@
+private-locations:
+  get:
+    summary: The signed-in account's Private locations, oldest first
+    responses:
+      "200":
+        description: The Private locations
+        content:
+          application/json:
+            schema:
+              type: array
+              items: { $ref: "../components/schemas.yaml#/PrivateLocation" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/NotVerified" }
+  post:
+    summary: Add a Private location
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../components/schemas.yaml#/PrivateLocationInput" }
+    responses:
+      "201":
+        description: The new Private location
+        content:
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/PrivateLocation" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/Forbidden" }
+      "409":
+        description: The account already has the most Private locations allowed
+        content:
+          text/plain:
+            schema: { type: string }
+private-locations_id:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      # Not format: uuid — a malformed id is a 404 from the handler, not a request error.
+      schema: { type: string }
+  patch:
+    summary: Move, resize or rename a Private location (a full replace)
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../components/schemas.yaml#/PrivateLocationInput" }
+    responses:
+      "200":
+        description: The Private location as saved
+        content:
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/PrivateLocation" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/Forbidden" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }
+  delete:
+    summary: Remove a Private location
+    responses:
+      "204":
+        description: Removed
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "403": { $ref: "../components/responses.yaml#/Forbidden" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }

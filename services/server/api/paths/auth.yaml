@@ -1,0 +1,228 @@
+auth_signup:
+  post:
+    summary: Create a password account and sign in to it
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../components/schemas.yaml#/Credentials" }
+    responses:
+      "201": { $ref: "../components/responses.yaml#/Session" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "409": { $ref: "../components/responses.yaml#/PlainError" }
+      "429": { $ref: "../components/responses.yaml#/PlainError" }
+auth_login:
+  post:
+    summary: Sign in with email and password
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../components/schemas.yaml#/Credentials" }
+    responses:
+      "200": { $ref: "../components/responses.yaml#/Session" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/PlainError" }
+      "429": { $ref: "../components/responses.yaml#/PlainError" }
+auth_logout:
+  post:
+    summary: End the current session, if any, and clear its cookie
+    security: []
+    responses:
+      "204":
+        description: Signed out
+auth_me:
+  get:
+    summary: The signed-in account
+    security: []
+    responses:
+      "200":
+        description: The account
+        content:
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/Account" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+auth_demo:
+  post:
+    summary: Start a session on the shared, read-only demo account
+    security: []
+    responses:
+      "201": { $ref: "../components/responses.yaml#/Session" }
+      "429": { $ref: "../components/responses.yaml#/PlainError" }
+auth_forgot-password:
+  post:
+    summary: Email a password reset link, if the address has an account
+    description: The same answer whether or not it has one.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              email: { type: string }
+    responses:
+      "200": { $ref: "../components/responses.yaml#/Message" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "429": { $ref: "../components/responses.yaml#/PlainError" }
+auth_reset-password:
+  post:
+    summary: Set a new password with a reset link's token, ending every other session, and sign in
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              token: { type: string }
+              password: { type: string }
+    responses:
+      "200": { $ref: "../components/responses.yaml#/Session" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+auth_verify-email:
+  post:
+    summary: Verify an address with a verification link's token, and sign in
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              token: { type: string }
+    responses:
+      "200": { $ref: "../components/responses.yaml#/Session" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "409": { $ref: "../components/responses.yaml#/PlainError" }
+auth_providers:
+  get:
+    summary: Which sign-in providers this server has configured
+    security: []
+    responses:
+      "200":
+        description: The providers
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [google, facebook]
+              additionalProperties: false
+              properties:
+                google: { type: boolean }
+                facebook: { type: boolean }
+                google_client_id:
+                  type: string
+                  description: The web client id a native app asks Google for an id_token with; only when google is true.
+auth_google_start:
+  get:
+    summary: Start Sign in with Google in a browser
+    description: A page navigation, not a fetch.
+    security: []
+    parameters:
+      - $ref: "../components/parameters.yaml#/OAuthTZ"
+      - $ref: "../components/parameters.yaml#/OAuthAppChallenge"
+    responses:
+      "302": { $ref: "../components/responses.yaml#/Redirect" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }
+auth_google_callback:
+  get:
+    summary: Where Google sends the browser back
+    description: >-
+      Redirects to the app with a session cookie, to the sign-in page with ?error=, or for a
+      round trip an app started, to holdmytrack://oauth with ?code= or ?error=.
+    security: []
+    responses:
+      "302": { $ref: "../components/responses.yaml#/Redirect" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }
+auth_facebook_start:
+  get:
+    summary: Start Sign in with Facebook in a browser
+    description: A page navigation, not a fetch.
+    security: []
+    parameters:
+      - $ref: "../components/parameters.yaml#/OAuthTZ"
+      - $ref: "../components/parameters.yaml#/OAuthAppChallenge"
+    responses:
+      "302": { $ref: "../components/responses.yaml#/Redirect" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }
+auth_facebook_callback:
+  get:
+    summary: Where Facebook sends the browser back; redirects as Google's callback does
+    security: []
+    responses:
+      "302": { $ref: "../components/responses.yaml#/Redirect" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }
+auth_google_token:
+  post:
+    summary: Sign in with a Google id_token a native app got from the platform
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              id_token: { type: string }
+              tz:
+                type: string
+                description: The device's IANA zone, for a new account.
+    responses:
+      "200": { $ref: "../components/responses.yaml#/Session" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/PlainError" }
+      "404": { $ref: "../components/responses.yaml#/PlainError" }
+auth_handoff:
+  post:
+    summary: Redeem the one-time code a browser-tab sign-in handed an app, with the app's PKCE verifier
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code: { type: string }
+              verifier: { type: string }
+    responses:
+      "200": { $ref: "../components/responses.yaml#/Session" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/PlainError" }
+auth_resend-verification:
+  post:
+    summary: Email the verification link again; works before the account is verified
+    responses:
+      "200": { $ref: "../components/responses.yaml#/Message" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "429": { $ref: "../components/responses.yaml#/PlainError" }
+auth_email:
+  patch:
+    summary: Change the address of an account that isn't verified yet, and send it a new link
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              email: { type: string }
+    responses:
+      "200":
+        description: The account as saved
+        content:
+          application/json:
+            schema: { $ref: "../components/schemas.yaml#/Account" }
+      "400": { $ref: "../components/responses.yaml#/PlainError" }
+      "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
+      "409": { $ref: "../components/responses.yaml#/PlainError" }
+      "429": { $ref: "../components/responses.yaml#/PlainError" }

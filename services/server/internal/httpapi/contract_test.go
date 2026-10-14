@@ -22,12 +22,21 @@ import (
 	"github.com/getkin/kin-openapi/routers/legacy"
 )
 
-// The API contract, api/openapi.yaml, is enforced here rather than by generating handlers from
-// it: dbTest.do and dbTest.send check every exchange a test makes on a path the file describes,
-// so a handler whose real JSON stops matching the contract fails its own tests. A path the file
-// doesn't describe yet goes unchecked.
+// The API contract, api/openapi.yaml with the paths/ and components/ files it refers to, is
+// enforced here rather than by generating handlers from it: dbTest.do, dbTest.send and
+// serveChecked check every exchange a test makes on a path it describes, so a handler whose real
+// JSON stops matching the contract fails its own tests, and TestContractCoversEveryRoute keeps
+// every route described.
 
 const contractPath = "../../api/openapi.yaml"
+
+// newContractLoader reads the contract across its files: openapi.yaml's paths and their shared
+// components live in files of their own.
+func newContractLoader() *openapi3.Loader {
+	loader := openapi3.NewLoader()
+	loader.IsExternalRefsAllowed = true
+	return loader
+}
 
 var (
 	contractOnce   sync.Once
@@ -39,7 +48,7 @@ func loadContract() (routers.Router, error) {
 	contractOnce.Do(func() {
 		// Lenient on version bits: ids are any hex UUID, not only RFC 4122 ones.
 		openapi3.DefineStringFormatValidator("uuid", openapi3.NewRegexpFormatValidator(uuidPattern.String()))
-		loader := openapi3.NewLoader()
+		loader := newContractLoader()
 		doc, err := loader.LoadFromFile(contractPath)
 		if err != nil {
 			contractErr = err
@@ -105,7 +114,7 @@ func TestContractCoversEveryRoute(t *testing.T) {
 		t.Fatal("found no route calls")
 	}
 
-	doc, err := openapi3.NewLoader().LoadFromFile(contractPath)
+	doc, err := newContractLoader().LoadFromFile(contractPath)
 	if err != nil {
 		t.Fatal(err)
 	}

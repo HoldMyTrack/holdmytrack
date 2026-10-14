@@ -1,0 +1,60 @@
+OAuthTZ:
+  name: tz
+  in: query
+  description: The browser's IANA zone, for a new account; anything invalid is ignored.
+  schema: { type: string }
+OAuthAppChallenge:
+  name: app_challenge
+  in: query
+  description: A native app's S256 PKCE challenge; the round trip then ends in the app with a one-time code.
+  schema: { type: string }
+FilterFrom:
+  name: from
+  in: query
+  description: Local start date, inclusive.
+  schema: { type: string, format: date }
+FilterTo:
+  name: to
+  in: query
+  description: Local start date, inclusive.
+  schema: { type: string, format: date }
+FilterTypes:
+  name: types
+  in: query
+  description: Comma-separated activity types.
+  schema: { type: string }
+FilterStory:
+  name: story
+  in: query
+  description: One Story's activities only.
+  schema: { type: string, format: uuid }
+ActivityID:
+  name: id
+  in: path
+  required: true
+  # Not format: uuid — a malformed id is a 404 from the handler, not a request error.
+  schema: { type: string }
+PhotoID:
+  name: id
+  in: path
+  required: true
+  # Not format: uuid — a malformed id is a 404 from the handler, not a request error.
+  schema: { type: string }
+SpotID:
+  name: id
+  in: path
+  required: true
+  # Not an integer — a malformed id is a 404 from the handler, not a request error.
+  schema: { type: string }
+StoryID:
+  name: id
+  in: path
+  required: true
+  # Not format: uuid — a malformed id is a 404 from the handler, not a request error.
+  schema: { type: string }
+StorySendID:
+  name: id
+  in: path
+  required: true
+  # Not format: uuid — a malformed id is a 404 from the handler, not a request error.
+  schema: { type: string }
