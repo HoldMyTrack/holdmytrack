@@ -10,7 +10,7 @@ CREATE TABLE users (
     id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email                VARCHAR(255) UNIQUE NOT NULL,
     password_hash        VARCHAR(255),  -- NULL for an account that only signs in via user_identities
-    last_seen_at         TIMESTAMPTZ,   -- drives the dormancy policy, VISION.md §5.7
+    last_seen_at         TIMESTAMPTZ,   -- the UTC day it was last used; IMPLEMENTATION.md §4.32
     created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     demo_expires_at      TIMESTAMPTZ,   -- dropped in 0035
     display_name         VARCHAR(255),  -- §4.12 account settings
