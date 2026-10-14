@@ -1410,7 +1410,7 @@ Outdoor places from OpenStreetMap on the map, in five categories, with what OSM 
 
 **Behavior**:
 1. `GET /v1/spots/{id}` answers one place: the fields of FR-15.5's places, `area` — its whole area as a GeoJSON MultiPolygon — and `captured_at` when the caller has captured it (absent otherwise). A retired place (FR-15.1) is answered only to an account that captured it.
-2. `GET /v1/spots/captures` answers `{captures}`: the caller's captured places as `{spot_id, captured_at}`, newest first; an empty list when there are none.
+2. `GET /v1/spots/captures` answers `{captures}`: the caller's captured places as `{spot_id, captured_at}`, newest first; an empty list when there are none. With `since` (an RFC 3339 time), only those captured at or after it; a `since` that isn't one → `400 Bad Request`. A capture is never changed or removed, so the web map and the Android app read the whole list once and afterwards only `since` the newest they have.
 3. `POST /v1/spots/{id}/captures` takes `{lat, lon}`, the position the phone last measured inside the place. The position must be inside the place's area, or within 10 m of it. The first capture of a place is kept: a new one answers `201`, a repeat `200` with the first one's `captured_at`, both as `{spot_id, captured_at}`.
 4. A capture belongs to its account and is deleted with it. A retired place keeps its captures (FR-15.1).
 

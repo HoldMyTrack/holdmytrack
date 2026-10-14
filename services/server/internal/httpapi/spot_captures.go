@@ -83,12 +83,37 @@ func (s *Server) handleSpotDetail(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, sp)
 }
 
+// capturesSince reads `GET /v1/spots/captures`' `since` parameter: nil when it's absent, for the
+// whole list, else the time from which captures are wanted (an RFC 3339 time, as the list's own
+// `captured_at` values are written).
+func capturesSince(q string) (*time.Time, error) {
+	if q == "" {
+		return nil, nil
+	}
+	t, err := time.Parse(time.RFC3339Nano, q)
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
 // handleListSpotCaptures serves `GET /v1/spots/captures` (FR-15.6): every place the caller has
-// captured, newest first — what the maps draw the captured badge from.
+// captured, newest first — what the maps draw the captured badge from — or with `since`, only
+// those captured at or after it. A capture is never changed or removed (§4.25), so a client
+// that has the list adds what this returns to it: what the web map does on every return to
+// its tab. At or after, not after, so a capture sharing the newest one's instant can't be
+// missed; the client already has the rest.
 func (s *Server) handleListSpotCaptures(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.pool.Query(r.Context(),
-		`SELECT spot_id, captured_at FROM spot_captures WHERE user_id = $1 ORDER BY captured_at DESC, spot_id`,
-		userIDFromContext(r.Context()))
+	since, err := capturesSince(r.URL.Query().Get("since"))
+	if err != nil {
+		http.Error(w, "since must be an RFC 3339 time", http.StatusBadRequest)
+		return
+	}
+	rows, err := s.pool.Query(r.Context(), `
+		SELECT spot_id, captured_at FROM spot_captures
+		WHERE user_id = $1 AND ($2::timestamptz IS NULL OR captured_at >= $2)
+		ORDER BY captured_at DESC, spot_id`,
+		userIDFromContext(r.Context()), since)
 	if err != nil {
 		s.log.Error("spot captures query failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)

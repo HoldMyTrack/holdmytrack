@@ -825,9 +825,11 @@ export interface SpotCapture {
   captured_at: string;
 }
 
-/** `GET /v1/spots/captures` — the account's captured places, newest first. */
-export async function getSpotCaptures(signal?: AbortSignal): Promise<SpotCapture[]> {
-  const res = await fetch(`${API_BASE_URL}${API_V1}/spots/captures`, {
+/** `GET /v1/spots/captures` — the account's captured places, newest first; with [since] (a
+ *  `captured_at` as the server wrote it), only those captured at or after it. */
+export async function getSpotCaptures(signal?: AbortSignal, since?: string): Promise<SpotCapture[]> {
+  const query = since ? `?since=${encodeURIComponent(since)}` : '';
+  const res = await fetch(`${API_BASE_URL}${API_V1}/spots/captures${query}`, {
     ...(signal ? { signal } : {}),
     credentials: 'include',
   });
