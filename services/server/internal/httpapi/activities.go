@@ -395,8 +395,8 @@ func (s *Server) handleUpdateActivity(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleDeleteActivity serves `DELETE /v1/activities/{id}` (§4.7.5) — a full purge, not a
-// soft delete: the DB cascade already handles activity_streams/activity_tile_masks (both
-// `ON DELETE CASCADE` back to activities.id), and Trends is live-aggregated over whatever
+// soft delete: the DB cascade already handles activity_tile_masks (`ON DELETE CASCADE`
+// back to activities.id), and Trends is live-aggregated over whatever
 // rows remain, so neither needs any explicit cleanup here. Two things genuinely do:
 //
 //   - Object storage has no foreign keys, so the raw upload

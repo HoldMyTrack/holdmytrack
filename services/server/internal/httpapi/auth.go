@@ -1068,18 +1068,35 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		var info authInfo
+		var lastSeen *time.Time
 		err := s.pool.QueryRow(r.Context(), `
-			SELECT u.id, u.email_verified, u.timezone, COALESCE(u.locale, '')
+			SELECT u.id, u.email_verified, u.timezone, COALESCE(u.locale, ''), u.last_seen_at
 			FROM sessions se JOIN users u ON u.id = se.user_id
 			WHERE se.id = $1 AND se.expires_at > NOW()
-		`, sessionID).Scan(&info.userID, &info.emailVerified, &info.timezone, &info.locale)
+		`, sessionID).Scan(&info.userID, &info.emailVerified, &info.timezone, &info.locale, &lastSeen)
 		if err != nil {
 			http.Error(w, "authentication required", http.StatusUnauthorized)
 			return
 		}
 		info.isDemo = info.userID == DemoCustomerUserID
+		if !info.isDemo && lastSeenDue(lastSeen, time.Now()) {
+			if _, err := s.pool.Exec(r.Context(), `UPDATE users SET last_seen_at = NOW() WHERE id = $1`, info.userID); err != nil {
+				s.log.Error("last_seen_at update failed", "err", err)
+			}
+		}
 		next(w, r.WithContext(context.WithValue(r.Context(), authContextKey, info)))
 	}
+}
+
+// lastSeenInterval is how stale users.last_seen_at may get before requireAuth writes it again:
+// it counts active users for cost per active user (IMPLEMENTATION.md §5.7), which needs the
+// day, not the request, so an account costs one write a day rather than one per request.
+const lastSeenInterval = 24 * time.Hour
+
+// lastSeenDue reports whether a request at now should write users.last_seen_at, given its
+// current value (nil when never written).
+func lastSeenDue(lastSeen *time.Time, now time.Time) bool {
+	return lastSeen == nil || now.Sub(*lastSeen) >= lastSeenInterval
 }
 
 // requireVerified wraps requireAuth with docs/ROADMAP.md's email-verification gate: a real

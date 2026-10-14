@@ -96,7 +96,7 @@ newest_migration=$(ls services/server/migrations/*.sql | sort | tail -n 1 | xarg
 log "newest migration: restored $(drill_psql 'SELECT max(filename) FROM schema_migrations'), checked out $newest_migration"
 
 printf '%-18s %10s %10s\n' table restored live
-for table in users activities activity_streams activity_photos stories privacy_zones spot_captures spots bike_paths admin_countries tz_parts; do
+for table in users activities activity_photos stories privacy_zones spot_captures spots bike_paths admin_countries tz_parts; do
   printf '%-18s %10s %10s\n' "$table" "$(drill_psql "SELECT count(*) FROM $table")" "$(live_psql "SELECT count(*) FROM $table")"
 done
 [[ $(drill_psql 'SELECT count(*) FROM users') -gt 0 ]] || fail "the restored database has no users"

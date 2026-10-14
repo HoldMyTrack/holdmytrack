@@ -94,7 +94,6 @@ func TestInterruptedIngestResumes(t *testing.T) {
 	// The state a worker killed right after the insert leaves behind.
 	for _, q := range []string{
 		`UPDATE activities SET ingest_complete = false WHERE id = $1`,
-		`DELETE FROM activity_streams WHERE activity_id = $1`,
 		`DELETE FROM activity_tile_masks WHERE activity_id = $1`,
 	} {
 		if _, err := d.pool.Exec(ctx, q, res.ActivityID); err != nil {
@@ -110,16 +109,15 @@ func TestInterruptedIngestResumes(t *testing.T) {
 		t.Fatalf("resumed ingest: %+v, %v", res2, err)
 	}
 	var complete bool
-	var streams, masks int
+	var masks int
 	if err := d.pool.QueryRow(ctx, `
 		SELECT a.ingest_complete,
-		       (SELECT count(*) FROM activity_streams WHERE activity_id = a.id),
 		       (SELECT count(*) FROM activity_tile_masks WHERE activity_id = a.id)
-		FROM activities a WHERE a.id = $1`, res.ActivityID).Scan(&complete, &streams, &masks); err != nil {
+		FROM activities a WHERE a.id = $1`, res.ActivityID).Scan(&complete, &masks); err != nil {
 		t.Fatal(err)
 	}
-	if !complete || streams != 1 || masks == 0 {
-		t.Fatalf("after resume: complete %v, streams %d, masks %d", complete, streams, masks)
+	if !complete || masks == 0 {
+		t.Fatalf("after resume: complete %v, masks %d", complete, masks)
 	}
 }
 
@@ -331,8 +329,8 @@ func TestIngestDropsImpossiblePoints(t *testing.T) {
 	var points int
 	var maxLat float64
 	if err := d.pool.QueryRow(context.Background(), `
-		SELECT s.point_count, ST_YMax(a.trajectory)
-		FROM activities a JOIN activity_streams s ON s.activity_id = a.id WHERE a.id = $1`, res.ActivityID).Scan(&points, &maxLat); err != nil {
+		SELECT ST_NPoints(a.trajectory), ST_YMax(a.trajectory)
+		FROM activities a WHERE a.id = $1`, res.ActivityID).Scan(&points, &maxLat); err != nil {
 		t.Fatal(err)
 	}
 	if points != 2 || maxLat > 90 {

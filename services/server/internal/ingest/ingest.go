@@ -138,25 +138,15 @@ func Process(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, job 
 
 	if !inserted && complete {
 		// Idempotency requirement: a duplicate that reached persist is a no-op, not an
-		// error, and the stream write is skipped along with it — the row from the first
-		// successful ingest already has its streams. Fog is skipped too: nothing new
-		// happened, so no tile needs marking dirty again.
+		// error. Fog is skipped too: nothing new happened, so no tile needs marking dirty
+		// again.
 		return Result{ActivityID: activityID, Persisted: false}, nil
 	}
 	// Otherwise this is a new row, or one an earlier run of this ingest inserted and then
 	// didn't finish (cut off, or failed partway): every step below is safe to run again.
 	if hidden {
-		// No streams, masks, tiles or regions: there is nothing visible to derive them from.
+		// No masks, tiles or regions: there is nothing visible to derive them from.
 		return Result{ActivityID: activityID, Persisted: true}, nil
-	}
-
-	_, err = pool.Exec(ctx, `
-		INSERT INTO activity_streams (activity_id, point_count, elapsed_s, elevation_m, dist_m)
-		VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (activity_id) DO NOTHING
-	`, activityID, len(points), pp.elapsedS, pp.elevM, pp.distM)
-	if err != nil {
-		return Result{}, fmt.Errorf("ingest: persist streams: %w", err)
 	}
 
 	// §4.1 step 4: render this activity's own fog/heatmap masks and mark every z14 tile it
@@ -307,9 +297,6 @@ func trajectorySQL(lons, lats, ts string) string {
 type preparedTrack struct {
 	m                          metrics
 	simpLons, simpLats, simpTs []float64
-	elapsedS                   []int32
-	elevM                      []*float32
-	distM                      []float32
 }
 
 func prepareTrack(ctx context.Context, pool *pgxpool.Pool, points []parse.Point) (preparedTrack, error) {
@@ -332,16 +319,6 @@ func prepareTrack(ctx context.Context, pool *pgxpool.Pool, points []parse.Point)
 		return preparedTrack{}, err
 	}
 	pp.simpTs = matchSimplifiedTimes(lons, lats, ts, pp.simpLons, pp.simpLats)
-
-	pp.elapsedS = make([]int32, len(points))
-	pp.elevM = make([]*float32, len(points))
-	pp.distM = make([]float32, len(points))
-	t0 := points[0].Time.Unix()
-	for i, p := range points {
-		pp.elapsedS[i] = int32(p.Time.Unix() - t0)
-		pp.elevM[i] = p.Elevation
-		pp.distM[i] = float32(pp.m.distM[i])
-	}
 	return pp, nil
 }
 
@@ -520,8 +497,6 @@ type metrics struct {
 	movingS        int
 	elevationGainM float64
 	avgSpeedMps    float64
-	// distM[i] is cumulative distance in meters at points[i]; distM[0] is always 0.
-	distM []float64
 }
 
 // movingSpeedThresholdMps is the speed below which a segment counts as stopped, not moving,
@@ -531,11 +506,10 @@ type metrics struct {
 const movingSpeedThresholdMps = 0.5
 
 func computeMetrics(points []parse.Point) metrics {
-	m := metrics{distM: make([]float64, len(points))}
+	var m metrics
 	for i := 1; i < len(points); i++ {
 		segM := HaversineM(points[i-1].Lat, points[i-1].Lon, points[i].Lat, points[i].Lon)
 		m.distanceM += segM
-		m.distM[i] = m.distanceM
 		if points[i-1].Elevation != nil && points[i].Elevation != nil {
 			d := float64(*points[i].Elevation - *points[i-1].Elevation)
 			if d > 0 {

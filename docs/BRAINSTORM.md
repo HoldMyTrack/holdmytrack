@@ -38,7 +38,7 @@ Normal mode fetches every activity in the selected date range in one response (`
 
 A map layer that shows terrain height, so the shape of the land under your tracks — valleys, climbs, ridgelines — reads at a glance. Raised when the pace/heart-rate + elevation profile card was removed (ADR-0017): elevation stays in the data as route information, and this is the exploration-shaped way to show it, rather than a per-activity chart.
 
-* Two very different things could be meant: a basemap hillshade/contour layer from a public elevation model (the same everywhere, nothing to do with the user's data), or the user's own tracks colored by the elevation they recorded. The first is a basemap and cost question (a DEM tileset to host, `VISION.md` §4.3); the second reuses `activity_streams.elevation_m` and the band machinery pace already has.
+* Two very different things could be meant: a basemap hillshade/contour layer from a public elevation model (the same everywhere, nothing to do with the user's data), or the user's own tracks colored by the elevation they recorded. The first is a basemap and cost question (a DEM tileset to host, `VISION.md` §4.3); the second reuses the band machinery pace already has, with elevation read from each activity's original upload, since per-point elevation isn't stored.
 * Many GPS-only recordings have no elevation at all, so a track-colored version would be patchy in exactly the way the old all-or-nothing profile was.
 
 ### Per-region stacks if a data-localization law applies

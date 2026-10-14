@@ -155,7 +155,7 @@ This isn't a resilience decision the way Paths 1–3 are — §4.1's provider-in
 | **Export** | Free, unrestricted | Print-grade raster/vector export, animated reveals — no tier; a small HoldMyTrack signature in the corner, nothing else |
 | **Privacy Controls** | Table stakes, see §7 | Private locations (user-defined privacy zones), per-map share scoping |
 
-**We don't keep your health profile — only the geographical data you trust us with, and the photos you choose to add to it.** An activity is a route: positions, times and elevation. Pace is derived from those and shown as the color of a selected track — a supporting detail on the route, not a pillar and not a training product; the pillars are the map and the exploration stats. Heart rate, cadence, power, calories and every other body signal are never read, stored or shown, whichever source an activity came from. The one place such data can still sit is inside an original upload, which is kept as-is so a track edit or a Private location change can rebuild the activity, is only ever read for its route, and is deleted with the activity. The schema carries per-point streams (`IMPLEMENTATION.md` §3.3) for the route, and no more. See ADR-0017.
+**We don't keep your health profile — only the geographical data you trust us with, and the photos you choose to add to it.** An activity is a route: positions, times and elevation. Pace is derived from those and shown as the color of a selected track — a supporting detail on the route, not a pillar and not a training product; the pillars are the map and the exploration stats. Heart rate, cadence, power, calories and every other body signal are never read, stored or shown, whichever source an activity came from. The one place such data can still sit is inside an original upload, which is kept as-is so a track edit or a Private location change can rebuild the activity, is only ever read for its route, and is deleted with the activity. The database keeps the route and no more. See ADR-0017.
 
 **Photos are the one thing kept that isn't geography, and only because the user adds them.** A trip is remembered by what was seen on it as much as by where it went, so an activity can carry the user's own photos, each pinned to the point of the route where it was taken — worked out from the photo's capture time, or its position when the time is unusable, or chosen by the user when neither says, and movable along the route by hand. Every photo has a place on its route; there are no loose ones. They're kept as a resized copy with every EXIF field stripped, never as the original: HoldMyTrack is a map of trips, not a photo backup, and the original stays wherever the user keeps it. They're private like everything else, and always sit on the route as it's drawn, so a Private location that hides a track's end hides the place a photo there was taken too. See ADR-0024.
 
@@ -175,7 +175,7 @@ The critical section for a product with no revenue. Costs must be *bounded by de
 | :--- | :--- | :--- |
 | Basemap storage | Fixed | ~138 GB planet `.pmtiles` on R2 — a couple of dollars a month |
 | Basemap tile reads | **Usage** | Every tile read is a billed Class B GET. The one basemap cost that grows; a CDN in front is what keeps it flat |
-| Activity storage | **Users × history** | Per-point streams are the bulk. Grows monotonically and never shrinks on its own |
+| Activity storage | **Users × history** | Original uploads are the bulk, kept as long as the activity. Grows monotonically and never shrinks on its own |
 | Fog raster storage | **Users** | A few MB per user; cheap, but per-user and permanent |
 | Photos | **Users × photos** | About 0.5 MB each — a resized copy and a thumbnail, never the original — capped at 2,000 per account |
 | Spots | Fixed | Several million OSM places, roughly 1 GB in Postgres; matching them is one indexed query per activity processed |
@@ -183,11 +183,11 @@ The critical section for a product with no revenue. Costs must be *bounded by de
 | Compliance | Fixed | DPA/DPIA work, EU-region hosting (§7) |
 | Egress | — | Cloudflare R2 charges none. This is why R2, not S3 |
 
-**Order-of-magnitude at 10,000 active users.** Assumptions stated so they can be argued with: 300 activities per user, ~80 KB of compressed stream data each, ~3 MB of fog rasters per user, 100 photos per user at ~0.5 MB each, 20 map sessions per user per month at ~300 tile reads per session with a 90% CDN hit rate.
+**Order-of-magnitude at 10,000 active users.** Assumptions stated so they can be argued with: 300 activities per user, ~80 KB of original upload and track data each, ~3 MB of fog rasters per user, 100 photos per user at ~0.5 MB each, 20 map sessions per user per month at ~300 tile reads per session with a 90% CDN hit rate.
 
 | | Estimate |
 | :--- | :--- |
-| Activity + stream storage | ~240 GB |
+| Activity storage | ~240 GB |
 | Fog rasters | ~30 GB |
 | Photos | ~500 GB |
 | Basemap | ~138 GB |
@@ -200,7 +200,7 @@ That is a genuinely small number, and it is the whole argument for this model wo
 
 **The two things that break this model**, in order of likelihood:
 
-1. **Storage growing without bound.** Every user who ever signs up costs money forever. A retention and dormancy policy is not a nicety here; it is what keeps the curve flat. See `IMPLEMENTATION.md` §5.7.
+1. **Storage growing without bound.** Every user who ever signs up costs money forever: an account keeps its activities, original uploads and photos until its owner deletes them, used or not, since keeping the journeys people choose is the product (§1). What holds the curve is per-account limits and measuring cost per active user from the start, so growth shows in the numbers before it shows in the bill. See `IMPLEMENTATION.md` §5.7.
 2. **A viral moment.** Free products have no natural throttle. A front-page day at 100× traffic is a cost event with no matching revenue event. Rate limits and a spend cap on the CDN and object store are load-bearing infrastructure, not hardening.
 
 ---
