@@ -14,7 +14,7 @@ Once the app is willing to capture location itself, there are two structurally d
 
 **Submit a finished recording directly to the existing `POST /v1/sync/activities` endpoint, with a new `source` value, immediately when recording stops.** No intermediate write into Health Connect, no read-back through Path 2's sync machinery.
 
-Concretely: the app buffers location updates locally while a recording is in progress (in memory or a small on-device store — an implementation detail for `apps/android/docs/ROADMAP.md`, not this ADR), and on "Stop," normalizes and posts the finished track through the same wire shape and endpoint `docs/IMPLEMENTATION.md` §4.0.3 already defines for Path 2, under its own `source` value distinct from `"healthconnect"` and `"healthkit"` — the activity was authored by HoldMyTrack itself, not read from the platform health store, and the schema's `source` column (`docs/IMPLEMENTATION.md` §3.3) already exists precisely to keep that distinction visible.
+Concretely: the app buffers location updates locally while a recording is in progress (in memory or a small on-device store — an implementation detail for `apps/android/docs/IMPLEMENTATION.md`, not this ADR), and on "Stop," normalizes and posts the finished track through the same wire shape and endpoint `docs/IMPLEMENTATION.md` §4.0.3 already defines for Path 2, under its own `source` value distinct from `"healthconnect"` and `"healthkit"` — the activity was authored by HoldMyTrack itself, not read from the platform health store, and the schema's `source` column (`docs/IMPLEMENTATION.md` §3.3) already exists precisely to keep that distinction visible.
 
 ## Alternatives considered
 
