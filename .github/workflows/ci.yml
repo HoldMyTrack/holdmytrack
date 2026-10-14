@@ -70,6 +70,8 @@ jobs:
       # test:unit under c8, which counts every file in src, not only the ones a test imports.
       - run: npm run test:coverage
       - run: npm run verify:style
+      # apiSchema.ts is generated from the API contract; a contract change regenerates it.
+      - run: npm run verify:api-types
       - uses: codecov/codecov-action@v5
         with:
           files: apps/web/coverage/lcov.info

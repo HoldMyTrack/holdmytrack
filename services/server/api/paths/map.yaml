@@ -52,6 +52,8 @@ coverage_status:
                 version:
                   type: integer
                   description: Changes whenever what the account's tiles return does; a client refetches tiles when it does.
-                tile_version: { type: string }
+                tile_version:
+                  type: string
+                  description: What every tile request sends as `cv` to have the tile cached; it changes with version.
       "401": { $ref: "../components/responses.yaml#/Unauthenticated" }
       "403": { $ref: "../components/responses.yaml#/NotVerified" }

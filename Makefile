@@ -46,11 +46,13 @@ test-go: ## Go unit tests (services/server), the database ones against compose's
 	$(COMPOSE) exec -T db sh -c 'createdb -U holdmytrack holdmytrack_test 2>/dev/null || true'
 	$(GO) go test -p 1 ./...
 
-# verify:style compares against services/server/internal/mapstyle/styles, which the web
-# container does not otherwise see; mounted where the script's own relative path lands.
-test-unit: ## Web unit tests, plus the served style documents' drift check
+# verify:style compares against services/server/internal/mapstyle/styles, and verify:api-types
+# against the API contract in services/server/api, which the web container does not otherwise
+# see; each mounted where the scripts' own relative paths land.
+test-unit: ## Web unit tests, plus the style documents' and the API types' drift checks
 	$(COMPOSE) run --rm -v $(CURDIR)/services/server/internal/mapstyle/styles:/services/server/internal/mapstyle/styles:ro \
-	  web sh -c "npm run test:unit && npm run verify:style"
+	  -v $(CURDIR)/services/server/api:/services/server/api:ro \
+	  web sh -c "npm run test:unit && npm run verify:style && npm run verify:api-types"
 
 verify: ## Headless map checks against a dev server (test profile)
 	$(TEST) npm run verify:map
