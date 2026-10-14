@@ -61,7 +61,8 @@ func tileDirty(t *testing.T, pool *pgxpool.Pool, userID string, zoom, x, y int) 
 
 // A render clears the tile's dirty flag only if nothing marked it again while it was drawn —
 // an activity deleted mid-render must not leave its old mask in the stored tile for good —
-// and always leaves its parent dirty, so the pyramid above survives an interrupted pass.
+// and always leaves its parent dirty, so the pyramid above survives an interrupted pass. It
+// stores both objects' sizes.
 func TestUpsertTileRenderedKeepsAMidRenderMark(t *testing.T) {
 	pool, userID := testAccount(t)
 	ctx := context.Background()
@@ -82,7 +83,7 @@ func TestUpsertTileRenderedKeepsAMidRenderMark(t *testing.T) {
 		userID, z, x, y); err != nil {
 		t.Fatal(err)
 	}
-	if err := upsertTileRendered(ctx, pool, userID, z, x, y, gen, "fog", "heat"); err != nil {
+	if err := upsertTileRendered(ctx, pool, userID, z, x, y, gen, "fog", "heat", [2]int{120, 340}); err != nil {
 		t.Fatal(err)
 	}
 	if !tileDirty(t, pool, userID, z, x, y) {
@@ -96,11 +97,20 @@ func TestUpsertTileRenderedKeepsAMidRenderMark(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := upsertTileRendered(ctx, pool, userID, z, x, y, gen, "fog", "heat"); err != nil {
+	if err := upsertTileRendered(ctx, pool, userID, z, x, y, gen, "fog", "heat", [2]int{120, 340}); err != nil {
 		t.Fatal(err)
 	}
 	if tileDirty(t, pool, userID, z, x, y) {
 		t.Error("tile rendered with nothing marking it since stayed dirty")
+	}
+	var fogBytes, heatmapBytes int
+	if err := pool.QueryRow(ctx,
+		`SELECT bytes, heatmap_bytes FROM fog_tiles WHERE user_id = $1 AND zoom = $2 AND tile_x = $3 AND tile_y = $4`,
+		userID, z, x, y).Scan(&fogBytes, &heatmapBytes); err != nil {
+		t.Fatal(err)
+	}
+	if fogBytes != 120 || heatmapBytes != 340 {
+		t.Errorf("sizes stored %d, %d; want 120, 340", fogBytes, heatmapBytes)
 	}
 }
 

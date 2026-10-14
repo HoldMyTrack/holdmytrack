@@ -118,6 +118,7 @@ func EnqueueRaw(ctx context.Context, db Querier, userID string, items []RawItem)
 			SourceDetail:  it.Filename,
 			ExternalID:    ids[i],
 			RawPayloadKey: keys[i],
+			RawBytes:      int64(len(it.Data)),
 			Batch:         it.Batch,
 		})
 		if err != nil {

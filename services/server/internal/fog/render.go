@@ -270,11 +270,12 @@ func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.
 	// necessarily the same *set* of masks.
 	fogMask := compositeFogMask(fogMasks)
 	heatmapMask := compositeHeatmapMask(heatmapMasks, heatmapCap)
-	if err := storeTilePair(ctx, store, userID, zoom, x, y, fogMask, heatmapMask); err != nil {
+	sizes, err := storeTilePair(ctx, store, userID, zoom, x, y, fogMask, heatmapMask)
+	if err != nil {
 		return err
 	}
 	return upsertTileRendered(ctx, pool, userID, zoom, x, y, gen,
-		fogObjectKey(userID, zoom, x, y), heatmapObjectKey(userID, zoom, x, y))
+		fogObjectKey(userID, zoom, x, y), heatmapObjectKey(userID, zoom, x, y), sizes)
 }
 
 // errTileSize is decodeGray's refusal of a PNG that isn't TileSize square.
@@ -442,11 +443,12 @@ func renderPyramidLevel(ctx context.Context, pool *pgxpool.Pool, store *storage.
 	}
 	fogMask := downsampleQuadrants([4]*image.Gray{children[0], children[1], children[2], children[3]})
 	heatmapMask := downsampleQuadrants([4]*image.Gray{children[4], children[5], children[6], children[7]})
-	if err := storeTilePair(ctx, store, userID, zoom, x, y, fogMask, heatmapMask); err != nil {
+	sizes, err := storeTilePair(ctx, store, userID, zoom, x, y, fogMask, heatmapMask)
+	if err != nil {
 		return err
 	}
 	return upsertTileRendered(ctx, pool, userID, zoom, x, y, gen,
-		fogObjectKey(userID, zoom, x, y), heatmapObjectKey(userID, zoom, x, y))
+		fogObjectKey(userID, zoom, x, y), heatmapObjectKey(userID, zoom, x, y), sizes)
 }
 
 // loadChildren reads the four children at zoom of parent (px, py), in downsampleQuadrants'
@@ -506,21 +508,27 @@ func loadChildren(ctx context.Context, pool *pgxpool.Pool, store *storage.Store,
 	return out, err
 }
 
-// storeTilePair stores one tile's Fog and Heatmap masks, side by side.
-func storeTilePair(ctx context.Context, store *storage.Store, userID string, zoom, x, y int, fogMask, heatmapMask *image.Gray) error {
+// storeTilePair stores one tile's Fog and Heatmap masks, side by side, and returns their
+// sizes in that order, for fog_tiles' storage statistics (IMPLEMENTATION.md §4.32).
+func storeTilePair(ctx context.Context, store *storage.Store, userID string, zoom, x, y int, fogMask, heatmapMask *image.Gray) ([2]int, error) {
 	keys := [2]string{fogObjectKey(userID, zoom, x, y), heatmapObjectKey(userID, zoom, x, y)}
 	masks := [2]*image.Gray{fogMask, heatmapMask}
-	return parallel.ForEach(ctx, 2, 2, func(ctx context.Context, i int) error {
-		return storeTilePNG(ctx, store, keys[i], masks[i])
+	var sizes [2]int
+	err := parallel.ForEach(ctx, 2, 2, func(ctx context.Context, i int) error {
+		n, err := storeTilePNG(ctx, store, keys[i], masks[i])
+		sizes[i] = n
+		return err
 	})
+	return sizes, err
 }
 
-func storeTilePNG(ctx context.Context, store *storage.Store, key string, mask *image.Gray) error {
+// storeTilePNG stores mask as a PNG at key and returns its size.
+func storeTilePNG(ctx context.Context, store *storage.Store, key string, mask *image.Gray) (int, error) {
 	b, err := encodeTilePNG(mask)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return store.Put(ctx, key, bytes.NewReader(b), int64(len(b)))
+	return len(b), store.Put(ctx, key, bytes.NewReader(b), int64(len(b)))
 }
 
 func encodeTilePNG(mask *image.Gray) ([]byte, error) {
@@ -565,19 +573,20 @@ func tileDirtyGen(ctx context.Context, pool *pgxpool.Pool, userID string, zoom, 
 // composited in — marks the tile again (bumping dirty_gen), and the tile stays dirty for the
 // render the change enqueued, instead of keeping the deleted track until something else
 // touches that tile.
-func upsertTileRendered(ctx context.Context, pool *pgxpool.Pool, userID string, zoom, x, y int, gen int64, fogKey, heatmapKey string) error {
+func upsertTileRendered(ctx context.Context, pool *pgxpool.Pool, userID string, zoom, x, y int, gen int64, fogKey, heatmapKey string, sizes [2]int) error {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO fog_tiles (user_id, zoom, tile_x, tile_y, object_key, heatmap_object_key, dirty, rendered_at)
-		VALUES ($1, $2, $3, $4, $5, $6, false, NOW())
+		INSERT INTO fog_tiles (user_id, zoom, tile_x, tile_y, object_key, heatmap_object_key, bytes, heatmap_bytes, dirty, rendered_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $8, $9, false, NOW())
 		ON CONFLICT (user_id, zoom, tile_x, tile_y)
 		DO UPDATE SET object_key = EXCLUDED.object_key, heatmap_object_key = EXCLUDED.heatmap_object_key,
+			bytes = EXCLUDED.bytes, heatmap_bytes = EXCLUDED.heatmap_bytes,
 			dirty = fog_tiles.dirty_gen <> $7, rendered_at = NOW()
-	`, userID, zoom, x, y, fogKey, heatmapKey, gen); err != nil {
+	`, userID, zoom, x, y, fogKey, heatmapKey, gen, sizes[0], sizes[1]); err != nil {
 		return err
 	}
 	if zoom > 0 {

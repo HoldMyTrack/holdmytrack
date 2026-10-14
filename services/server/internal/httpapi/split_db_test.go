@@ -97,6 +97,14 @@ func TestSplitAndMerge(t *testing.T) {
 	if first.ID != orig || second.ID == orig {
 		t.Fatalf("pieces %s, %s: the original should keep the earlier part", first.ID, second.ID)
 	}
+	var sizes []int64
+	if err := d.pool.QueryRow(ctx, `SELECT array_agg(raw_bytes) FROM activities WHERE id = ANY($1)`,
+		[]string{first.ID, second.ID}).Scan(&sizes); err != nil {
+		t.Fatal(err)
+	}
+	if len(sizes) != 2 || sizes[0] != int64(len(splitGPX)) || sizes[1] != sizes[0] {
+		t.Errorf("pieces' raw_bytes %v, want both %d: they share the original", sizes, len(splitGPX))
+	}
 	for _, c := range []struct {
 		row      activityRow
 		start    int

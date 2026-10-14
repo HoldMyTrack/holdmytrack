@@ -400,6 +400,22 @@ func TestSyncEnqueuesRawPayloadsInline(t *testing.T) {
 	if !s3.Has(key) {
 		t.Fatal("PromoteRaw didn't write the raw payload")
 	}
+	obj, err := d.srv.store.Get(ctx, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, err := io.ReadAll(obj)
+	obj.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rawBytes *int64
+	if err := d.pool.QueryRow(ctx, `SELECT raw_bytes FROM activities WHERE id = $1`, res.ActivityID).Scan(&rawBytes); err != nil {
+		t.Fatal(err)
+	}
+	if rawBytes == nil || *rawBytes != int64(len(stored)) {
+		t.Errorf("raw_bytes %v, want the object's %d", rawBytes, len(stored))
+	}
 	var cleared bool
 	if err := d.pool.QueryRow(ctx, `SELECT raw IS NULL FROM jobs WHERE user_id = $1 AND payload->>'external_id' = 'second-walk'`, me.id).Scan(&cleared); err != nil || !cleared {
 		t.Fatalf("raw cleared: %v, %v", cleared, err)
