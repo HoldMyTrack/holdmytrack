@@ -249,8 +249,7 @@ func TestAuthFormsRequireSameOrigin(t *testing.T) {
 func TestResponsesCarrySecurityHeaders(t *testing.T) {
 	s := newPagesTestServer(t)
 	for _, path := range []string{"/signin", "/v1/auth/me", "/no-such-page"} {
-		rec := httptest.NewRecorder()
-		s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		rec := serveChecked(t, s.ServeHTTP, httptest.NewRequest(http.MethodGet, path, nil))
 		h := rec.Header()
 		if h.Get("Content-Security-Policy") != "frame-ancestors 'none'" || h.Get("X-Frame-Options") != "DENY" || h.Get("X-Content-Type-Options") != "nosniff" {
 			t.Errorf("%s: headers %v", path, h)
@@ -263,8 +262,7 @@ func TestResponsesCarrySecurityHeaders(t *testing.T) {
 func TestAPIBodiesAreBounded(t *testing.T) {
 	s := newPagesTestServer(t)
 	body := `{"email":"` + strings.Repeat("a", maxJSONBodyBytes) + `@example.com","password":"long-enough"}`
-	rec := httptest.NewRecorder()
-	s.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/auth/login", strings.NewReader(body)))
+	rec := serveChecked(t, s.ServeHTTP, httptest.NewRequest(http.MethodPost, "/v1/auth/login", strings.NewReader(body)))
 	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "invalid request body") {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}

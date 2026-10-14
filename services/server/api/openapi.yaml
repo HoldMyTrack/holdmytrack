@@ -3,9 +3,10 @@ info:
   title: HoldMyTrack API
   version: v1
   description: >-
-    The JSON contract between the Go server and its clients. The httpapi package's database
-    tests check every request and response they make to a path described here against this
-    file, so a handler that stops matching it fails CI.
+    The JSON contract between the Go server and its clients. The httpapi package's tests check
+    every request and response they make to a path described here against this file, so a
+    handler that stops matching it fails CI. A browser's write from another site is
+    refused with a plain-text 403 before any operation runs; the operations don't repeat it.
 servers:
   - url: /v1
 security:
@@ -1348,6 +1349,345 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/PlainError" }
+  /uploads:
+    get:
+      summary: The account's import history, newest first, a page at a time
+      parameters:
+        - name: limit
+          in: query
+          description: Defaults to 5; anything over 50 is 50.
+          schema: { type: integer, minimum: 1 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: source
+          in: query
+          description: Comma-separated sources (upload, takeout, healthconnect, healthkit, recorded); every source when missing.
+          schema: { type: string }
+      responses:
+        "200":
+          description: The page
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total, processing, limit, offset, uploads]
+                additionalProperties: false
+                properties:
+                  total:
+                    type: integer
+                    description: How many imports the source filter matches.
+                  processing:
+                    type: integer
+                    description: How many imports are still running, whatever the source filter.
+                  limit: { type: integer }
+                  offset: { type: integer }
+                  uploads:
+                    type: array
+                    items:
+                      type: object
+                      required: [filename, external_id, source, status, submitted_at]
+                      additionalProperties: false
+                      properties:
+                        filename: { type: string }
+                        external_id: { type: string }
+                        source: { type: string }
+                        status:
+                          type: string
+                          description: processing, done or failed.
+                        error:
+                          type: string
+                          description: Why it failed, in the request's language; only with failed.
+                        submitted_at: { type: string, format: date-time }
+                        finished_at: { type: string, format: date-time }
+                        started_at:
+                          type: string
+                          format: date-time
+                          description: The activity's start, once there is one, like timezone, distance_meters and activity_id.
+                        timezone: { type: string }
+                        distance_meters: { type: number }
+                        activity_id: { type: string, format: uuid }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+  /uploads/active:
+    get:
+      summary: Imports still running, grouped by batch, and how many failures the account hasn't seen
+      responses:
+        "200":
+          description: The running imports
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [imports, unseen_failures]
+                additionalProperties: false
+                properties:
+                  imports:
+                    type: array
+                    items:
+                      type: object
+                      required: [title, source, done, total, submitted_at]
+                      additionalProperties: false
+                      properties:
+                        title: { type: string }
+                        source: { type: string }
+                        done: { type: integer }
+                        total: { type: integer }
+                        submitted_at: { type: string, format: date-time }
+                  unseen_failures: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+  /coverage/status:
+    get:
+      summary: Whether the account's map is being rendered, and its tile version
+      responses:
+        "200":
+          description: The status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rendering, version, tile_version]
+                additionalProperties: false
+                properties:
+                  rendering: { type: boolean }
+                  version:
+                    type: integer
+                    description: Changes whenever what the account's tiles return does; a client refetches tiles when it does.
+                  tile_version: { type: string }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+  /sync/activities:
+    post:
+      summary: Send activities recorded on the device or read from a health service, as points
+      description: Each activity gets its own result; one rejected doesn't stop the rest.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                source: { $ref: "#/components/schemas/SyncSource" }
+                activities:
+                  type: array
+                  nullable: true
+                  maxItems: 100
+                  items:
+                    type: object
+                    properties:
+                      external_id:
+                        type: string
+                        description: The source's own id; one that doesn't match SyncExternalID rejects that activity, not the request.
+                      activity_type: { type: string }
+                      name: { type: string }
+                      description: { type: string }
+                      points:
+                        type: array
+                        nullable: true
+                        items:
+                          type: object
+                          properties:
+                            lat: { type: number }
+                            lon: { type: number }
+                            elevation_m: { type: number, nullable: true }
+                            time: { type: string, format: date-time }
+      responses:
+        "200":
+          description: One result per activity, in the order sent
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results]
+                additionalProperties: false
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      required: [external_id, status]
+                      additionalProperties: false
+                      properties:
+                        external_id: { type: string }
+                        status: { type: string, enum: [enqueued, already_processed, rejected] }
+                        error:
+                          type: string
+                          description: Why it was rejected, in the request's language; only with rejected.
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/PlainError" }
+        "503": { $ref: "#/components/responses/DailyCapacity" }
+  /sync/known:
+    post:
+      summary: Which of these external ids the account already has, or is still importing, from a source
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                source: { $ref: "#/components/schemas/SyncSource" }
+                external_ids:
+                  type: array
+                  nullable: true
+                  maxItems: 5000
+                  items: { $ref: "#/components/schemas/SyncExternalID" }
+      responses:
+        "200":
+          description: The ones it has
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [known, processing]
+                additionalProperties: false
+                properties:
+                  known:
+                    type: array
+                    items: { type: string }
+                  processing:
+                    type: array
+                    items: { type: string }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /spots:
+    get:
+      summary: The places in an area, in the chosen categories ("Show in this area")
+      parameters:
+        - name: bbox
+          in: query
+          required: true
+          description: west,south,east,north in degrees; west may be greater than east across the antimeridian.
+          schema: { type: string }
+        - name: categories
+          in: query
+          required: true
+          description: Comma-separated, from playground, dog_park, monument, viewpoint, history.
+          schema: { type: string }
+      responses:
+        "200":
+          description: The places, at most 2,000
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [spots, total]
+                additionalProperties: false
+                properties:
+                  spots:
+                    type: array
+                    items: { $ref: "#/components/schemas/Spot" }
+                  total:
+                    type: integer
+                    description: How many the area holds; more than the spots returned when they were cut off.
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+  /spots/captures:
+    get:
+      summary: Every place the account has captured, newest first
+      parameters:
+        - name: since
+          in: query
+          description: Only captures at or after this time (RFC 3339).
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: The captures
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [captures]
+                additionalProperties: false
+                properties:
+                  captures:
+                    type: array
+                    items: { $ref: "#/components/schemas/SpotCapture" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+  /spots/{id}:
+    parameters:
+      - $ref: "#/components/parameters/SpotID"
+    get:
+      summary: One place with its whole area and the account's capture of it
+      responses:
+        "200":
+          description: The place
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, category, lon, lat, area]
+                additionalProperties: false
+                properties:
+                  id: { type: integer }
+                  category: { type: string }
+                  name: { type: string }
+                  address: { type: string }
+                  description: { type: string }
+                  inscription: { type: string }
+                  memorial: { type: string }
+                  start_date: { type: string }
+                  wikipedia: { type: string }
+                  lon: { type: number }
+                  lat: { type: number }
+                  area:
+                    type: object
+                    description: A GeoJSON MultiPolygon.
+                  captured_at:
+                    type: string
+                    format: date-time
+                    description: Missing when the account hasn't captured it.
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+        "404": { $ref: "#/components/responses/PlainError" }
+  /spots/{id}/captures:
+    parameters:
+      - $ref: "#/components/parameters/SpotID"
+    post:
+      summary: Capture a place from the last position the phone measured inside it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lon]
+              properties:
+                lat: { type: number, minimum: -90, maximum: 90 }
+                lon: { type: number, minimum: -180, maximum: 180 }
+      responses:
+        "200":
+          description: Captured already; the first capture's time
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SpotCapture" }
+        "201":
+          description: Captured
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SpotCapture" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/PlainError" }
+        "410":
+          description: The place is no longer on the map
+          content:
+            text/plain:
+              schema: { type: string }
+        "422":
+          description: The position is outside the place
+          content:
+            text/plain:
+              schema: { type: string }
 components:
   parameters:
     OAuthTZ:
@@ -1391,6 +1731,12 @@ components:
       in: path
       required: true
       # Not format: uuid — a malformed id is a 404 from the handler, not a request error.
+      schema: { type: string }
+    SpotID:
+      name: id
+      in: path
+      required: true
+      # Not an integer — a malformed id is a 404 from the handler, not a request error.
       schema: { type: string }
     StoryID:
       name: id
@@ -1795,3 +2141,34 @@ components:
               url:
                 type: string
                 description: Relative to the site.
+    SyncSource:
+      type: string
+      enum: [healthconnect, healthkit, recorded]
+    SyncExternalID:
+      type: string
+      pattern: "^[A-Za-z0-9_-][A-Za-z0-9._-]{0,199}$"
+      description: The source's own id for the activity.
+    Spot:
+      type: object
+      required: [id, category, lon, lat]
+      additionalProperties: false
+      description: A place; each text field is missing when the map data has none.
+      properties:
+        id: { type: integer }
+        category: { type: string, enum: [playground, dog_park, monument, viewpoint, history] }
+        name: { type: string }
+        address: { type: string }
+        description: { type: string }
+        inscription: { type: string }
+        memorial: { type: string }
+        start_date: { type: string }
+        wikipedia: { type: string }
+        lon: { type: number }
+        lat: { type: number }
+    SpotCapture:
+      type: object
+      required: [spot_id, captured_at]
+      additionalProperties: false
+      properties:
+        spot_id: { type: integer }
+        captured_at: { type: string, format: date-time }

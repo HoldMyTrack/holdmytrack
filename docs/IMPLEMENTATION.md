@@ -953,6 +953,7 @@ Outdoor places from OpenStreetMap, on the web and in the Android app over the sa
 - The request is checked only when the server accepted it: a test that sends a bad body to get its 400 isn't a contract violation.
 - The file has to describe what the Go decoder actually accepts, not what the clients happen to send. `encoding/json` takes a missing field, or `null`, as its zero value, so a field the handler doesn't insist on is optional in the file, and an optional array is `nullable` too.
 - `format: uuid` is the handlers' own pattern, any hex UUID, not kin-openapi's RFC 4122 one, which would refuse ids with other version bits.
+- The cross-origin guard's 403 (§4.19) answers before any operation and isn't in the file, so a test of it can't go through the check.
 - The file's `servers` entry is for readers; the router can't match a relative one, so the check cuts the `/v1` prefix itself. A path outside `/v1` (tiles, pages) is never checked.
 
 ### 4.32 Service statistics
