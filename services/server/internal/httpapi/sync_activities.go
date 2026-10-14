@@ -88,6 +88,10 @@ type syncActivitiesResponse struct {
 // path, and ingest.Process's `ON CONFLICT DO NOTHING` at persist time is the actual guarantee
 // under concurrent duplicates.
 func (s *Server) handleSyncActivities(w http.ResponseWriter, r *http.Request) {
+	// Before the body is read, as for uploads.
+	if limited(w, r, s.syncLimiter, "error.sync_rate_limit") {
+		return
+	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxSyncBodyBytes)
 
 	var req syncActivitiesRequest

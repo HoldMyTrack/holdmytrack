@@ -82,6 +82,9 @@ type Server struct {
 	facebook              facebookOAuth
 	pages                 *web.Renderer
 	uploadLimiter         *fixedWindowLimiter
+	tileLimiter           *fixedWindowLimiter
+	syncLimiter           *fixedWindowLimiter
+	trackPointsLimiter    *fixedWindowLimiter
 }
 
 // defaultUploadsPerHour is how many files one account may send to `POST /v1/activities/upload`
@@ -99,6 +102,9 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 		facebook:              newFacebookOAuth(facebook),
 		pages:                 pages,
 		uploadLimiter:         newFixedWindowLimiter(defaultUploadsPerHour, time.Hour),
+		tileLimiter:           newFixedWindowLimiter(defaultTilesPerMinute, time.Minute),
+		syncLimiter:           newFixedWindowLimiter(syncRequestsPerHour, time.Hour),
+		trackPointsLimiter:    newFixedWindowLimiter(trackPointsPerHour, time.Hour),
 	}
 	s.registerPages()
 	s.mux.HandleFunc(route("POST", "/auth/signup"), s.handleSignup)
@@ -183,11 +189,11 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("GET", "/coverage/status"), s.requireVerified(s.handleCoverageStatus))
 	s.mux.HandleFunc(route("POST", "/sync/activities"), s.requireNotDemo(s.handleSyncActivities))
 	s.mux.HandleFunc(route("POST", "/sync/known"), s.requireNotDemo(s.handleSyncKnown))
-	s.mux.HandleFunc(tileRoute("GET", "/tracks/{z}/{x}/{y}"), s.requireVerified(s.handleTracksTile))
-	s.mux.HandleFunc(tileRoute("GET", "/fog/{z}/{x}/{y}"), s.requireVerified(s.handleFogTile))
-	s.mux.HandleFunc(tileRoute("GET", "/heatmap/{z}/{x}/{y}"), s.requireVerified(s.handleHeatmapTile))
-	s.mux.HandleFunc(tileRoute("GET", "/spots/{z}/{x}/{y}"), s.requireVerified(s.handleSpotsTile))
-	s.mux.HandleFunc(tileRoute("GET", "/bike-paths/{z}/{x}/{y}"), s.requireVerified(s.handleBikePathsTile))
+	s.tile("/tracks/{z}/{x}/{y}", s.handleTracksTile)
+	s.tile("/fog/{z}/{x}/{y}", s.handleFogTile)
+	s.tile("/heatmap/{z}/{x}/{y}", s.handleHeatmapTile)
+	s.tile("/spots/{z}/{x}/{y}", s.handleSpotsTile)
+	s.tile("/bike-paths/{z}/{x}/{y}", s.handleBikePathsTile)
 	s.mux.HandleFunc(route("GET", "/spots"), s.requireVerified(s.handleSpotsInArea))
 	s.mux.HandleFunc(route("GET", "/spots/captures"), s.requireVerified(s.handleListSpotCaptures))
 	s.mux.HandleFunc(route("GET", "/spots/{id}"), s.requireVerified(s.handleSpotDetail))
@@ -195,10 +201,10 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	// §4.2.4's Country/Region zoom tiers — live MVT, not precomputed, see
 	// admin_country_tiles.go's own doc comment for why that's safe here despite the
 	// live-heatmap-compositing cost fog/heatmap's own tiles were moved away from.
-	s.mux.HandleFunc(tileRoute("GET", "/country-fog/{z}/{x}/{y}"), s.requireVerified(s.handleCountryFogTile))
-	s.mux.HandleFunc(tileRoute("GET", "/country-heatmap/{z}/{x}/{y}"), s.requireVerified(s.handleCountryHeatmapTile))
-	s.mux.HandleFunc(tileRoute("GET", "/region-fog/{z}/{x}/{y}"), s.requireVerified(s.handleRegionFogTile))
-	s.mux.HandleFunc(tileRoute("GET", "/region-heatmap/{z}/{x}/{y}"), s.requireVerified(s.handleRegionHeatmapTile))
+	s.tile("/country-fog/{z}/{x}/{y}", s.handleCountryFogTile)
+	s.tile("/country-heatmap/{z}/{x}/{y}", s.handleCountryHeatmapTile)
+	s.tile("/region-fog/{z}/{x}/{y}", s.handleRegionFogTile)
+	s.tile("/region-heatmap/{z}/{x}/{y}", s.handleRegionHeatmapTile)
 	// Deliberately not behind requireAuth, unlike every /v1 route above it. The style
 	// document is derived entirely from the public Protomaps basemap and contains no
 	// per-user data — only layer definitions and the asset URLs a client would need

@@ -28,6 +28,8 @@ Fill in every value — see that file's own comments for what each one means and
 
 **Uploads per hour.** `UPLOADS_PER_HOUR` (default 100) is how many files one account may send to `POST /v1/activities/upload` in an hour (`docs/SPEC.md` FR-3.1). Leave it at 100. A load test's `seed` and `import` send more than that per account, so raise it for their run (`docs/PERFORMANCE.md`). A change needs only `up -d` for `api`, which also starts every account's count afresh.
 
+**Tiles per minute.** `TILES_PER_MINUTE` (default 1200) is how many tile requests one account may make in a minute, across every map layer (`docs/SPEC.md` FR-4.11). Leave it at 1200. A load test's `browse` runs several visitors on each test account, so raise it for its run (`docs/PERFORMANCE.md`). A change needs only `up -d` for `api`.
+
 **Sign in with Google (optional).** Leave `GOOGLE_CLIENT_ID` empty to run without it; the sign-in screen then shows only email and password. To turn it on:
 
 1. In the Google Cloud console, create a project (or reuse one) and set up the OAuth consent screen: user type External, app name HoldMyTrack, the domain from step 3 as an authorized domain, and only the `openid`, `email` and `profile` scopes — none of them needs Google's app verification. Publish it ("In production"); in "Testing" only listed test users can sign in.
@@ -457,4 +459,4 @@ The two backup alerts read the files the scripts write after a successful run (�
 
 ## What this doesn't cover
 
-Per `docs/ROADMAP.md`, still open beyond this minimal setup: per-user quotas, the app's own rate limits and an R2 budget (Phase 5), and the compliance work (DPIA, EU-region hosting — Phase 6) a genuine public launch needs regardless of how small the deployment is. This document gets you to "it's live," not to "it's ready for the public."
+Per `docs/ROADMAP.md`, still open beyond this minimal setup: per-user quotas and an R2 budget (Phase 5), and the compliance work (DPIA, EU-region hosting — Phase 6) a genuine public launch needs regardless of how small the deployment is. This document gets you to "it's live," not to "it's ready for the public."

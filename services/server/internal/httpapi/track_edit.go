@@ -30,6 +30,9 @@ type trackPointsResponse struct {
 // very places those locations exist to hide. A piece of a split (§4.7.8) gets its own range
 // of them only.
 func (s *Server) handleActivityTrackPoints(w http.ResponseWriter, r *http.Request) {
+	if limited(w, r, s.trackPointsLimiter, "error.track_points_rate_limit") {
+		return
+	}
 	activityID, ok := activityIDFromPath(w, r)
 	if !ok {
 		return

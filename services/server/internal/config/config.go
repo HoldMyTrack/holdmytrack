@@ -90,6 +90,10 @@ type Config struct {
 	// UploadsPerHour is how many files one account may upload in an hour (internal/httpapi's
 	// defaultUploadsPerHour). Raised only on a load test's target. Only read by `serve`.
 	UploadsPerHour int
+	// TilesPerMinute is how many tile requests one account may make in a minute
+	// (internal/httpapi's defaultTilesPerMinute). Raised only on a load test's target. Only
+	// read by `serve`.
+	TilesPerMinute int
 }
 
 func Load() (Config, error) {
@@ -132,6 +136,9 @@ func Load() (Config, error) {
 		return c, err
 	}
 	if c.UploadsPerHour, err = positiveInt("UPLOADS_PER_HOUR", 100); err != nil {
+		return c, err
+	}
+	if c.TilesPerMinute, err = positiveInt("TILES_PER_MINUTE", 1200); err != nil {
 		return c, err
 	}
 	c.WebDevDir = env("WEB_DEV_DIR", "")
