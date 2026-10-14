@@ -60,6 +60,14 @@ var (
 		Help: "Jobs finished by the worker, by kind, outcome and failure code.",
 	}, []string{"kind", "outcome", "code"})
 
+	// R2Operations counts the requests this process made to the object store, by the class R2
+	// bills them as: "A" (writes, listings) or "B" (reads); deletes are free and not counted
+	// (internal/storage's countingTransport).
+	R2Operations = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "holdmytrack_r2_operations_total",
+		Help: "Object store requests by R2 billing class.",
+	}, []string{"class"})
+
 	// JobDuration is how long a job ran, by kind.
 	JobDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "holdmytrack_job_duration_seconds",
@@ -72,7 +80,7 @@ func init() {
 	Registry.MustRegister(
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
-		HTTPRequests, HTTPDuration, HTTPPanics, JobsFinished, JobDuration,
+		HTTPRequests, HTTPDuration, HTTPPanics, JobsFinished, JobDuration, R2Operations,
 	)
 }
 

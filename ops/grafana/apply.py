@@ -101,6 +101,16 @@ RULES = [
          expr=f'max(holdmytrack_stat{{{D}, key="original_bytes_per_account.max"}})',
          op=">", threshold=2.5e9, for_="0m", nodata="OK",
          summary="The heaviest account's original files take up {{ humanize $values.A.Value }}B, of the 5 GB every account can keep. A script, or a real person to raise the limit for (ADR-0043)?"),
+    # The daily R2 budget (ADR-0044, internal/budget): half spent is a look, 70% is when renders
+    # stop and the next stage, adding, is close. No data is fine: api reports it on each scrape.
+    dict(uid="hmt-r2-budget-half", title="Half the daily R2 budget spent",
+         expr=f'max(holdmytrack_r2_budget_used_ratio{{{D}}})',
+         op=">", threshold=0.5, for_="0m", nodata="OK",
+         summary="Today's object store requests have cost {{ humanizePercentage $values.A.Value }} of the daily R2 budget. Renders stop at 70%, adding at 85%, until midnight UTC. Real use? Raise R2_DAILY_BUDGET_USD (docs/DEPLOY.md §4)."),
+    dict(uid="hmt-r2-budget-renders", title="Renders paused by the daily R2 budget",
+         expr=f'max(holdmytrack_r2_budget_used_ratio{{{D}}})',
+         op=">", threshold=0.7, for_="0m", nodata="OK",
+         summary="Today's object store requests have cost {{ humanizePercentage $values.A.Value }} of the daily R2 budget: Fog and Heatmap wait for midnight UTC, and uploads stop at 85%."),
     dict(uid="hmt-drill-stale", title="Restore drill overdue",
          expr=f'(time() - max(holdmytrack_restore_drill_last_success_timestamp_seconds{{{D}}})) or vector({NEVER})',
          op=">", threshold=33 * 86400, for_="1h", nodata="Alerting",

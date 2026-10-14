@@ -19,6 +19,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/budget"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mail"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mapstyle"
@@ -87,6 +88,7 @@ type Server struct {
 	trackPointsLimiter    *fixedWindowLimiter
 	syncActivityLimiter   *fixedWindowLimiter
 	signupLimiter         *fixedWindowLimiter
+	budget                *budget.Gate
 }
 
 // defaultUploadsPerHour is how many files one account may send to `POST /v1/activities/upload`
@@ -141,15 +143,15 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	// Readable by a demo session, whose Settings screen shows the fields, disabled.
 	s.mux.HandleFunc(route("GET", "/account/settings/options"), s.requireVerified(s.handleSettingsOptions))
 	s.mux.HandleFunc(route("POST", "/account/avatar"), s.requireNotDemo(s.handleUploadAvatar))
-	s.mux.HandleFunc(route("GET", "/account/avatar"), s.requireVerified(s.handleGetAvatar))
+	s.mux.HandleFunc(route("GET", "/account/avatar"), s.requireVerified(s.budgeted(budget.ReadsPaused, s.handleGetAvatar)))
 	s.mux.HandleFunc(route("DELETE", "/account/avatar"), s.requireNotDemo(s.handleDeleteAvatar))
 	// requireAuth alone: an unverified account can be deleted too. closeAccount refuses a demo.
 	s.mux.HandleFunc(route("DELETE", "/account"), s.requireAuth(s.handleDeleteAccount))
 	// exports.go — downloading your data. A demo session sees "none" and is refused a request.
 	s.mux.HandleFunc(route("POST", "/account/export"), s.requireNotDemo(s.handleRequestExport))
 	s.mux.HandleFunc(route("GET", "/account/export"), s.requireVerified(s.handleGetExport))
-	s.mux.HandleFunc(route("GET", "/account/exports/{id}/parts/{n}"), s.requireVerified(s.handleDownloadExportPart))
-	s.mux.HandleFunc(route("POST", "/activities/upload"), s.requireNotDemo(s.handleUpload))
+	s.mux.HandleFunc(route("GET", "/account/exports/{id}/parts/{n}"), s.requireVerified(s.budgeted(budget.ReadsPaused, s.handleDownloadExportPart)))
+	s.mux.HandleFunc(route("POST", "/activities/upload"), s.requireNotDemo(s.budgeted(budget.AddingPaused, s.handleUpload)))
 	s.mux.HandleFunc(route("GET", "/activities"), s.requireVerified(s.handleListActivities))
 	s.mux.HandleFunc(route("PATCH", "/activities/{id}"), s.requireNotDemo(s.handleUpdateActivity))
 	s.mux.HandleFunc(route("DELETE", "/activities/{id}"), s.requireNotDemo(s.handleDeleteActivity))
@@ -160,7 +162,7 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("GET", "/activities/trends"), s.requireVerified(s.handleActivityTrends))
 	s.mux.HandleFunc(route("GET", "/activities/status/{external_id}"), s.requireVerified(s.handleActivityStatus))
 	s.mux.HandleFunc(route("GET", "/activities/track-metrics/{id}"), s.requireVerified(s.handleActivityTrackMetrics))
-	s.mux.HandleFunc(route("GET", "/activities/track-points/{id}"), s.requireVerified(s.handleActivityTrackPoints))
+	s.mux.HandleFunc(route("GET", "/activities/track-points/{id}"), s.requireVerified(s.budgeted(budget.ReadsPaused, s.handleActivityTrackPoints)))
 	s.mux.HandleFunc(route("POST", "/activities/track-edit/{id}"), s.requireNotDemo(s.handleActivityTrackEdit))
 	s.mux.HandleFunc(route("POST", "/activities/track-merge"), s.requireNotDemo(s.handleActivityTrackMerge))
 	s.mux.HandleFunc(route("GET", "/private-locations"), s.requireVerified(s.handleListPrivateLocations))
@@ -177,25 +179,25 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	// Sending a copy of a Story (story_sends.go).
 	s.mux.HandleFunc(route("POST", "/stories/{id}/send"), s.requireNotDemo(s.handleSendStory))
 	s.mux.HandleFunc(route("GET", "/story-sends"), s.requireVerified(s.handleListStorySends))
-	s.mux.HandleFunc(route("POST", "/story-sends/{id}/accept"), s.requireNotDemo(s.handleAcceptStorySend))
+	s.mux.HandleFunc(route("POST", "/story-sends/{id}/accept"), s.requireNotDemo(s.budgeted(budget.AddingPaused, s.handleAcceptStorySend)))
 	s.mux.HandleFunc(route("DELETE", "/story-sends/{id}"), s.requireNotDemo(s.handleDeclineStorySend))
 	// Activity photos (photos.go) — under /photos rather than /activities/{id}/photos, which
 	// would collide with /activities/track-points/{id} and the other fixed segments above.
 	s.mux.HandleFunc(route("GET", "/photos"), s.requireVerified(s.handleListPhotos))
-	s.mux.HandleFunc(route("POST", "/photos"), s.requireNotDemo(s.handleUploadPhoto))
+	s.mux.HandleFunc(route("POST", "/photos"), s.requireNotDemo(s.budgeted(budget.AddingPaused, s.handleUploadPhoto)))
 	s.mux.HandleFunc(route("POST", "/photos/place"), s.requireNotDemo(s.handlePlacePhoto))
-	s.mux.HandleFunc(route("GET", "/photos/{id}"), s.requireVerified(s.handleGetPhoto))
-	s.mux.HandleFunc(route("GET", "/photos/{id}/thumb"), s.requireVerified(s.handleGetPhotoThumb))
+	s.mux.HandleFunc(route("GET", "/photos/{id}"), s.requireVerified(s.budgeted(budget.ReadsPaused, s.handleGetPhoto)))
+	s.mux.HandleFunc(route("GET", "/photos/{id}/thumb"), s.requireVerified(s.budgeted(budget.ReadsPaused, s.handleGetPhotoThumb)))
 	s.mux.HandleFunc(route("PATCH", "/photos/{id}"), s.requireNotDemo(s.handleUpdatePhoto))
 	s.mux.HandleFunc(route("DELETE", "/photos/{id}"), s.requireNotDemo(s.handleDeletePhoto))
 	s.mux.HandleFunc(route("GET", "/uploads"), s.requireVerified(s.handleListUploads))
 	s.mux.HandleFunc(route("GET", "/uploads/active"), s.requireVerified(s.handleActiveUploads))
 	s.mux.HandleFunc(route("GET", "/coverage/status"), s.requireVerified(s.handleCoverageStatus))
-	s.mux.HandleFunc(route("POST", "/sync/activities"), s.requireNotDemo(s.handleSyncActivities))
+	s.mux.HandleFunc(route("POST", "/sync/activities"), s.requireNotDemo(s.budgeted(budget.AddingPaused, s.handleSyncActivities)))
 	s.mux.HandleFunc(route("POST", "/sync/known"), s.requireNotDemo(s.handleSyncKnown))
 	s.tile("/tracks/{z}/{x}/{y}", s.handleTracksTile)
-	s.tile("/fog/{z}/{x}/{y}", s.handleFogTile)
-	s.tile("/heatmap/{z}/{x}/{y}", s.handleHeatmapTile)
+	s.tile("/fog/{z}/{x}/{y}", s.budgeted(budget.ReadsPaused, s.handleFogTile))
+	s.tile("/heatmap/{z}/{x}/{y}", s.budgeted(budget.ReadsPaused, s.handleHeatmapTile))
 	s.tile("/spots/{z}/{x}/{y}", s.handleSpotsTile)
 	s.tile("/bike-paths/{z}/{x}/{y}", s.handleBikePathsTile)
 	s.mux.HandleFunc(route("GET", "/spots"), s.requireVerified(s.handleSpotsInArea))

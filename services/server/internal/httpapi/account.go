@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/budget"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
 )
 
@@ -129,6 +130,9 @@ func (s *Server) handleUploadAvatar(w http.ResponseWriter, r *http.Request) {
 // setAvatar is the avatar upload's shared core (the JSON endpoint and the /settings page's
 // avatar form, both multipart with the image in field "file").
 func (s *Server) setAvatar(w http.ResponseWriter, r *http.Request, userID string) error {
+	if err := s.overBudget(r.Context(), budget.AddingPaused); err != nil {
+		return err
+	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxAvatarBytes+1<<20) // +1MiB of multipart overhead
 	if err := r.ParseMultipartForm(maxAvatarBytes); err != nil {
 		return accountFailure(http.StatusRequestEntityTooLarge, "error.avatar_too_large")

@@ -149,6 +149,8 @@ services:
       TILES_PER_MINUTE: ${TILES_PER_MINUTE:-1200}
       # Accounts one address may create an hour (docs/DEPLOY.md §4); raise it for a load test.
       SIGNUPS_PER_HOUR: ${SIGNUPS_PER_HOUR:-5}
+      # Daily R2 budget in US dollars, read by api and worker (docs/DEPLOY.md §4).
+      R2_DAILY_BUDGET_USD: ${R2_DAILY_BUDGET_USD:-2}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-}

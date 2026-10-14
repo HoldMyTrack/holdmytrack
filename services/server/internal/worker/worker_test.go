@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/budget"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/db"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
@@ -403,5 +404,24 @@ func TestRenderFogCoalescesWhileUnclaimed(t *testing.T) {
 	}
 	if n := count(); n != 2 {
 		t.Fatalf("an enqueue behind a claimed job left %d jobs, want 2", n)
+	}
+}
+
+func TestLanePaused(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		l     lane
+		stage budget.Stage
+		want  bool
+	}{
+		{"renders run on a normal day", laneRender, budget.Normal, false},
+		{"renders wait at the first stage", laneRender, budget.RendersPaused, true},
+		{"exports run at the first stage", laneLong, budget.RendersPaused, false},
+		{"exports wait once adding stops", laneLong, budget.AddingPaused, true},
+		{"the main lane always runs", laneMain, budget.ReadsPaused, false},
+	} {
+		if got := lanePaused(tc.l, tc.stage); got != tc.want {
+			t.Errorf("%s: got %v", tc.name, got)
+		}
 	}
 }

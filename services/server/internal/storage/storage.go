@@ -43,7 +43,7 @@ func New(endpoint, accessKey, secretKey, bucket string) (*Store, error) {
 	client, err := minio.New(host, &minio.Options{
 		Creds:     credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure:    secure,
-		Transport: transport,
+		Transport: countingTransport{next: transport, bucket: bucket},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("storage: new client: %w", err)

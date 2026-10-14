@@ -105,6 +105,8 @@ services:
       TILES_PER_MINUTE: ${TILES_PER_MINUTE:-1200}
       # Accounts one address may create an hour (docs/DEPLOY.md §4); raised only for a load test.
       SIGNUPS_PER_HOUR: ${SIGNUPS_PER_HOUR:-5}
+      # Daily R2 budget in US dollars, read by api and worker (docs/DEPLOY.md §4).
+      R2_DAILY_BUDGET_USD: ${R2_DAILY_BUDGET_USD:-2}
       # Sign in with Google (docs/SPEC.md FR-1.9, docs/DEPLOY.md) — optional; empty turns it
       # off. The redirect URL defaults to APP_BASE_URL + /v1/auth/google/callback (config.go),
       # which is right here because Caddy serves the app and the API from one origin.

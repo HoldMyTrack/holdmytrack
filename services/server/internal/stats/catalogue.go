@@ -195,6 +195,11 @@ var catalogue = []stat{
 		SELECT count(*) FROM exports e JOIN acct u ON u.id = e.user_id, p
 		WHERE e.requested_at >= p.d0 AND e.requested_at < p.d1`},
 
+	// Object store requests, by the class R2 bills them as, from the daily budget's own count
+	// (internal/budget): what the operations cost, kept past r2_ops' use for the day.
+	{prefix: "r2_ops", kind: flow, groups: []string{"class_a", "class_b"}, query: `
+		SELECT 'class_' || lower(o.class), o.count FROM r2_ops o, p WHERE o.day = (p.d0 AT TIME ZONE 'UTC')::date`},
+
 	// Jobs: finished ones by the day they finished, pending ones as they stand. Jobs without an
 	// account (none today) count; the demo's don't.
 	{prefix: "jobs", kind: flow, query: `

@@ -98,6 +98,10 @@ type Config struct {
 	// in an hour (internal/httpapi's defaultSignupsPerHour). Raised only while a load test
 	// creates its accounts. Only read by `serve`.
 	SignupsPerHour int
+	// R2DailyBudgetUSD is the daily R2 budget in US dollars (internal/budget, docs/DEPLOY.md
+	// §4): what every account together may spend on object store requests in a UTC day before
+	// the service starts giving things up. Read by `serve` and `work`.
+	R2DailyBudgetUSD float64
 }
 
 func Load() (Config, error) {
@@ -148,6 +152,9 @@ func Load() (Config, error) {
 	if c.SignupsPerHour, err = positiveInt("SIGNUPS_PER_HOUR", 5); err != nil {
 		return c, err
 	}
+	if c.R2DailyBudgetUSD, err = positiveFloat("R2_DAILY_BUDGET_USD", 2); err != nil {
+		return c, err
+	}
 	c.WebDevDir = env("WEB_DEV_DIR", "")
 	c.GoogleClientID = env("GOOGLE_CLIENT_ID", "")
 	c.GoogleClientSecret = env("GOOGLE_CLIENT_SECRET", "")
@@ -192,6 +199,19 @@ func positiveInt(key string, def int) (int, error) {
 		return 0, fmt.Errorf("config: %s must be a positive integer, got %q", key, v)
 	}
 	return n, nil
+}
+
+// positiveFloat reads key as a number above 0, def when unset.
+func positiveFloat(key string, def float64) (float64, error) {
+	v := os.Getenv(key)
+	if v == "" {
+		return def, nil
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil || !(f > 0) {
+		return 0, fmt.Errorf("config: %s must be a number above 0, got %q", key, v)
+	}
+	return f, nil
 }
 
 func env(key, def string) string {
