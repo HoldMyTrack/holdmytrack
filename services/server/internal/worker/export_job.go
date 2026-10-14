@@ -67,9 +67,13 @@ func runExport(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, lo
 		return err
 	}
 	var expires time.Time
+	// The account's last_export_ready_at moves with it: the once-a-week rule counts from here.
 	if err := pool.QueryRow(ctx, `
-		UPDATE exports SET ready_at = NOW(), expires_at = NOW() + make_interval(secs => $2), part_sizes = $3
-		WHERE id = $1 RETURNING expires_at`, ej.ExportID, export.Lifetime.Seconds(), sizes,
+		WITH e AS (
+			UPDATE exports SET ready_at = NOW(), expires_at = NOW() + make_interval(secs => $2), part_sizes = $3
+			WHERE id = $1 RETURNING user_id, expires_at)
+		UPDATE users u SET last_export_ready_at = NOW() FROM e WHERE u.id = e.user_id
+		RETURNING e.expires_at`, ej.ExportID, export.Lifetime.Seconds(), sizes,
 	).Scan(&expires); err != nil {
 		return fmt.Errorf("export mark ready: %w", err)
 	}

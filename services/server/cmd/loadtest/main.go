@@ -8,7 +8,8 @@
 //	go run ./cmd/loadtest -base https://example.com -dir /tmp/lt cleanup
 //
 // seed and import send more files than an account may upload in an hour, so run them against
-// an api with UPLOADS_PER_HOUR raised (docs/PERFORMANCE.md).
+// an api with UPLOADS_PER_HOUR raised, and browse against one with TILES_PER_MINUTE raised
+// (docs/PERFORMANCE.md).
 //
 // Subcommands:
 //

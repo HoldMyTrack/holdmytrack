@@ -12,6 +12,8 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/export"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
+	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
 )
 
 // Downloading your data (SPEC FR-1.12, IMPLEMENTATION.md §4.29): a request makes an exports
@@ -81,9 +83,22 @@ func (s *Server) latestExport(ctx context.Context, userID string) (exportStatus,
 	return st, nil
 }
 
+// exportAvailableFrom is when an account may ask for its next export: one a week, counted from
+// when the last one was built (users.last_export_ready_at, nil for never), so a failed build
+// doesn't use up the week. The wait is the download window itself (export.Lifetime): the next
+// copy can be asked for as the last one expires. The zero time means now.
+func exportAvailableFrom(lastReady *time.Time) time.Time {
+	if lastReady == nil {
+		return time.Time{}
+	}
+	return lastReady.Add(export.Lifetime)
+}
+
 // requestExport asks for a new export, unless one is already being prepared, which it
-// returns instead. A new one ends any earlier one's downloads at once (the worker's sweep
-// removes its parts). lang is the language its email and README are written in.
+// returns instead, or the account's last one was built less than a week ago
+// (exportAvailableFrom). A new one ends any earlier one's downloads at once (the worker's sweep
+// removes its parts). lang is the language its email and README are written in, and the
+// refusal's.
 func (s *Server) requestExport(ctx context.Context, userID string, isDemo bool, lang string) (exportStatus, error) {
 	if isDemo {
 		return exportStatus{}, accountFailure(http.StatusForbidden, "error.demo_read_only")
@@ -94,7 +109,10 @@ func (s *Server) requestExport(ctx context.Context, userID string, isDemo bool, 
 	}
 	defer tx.Rollback(ctx)
 	// The account's row as a lock: two requests at once make one export, not two.
-	if _, err := tx.Exec(ctx, `SELECT 1 FROM users WHERE id = $1 FOR UPDATE`, userID); err != nil {
+	var lastReady *time.Time
+	var timezone string
+	if err := tx.QueryRow(ctx, `SELECT last_export_ready_at, timezone FROM users WHERE id = $1 FOR UPDATE`, userID,
+	).Scan(&lastReady, &timezone); err != nil {
 		return exportStatus{}, fmt.Errorf("request export: lock: %w", err)
 	}
 	var preparing bool
@@ -105,6 +123,10 @@ func (s *Server) requestExport(ctx context.Context, userID string, isDemo bool, 
 		return exportStatus{}, fmt.Errorf("request export: check: %w", err)
 	}
 	if !preparing {
+		if from := exportAvailableFrom(lastReady); time.Now().Before(from) {
+			return exportStatus{}, accountFailure(http.StatusTooManyRequests, "error.export_too_soon",
+				"time", web.LocalTime(i18n.Get(lang), from, timezone))
+		}
 		if _, err := tx.Exec(ctx, `UPDATE exports SET expires_at = NOW() WHERE user_id = $1 AND ready_at IS NOT NULL`, userID); err != nil {
 			return exportStatus{}, fmt.Errorf("request export: expire old: %w", err)
 		}
