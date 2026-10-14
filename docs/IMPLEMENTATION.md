@@ -951,7 +951,7 @@ Outdoor places from OpenStreetMap, on the web and in the Android app over the sa
 
 **Enforced by tests, not by generating handlers from it.** Every exchange a database test makes is matched to the file (`contract_test.go`, kin-openapi), and a mismatch fails the test. That checks the bytes sent, which generated Go types can't: a nil slice encoded as `null`, an `omitempty` dropping a required field, a time in another format. It also leaves the handlers as they are. The cost is that only exchanges some test makes are checked. kin-openapi is imported only by test files, so it isn't in the server binary. Traps:
 - The request is checked only when the server accepted it: a test that sends a bad body to get its 400 isn't a contract violation.
-- The file has to describe what the Go decoder actually accepts, not what the clients happen to send. `encoding/json` takes a missing field as its zero value, so a field the handler doesn't insist on is optional in the file.
+- The file has to describe what the Go decoder actually accepts, not what the clients happen to send. `encoding/json` takes a missing field, or `null`, as its zero value, so a field the handler doesn't insist on is optional in the file, and an optional array is `nullable` too.
 - `format: uuid` is the handlers' own pattern, any hex UUID, not kin-openapi's RFC 4122 one, which would refuse ids with other version bits.
 - The file's `servers` entry is for readers; the router can't match a relative one, so the check cuts the `/v1` prefix itself. A path outside `/v1` (tiles, pages) is never checked.
 

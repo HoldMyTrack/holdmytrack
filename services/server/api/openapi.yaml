@@ -113,7 +113,226 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/PlainError" }
+  /stories:
+    get:
+      summary: The signed-in account's Stories, newest first, each with its members and statistics
+      responses:
+        "200":
+          description: The Stories
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [stories]
+                additionalProperties: false
+                properties:
+                  stories:
+                    type: array
+                    items: { $ref: "#/components/schemas/Story" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+    post:
+      summary: Create a Story, optionally with its first activities
+      description: Any activity that isn't the caller's own fails the whole request with a 404 and creates nothing.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: "#/components/schemas/StoryInput" }
+                - type: object
+                  properties:
+                    activity_ids: { $ref: "#/components/schemas/ActivityIDs" }
+      responses:
+        "201":
+          description: The new Story
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Story" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/PlainError" }
+  /stories/{id}:
+    parameters:
+      - $ref: "#/components/parameters/StoryID"
+    get:
+      summary: One of the signed-in account's Stories
+      responses:
+        "200":
+          description: The Story
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Story" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+        "404": { $ref: "#/components/responses/PlainError" }
+    patch:
+      summary: Rename a Story or change its description (a full replace)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StoryInput" }
+      responses:
+        "200":
+          description: The Story as saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Story" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/PlainError" }
+    delete:
+      summary: Delete a Story; its activities stay
+      responses:
+        "204":
+          description: Deleted
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/PlainError" }
+  /stories/{id}/activities:
+    parameters:
+      - $ref: "#/components/parameters/StoryID"
+    post:
+      summary: Add activities to a Story
+      description: One already in the Story is left as it is; one that isn't the caller's own fails the whole request with a 404 and adds nothing.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StoryActivitiesInput" }
+      responses:
+        "200":
+          description: The Story as saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Story" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/PlainError" }
+    delete:
+      summary: Take activities out of a Story; an id not in it is ignored, and the activities stay
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StoryActivitiesInput" }
+      responses:
+        "200":
+          description: The Story as saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Story" }
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/PlainError" }
+  /stories/{id}/send:
+    parameters:
+      - $ref: "#/components/parameters/StoryID"
+    post:
+      summary: Send a copy of a Story to another account by email address
+      description: 204 whether or not the address belongs to an account that can receive it, so the answer doesn't tell the sender who has an account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string }
+      responses:
+        "204":
+          description: Sent, or silently not
+        "400": { $ref: "#/components/responses/PlainError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/PlainError" }
+        "429": { $ref: "#/components/responses/PlainError" }
+  /story-sends:
+    get:
+      summary: Copies of Stories waiting for the signed-in account, newest first, and accepted ones still being copied
+      responses:
+        "200":
+          description: The waiting and arriving copies
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sends, copying]
+                additionalProperties: false
+                properties:
+                  sends:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, story_name, from, sent_at, activity_count]
+                      additionalProperties: false
+                      properties:
+                        id: { type: string, format: uuid }
+                        story_name: { type: string }
+                        from:
+                          type: string
+                          description: The sender's name, or their email address when they've set none.
+                        sent_at: { type: string, format: date-time }
+                        activity_count: { type: integer }
+                  copying:
+                    type: array
+                    items:
+                      type: object
+                      required: [story_name, from]
+                      additionalProperties: false
+                      properties:
+                        story_name: { type: string }
+                        from: { type: string }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/NotVerified" }
+  /story-sends/{id}/accept:
+    parameters:
+      - $ref: "#/components/parameters/StorySendID"
+    post:
+      summary: Accept a copy; the Story arrives once its copy job has run
+      responses:
+        "202":
+          description: Accepted, copy queued
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/PlainError" }
+        "409":
+          description: The account is at its activity or storage limit; the copy stays waiting
+          content:
+            text/plain:
+              schema: { type: string }
+        "503": { $ref: "#/components/responses/DailyCapacity" }
+  /story-sends/{id}:
+    parameters:
+      - $ref: "#/components/parameters/StorySendID"
+    delete:
+      summary: Decline a copy; nothing is copied
+      responses:
+        "204":
+          description: Declined
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/PlainError" }
 components:
+  parameters:
+    StoryID:
+      name: id
+      in: path
+      required: true
+      # Not format: uuid — a malformed id is a 404 from the handler, not a request error.
+      schema: { type: string }
+    StorySendID:
+      name: id
+      in: path
+      required: true
+      # Not format: uuid — a malformed id is a 404 from the handler, not a request error.
+      schema: { type: string }
   securitySchemes:
     session:
       type: http
@@ -140,6 +359,14 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/CodedError" }
+    DailyCapacity:
+      description: The service has reached its daily capacity; try again after Retry-After
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        text/plain:
+          schema: { type: string }
   schemas:
     CodedError:
       type: object
@@ -214,3 +441,70 @@ components:
         lon: { type: number }
         lat: { type: number }
         radius_m: { type: integer }
+    StoryInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: Trimmed; blank or longer than 200 characters is a 400.
+        description:
+          type: string
+          description: Trimmed; missing or empty leaves the Story without one. Longer than 2000 characters is a 400.
+    ActivityIDs:
+      type: array
+      nullable: true
+      maxItems: 10000
+      description: Duplicates are ignored; missing or null adds none.
+      items: { type: string, format: uuid }
+    StoryActivitiesInput:
+      type: object
+      required: [activity_ids]
+      properties:
+        activity_ids:
+          type: array
+          minItems: 1
+          maxItems: 10000
+          description: Duplicates are ignored.
+          items: { type: string, format: uuid }
+    Story:
+      type: object
+      required: [id, name, description, created_at, updated_at, from, activity_ids, stats]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        from:
+          type: string
+          nullable: true
+          description: Who sent the copy this Story came from, while the Story it was copied from still exists; null for the account's own.
+        activity_ids:
+          type: array
+          description: Every member, oldest activity first.
+          items: { type: string, format: uuid }
+        stats:
+          type: object
+          description: Joint statistics over every member, with no date bound.
+          required: [count, distance_meters, moving_seconds, elapsed_seconds, by_type]
+          additionalProperties: false
+          properties:
+            count: { type: integer }
+            distance_meters: { type: number }
+            moving_seconds: { type: integer }
+            elapsed_seconds: { type: integer }
+            by_type:
+              type: array
+              description: The same per activity type, most frequent first.
+              items:
+                type: object
+                required: [activity_type, count, distance_meters, moving_seconds, elapsed_seconds]
+                additionalProperties: false
+                properties:
+                  activity_type: { type: string }
+                  count: { type: integer }
+                  distance_meters: { type: number }
+                  moving_seconds: { type: integer }
+                  elapsed_seconds: { type: integer }
