@@ -40,7 +40,13 @@ recyclerview = "1.2.1"
 fragment = "1.8.9"
 # Unit tests for the panel's pure logic (src/test).
 junit = "4.13.2"
-json = "20240303"
+# The API's request and response bodies as typed classes (net/Wire.kt). The compiler plugin must
+# match the Kotlin compiler AGP builds with (2.2.10), and 1.9.0 is the last runtime built with
+# Kotlin 2.2: 1.10.0 needs 2.3's metadata, which this compiler can't read.
+kotlin = "2.2.10"
+serialization = "1.9.0"
+# The test that holds net/Wire.kt to the API contract reads services/server/api's YAML.
+snakeyaml = "2.5"
 
 [libraries]
 maplibre = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibre" }
@@ -57,7 +63,9 @@ browser = { module = "androidx.browser:browser", version.ref = "browser" }
 recyclerview = { module = "androidx.recyclerview:recyclerview", version.ref = "recyclerview" }
 fragment = { module = "androidx.fragment:fragment", version.ref = "fragment" }
 junit = { module = "junit:junit", version.ref = "junit" }
-json = { module = "org.json:json", version.ref = "json" }
+serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

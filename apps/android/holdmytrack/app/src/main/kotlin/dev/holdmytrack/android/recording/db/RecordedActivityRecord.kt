@@ -1,5 +1,7 @@
 package dev.holdmytrack.android.recording.db
 
+import dev.holdmytrack.android.net.SyncActivityJson
+import dev.holdmytrack.android.net.SyncPointJson
 import dev.holdmytrack.android.recording.RecordedPoint
 import java.time.Instant
 import org.json.JSONArray
@@ -27,25 +29,15 @@ data class RecordedActivityRecord(
     val createdAtMs: Long,
 )
 
-/** The exact shape `POST /v1/sync/activities` accepts for one batch entry
- *  (`docs/IMPLEMENTATION.md` §4.0.3/§4.0.4). */
-fun RecordedActivityRecord.toSyncJson(): JSONObject {
-    val pointsArray = JSONArray()
-    for (point in points) {
-        val json = JSONObject()
-            .put("lat", point.lat)
-            .put("lon", point.lon)
-            .put("time", point.time.toString())
-        point.elevationM?.let { json.put("elevation_m", it) }
-        pointsArray.put(json)
-    }
-    return JSONObject()
-        .put("external_id", id)
-        .put("activity_type", activityType)
-        .put("name", name)
-        .put("description", description)
-        .put("points", pointsArray)
-}
+/** The recording as one batch entry of `POST /v1/sync/activities` (`docs/IMPLEMENTATION.md`
+ *  §4.0.3/§4.0.4). */
+internal fun RecordedActivityRecord.toSyncActivity() = SyncActivityJson(
+    externalId = id,
+    activityType = activityType,
+    name = name,
+    description = description,
+    points = points.map { SyncPointJson(lat = it.lat, lon = it.lon, elevationM = it.elevationM?.toDouble(), time = it.time.toString()) },
+)
 
 /**
  * The recording as a GPX 1.1 file — `RecordingActivity`'s Download. GPX rather than the sync
@@ -74,9 +66,9 @@ fun RecordedActivityRecord.toGpx(): String = buildString {
 private fun xmlEscape(text: String): String =
     text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
 
-/** `points_json`'s wire format on disk — an array of `{lat, lon, elevation_m?, time}`,
- *  identical to the points array [toSyncJson] sends, so persisting and submitting never
- *  disagree about what a point is. */
+/** `points_json`'s format on disk — an array of `{lat, lon, elevation_m?, time}`, the same
+ *  fields as the points [toSyncActivity] sends, so persisting and submitting never disagree
+ *  about what a point is. */
 internal fun List<RecordedPoint>.toJson(): String {
     val array = JSONArray()
     for (point in this) {
