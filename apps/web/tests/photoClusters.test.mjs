@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 // Plain .mjs, like editTrackOps.test.mjs: Node strips the types from the imported module itself.
-import { clusterPoints } from '../src/map/photoClusters.ts';
+import { clusterPoints, photoMarkerSize } from '../src/map/photoClusters.ts';
 
 const ids = (clusters) => clusters.map((c) => c.ids);
 
@@ -30,4 +30,13 @@ test('grouping is anchored, not chained: a run of close points splits at the rad
 
 test('nothing in, nothing out', () => {
   assert.deepEqual(clusterPoints([]), []);
+});
+
+test('markers are hidden where tracks are, small zoomed out, full size from zoom 10', () => {
+  assert.equal(photoMarkerSize(0), 'hidden');
+  assert.equal(photoMarkerSize(3.99), 'hidden');
+  assert.equal(photoMarkerSize(4), 'small');
+  assert.equal(photoMarkerSize(9.99), 'small');
+  assert.equal(photoMarkerSize(10), 'full');
+  assert.equal(photoMarkerSize(18), 'full');
 });

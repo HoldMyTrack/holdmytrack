@@ -727,7 +727,7 @@ The first three never overlap: a way tagged as a cycleway or shared path that is
 | **Dirt tracks** | `highway=track`: a dirt, farm or forest road, unpaved and wide enough for a vehicle | Longer-dashed, wider brown, under the trails | Always | 12 | FR-4.13 |
 | **Spot badges** | A place of a ticked category: a playground, dog park, monument, mesmerizing view or historic site (FR-15.1) | A round badge, its category's icon in ink on white, ringed in gold; captured, its icon in white on gold, ringed darker | When its category is ticked in Layers; not during an Edit track session; a retired place only for an account that captured it | 13; 10–12 on request (**Show in this area**, badges only) | FR-15.2, FR-15.3, FR-15.5 |
 | **Spot areas** | A place's OpenStreetMap outline, or the 30 m circle of a place mapped as a point | Shaded faintly in gold, edged with a solid line (dashed for a circle) | With its badge | 13 | FR-15.2 |
-| **Photo markers** | The photos of the selected activity, of the one the Edit window is open on, or of every activity of the open Story | A photo's thumbnail in a round white frame; photos that would overlap, one marker: the first photo, stacked, with their count; the one open or in hand, larger, ringed in the accent | Normal mode; not for a hidden activity or while the Edit window's Track tab has the map | Any | FR-16.7 |
+| **Photo markers** | The photos of the selected activity, of the one the Edit window is open on, or of every activity of the open Story | A photo's thumbnail in a round white frame, smaller below zoom 10; photos that would overlap, one marker: the first photo, stacked, with their count; the one open or in hand, larger, ringed in the accent | Normal mode; not for a hidden activity or while the Edit window's Track tab has the map | 4 | FR-16.7 |
 | **Private locations** | The account's Private locations | Each a circle around a fixed-size center dot | Only while the Privacy tab is showing | Any | FR-8.1 |
 | **The track being edited** | The activity's full-resolution recorded points | Every point visible; the part outside the slider's knobs dashed and faded; every other track hidden | The Edit window's Track tab | Any | FR-5.14 |
 | **Sync candidates** (Android) | What's on the phone, waiting to be sent | A dashed line per candidate | While the Sync sheet shows | Any | `apps/android/docs/SPEC.md` FR-3.5 |
@@ -738,21 +738,21 @@ The first three never overlap: a way tagged as a cycleway or shared path that is
 
 **Zoom levels**: what the map draws at each zoom. Bike and shared paths and points of interest show only for what is ticked in the Layers menu; with nothing ticked they draw at no zoom. Trails and dirt tracks are always drawn.
 
-| Zoom | A 1280 px-wide view spans | Tracks (Normal) | Fog and Heatmap | Bike paths, shared paths and mountain-bike trails (ticked) | Trails and dirt tracks | Points of interest (ticked) |
-| :-- | :-- | :-- | :-- | :-- | :-- | :-- |
-| 0–2 | Most of the world or more (~25,000 km and more) | — | Whole countries | — | — | — |
-| 3 | A continent (~12,000 km) | — | States and regions | — | — | — |
-| 4–6 | Several countries to a country (~6,000–1,600 km) | Drawn | States and regions | — | — | — |
-| 7–8 | A state (~800–400 km) | Drawn | Street level | — | — | — |
-| 9 | A region (~200 km) | Drawn | Street level | Drawn | — | — |
-| 10–11 | A metro area (~100–50 km) | Drawn | Street level | Drawn | — | On request: **Show in this area** |
-| 12 | A city (~25 km) | Drawn | Street level | Drawn | Dirt tracks | On request: **Show in this area** |
-| 13 and up | A few neighbourhoods or less (~12 km and less) | Drawn | Street level | Drawn | Drawn | Drawn, loaded as the map moves |
+| Zoom | A 1280 px-wide view spans | Tracks (Normal) | Fog and Heatmap | Bike paths, shared paths and mountain-bike trails (ticked) | Trails and dirt tracks | Points of interest (ticked) | Photo markers (an activity or Story open) |
+| :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- |
+| 0–2 | Most of the world or more (~25,000 km and more) | — | Whole countries | — | — | — | — |
+| 3 | A continent (~12,000 km) | — | States and regions | — | — | — | — |
+| 4–6 | Several countries to a country (~6,000–1,600 km) | Drawn | States and regions | — | — | — | Small |
+| 7–8 | A state (~800–400 km) | Drawn | Street level | — | — | — | Small |
+| 9 | A region (~200 km) | Drawn | Street level | Drawn | — | — | Small |
+| 10–11 | A metro area (~100–50 km) | Drawn | Street level | Drawn | — | On request: **Show in this area** | Drawn |
+| 12 | A city (~25 km) | Drawn | Street level | Drawn | Dirt tracks | On request: **Show in this area** | Drawn |
+| 13 and up | A few neighbourhoods or less (~12 km and less) | Drawn | Street level | Drawn | Drawn | Drawn, loaded as the map moves | Drawn |
 
 **Behavior**:
 1. Each band starts at its first zoom and runs up to, not including, the next band's: zoom 6.9 is still States and regions, and zoom 12.9 still offers Show in this area.
 2. Zoomed in far enough, the map runs out of stored detail and enlarges the most detailed level it has instead: tracks, Fog, Heatmap, the three bike kinds and points of interest past zoom 14, the base map past zoom 15, and satellite imagery (FR-4.14) past the deployment's deepest level (zoom 18 on holdmytrack.com). Lines, labels and badges — the base map, tracks, paths and points of interest — stay sharp when enlarged, though a track's shape gets no more detailed; Fog, Heatmap and satellite imagery are pictures and grow softer.
-3. The Android app follows the same bands for tracks, Fog, Heatmap, paths and points of interest.
+3. The Android app follows the same bands for tracks, Fog, Heatmap, paths, points of interest and photo markers.
 
 **Notes**: The widths are at the equator; further from it the same zoom spans less ground (at Ohio's latitude, about a quarter less).
 
@@ -1574,10 +1574,11 @@ What is planned but not yet built is in `docs/ROADMAP.md`.
 **Behavior**:
 1. Whenever an activity is selected (FR-5.5) — and while the Edit window is open on one, as its Photos tab would leave them — each of its photos is drawn on its route as its thumbnail in a round frame, over the tracks. With no activity selected and a Story open (FR-14), every photo of the Story's activities is. None show in Fog of War or Heatmap, for an activity hidden on the map (FR-5.8), or while the Edit window's Track tab has the map. The photo in hand in the Photos tab is drawn larger.
 2. Photos whose markers would overlap at the current zoom — a whole trip seen zoomed out, or several taken at one spot — share one marker: the first of them in route order, stacked, with their count. The groups are worked out again after every move of the map, so zooming in splits them. The photo in hand in the Photos tab is never grouped.
-3. The photos follow the track: they're refetched when an Edit track or a Private location change has been reprocessed (FR-5.14, FR-8.1), and sit at the track's nearest end when their stretch was cut away (FR-16.2).
-4. Clicking a group's marker zooms the map in to fit its photos (to at most z19) when they lie more than 15 m apart; when they don't — photos taken at one spot, which no zoom separates — it opens the popup on the first of them, with ‹ › and "n of m" to step through the rest in route order, the popup staying where it opened.
-5. Clicking a photo's marker opens a popup at it, on the map rather than over the page: the picture, which opens the photo viewer when clicked (FR-16.8), its caption, when it was taken (if known), and Full size, which opens the stored copy in a new browser tab. It opens on whichever side of the marker it fits, moves with the map, and closes with its ×; its marker is drawn larger meanwhile. A marker's click doesn't change the selection. A demo session sees the same.
-6. Changing or deleting a photo is the Photos tab's (FR-16.6), not the popup's.
+3. Zoomed out, the markers make way for the tracks: below zoom 10 each is drawn smaller — the frame, the stack and the count — and grouped at that size, so the routes still show under them; the one open or in hand is the usual size. Below zoom 4, where tracks aren't drawn either (FR-4.1), no marker is.
+4. The photos follow the track: they're refetched when an Edit track or a Private location change has been reprocessed (FR-5.14, FR-8.1), and sit at the track's nearest end when their stretch was cut away (FR-16.2).
+5. Clicking a group's marker zooms the map in to fit its photos (to at most z19) when they lie more than 15 m apart; when they don't — photos taken at one spot, which no zoom separates — it opens the popup on the first of them, with ‹ › and "n of m" to step through the rest in route order, the popup staying where it opened.
+6. Clicking a photo's marker opens a popup at it, on the map rather than over the page: the picture, which opens the photo viewer when clicked (FR-16.8), its caption, when it was taken (if known), and Full size, which opens the stored copy in a new browser tab. It opens on whichever side of the marker it fits, moves with the map, and closes with its ×; its marker is drawn larger meanwhile. A marker's click doesn't change the selection. A demo session sees the same.
+7. Changing or deleting a photo is the Photos tab's (FR-16.6), not the popup's.
 
 ### FR-16.8 The photo viewer (web)
 
