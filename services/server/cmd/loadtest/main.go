@@ -399,8 +399,10 @@ func layers(mode string, spots bool, z int) ([]string, int) {
 			out = append(out, "country-fog:mvt")
 		case z < regionMaxZoom:
 			out = append(out, "region-fog:mvt")
-		default:
+		case *fogPNG:
 			out = append(out, "fog:png")
+		default:
+			out = append(out, "fog-vector:mvt")
 		}
 	}
 	if spots && z >= spotsMinZoom {
@@ -421,6 +423,10 @@ type visitor struct {
 	z     int
 	cache map[string]bool
 }
+
+// fogPNG has Fog ask for the PNG raster Android builds from before the vector veil draw, in
+// place of the vector tiles the clients now draw, to compare the two.
+var fogPNG = flag.Bool("fog-png", false, "browse: request Fog's PNG raster tiles instead of its vector tiles")
 
 // onlyMode pins every visitor to one mode for the whole run, for a session measuring one.
 var onlyMode = flag.String("mode", "", "browse: keep every visitor in this mode (normal, fog or heatmap) instead of the usual mix")
