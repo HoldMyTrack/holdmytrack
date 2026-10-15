@@ -61,7 +61,7 @@ Public pages, followers and the rest (`VISION.md` §5.7, §5.8). No steps are li
 - [x] Describe every `/v1` endpoint in the API contract, `services/server/api/` (`IMPLEMENTATION.md` §4.31), so every test that calls one checks it.
 - [x] One error shape for the JSON API, `{"error", "message"}` everywhere (ADR-0045), described in the contract.
 - [x] Generate the web client's types from the contract (`openapi-typescript`, `apps/web/src/apiSchema.ts`) in place of `apps/web/src/api.ts`'s hand-written `*Body` interfaces.
-- [ ] Move the Android app's `net/HoldMyTrackApi.kt` from hand-parsed `org.json` to typed data classes, checked against the contract.
+- [x] Move the Android app's `net/HoldMyTrackApi.kt` from hand-parsed `org.json` to typed data classes (`net/Wire.kt`), checked against the contract (`WireContractTest`).
 - [ ] Check the Russian translation — run the Android app in Russian on a real device, and have a native speaker review the Russian across the web, the server's pages and emails, and the app (`IMPLEMENTATION.md` §4.21).
 - [ ] Split `apps/web/src/map/MapView.tsx` by feature when the next feature touches it, the part that feature needs first: its state rules — Story mode, the Pending poll, track editing, selection and focus — into a reducer or a few custom hooks, under `verify:map` and the unit tests.
 - [ ] Split the Android app's `MapFragment.kt` by feature when the next feature touches it, the part that feature needs first: the session and first-run check, Story mode, View on map, the notice panel, camera framing, photo markers — pure logic out first, with unit tests as `panel/PanelState` has, the UI wiring last.

@@ -38,7 +38,7 @@ import kotlinx.coroutines.withContext
 
 enum class RecordingState { IDLE, RECORDING, PAUSED }
 
-/** One GPS fix kept for the wire payload — see `RecordedActivityRecord.toSyncJson`. */
+/** One GPS fix kept for the wire payload — see `RecordedActivityRecord.toSyncActivity`. */
 data class RecordedPoint(val lat: Double, val lon: Double, val elevationM: Float?, val time: Instant)
 
 /** What the notification redraws on every fix — recomputed, not accumulated field by field,

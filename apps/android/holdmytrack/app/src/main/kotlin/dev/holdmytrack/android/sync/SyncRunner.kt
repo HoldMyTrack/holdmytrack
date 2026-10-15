@@ -6,14 +6,14 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.records.ExerciseRoute
 import dev.holdmytrack.android.R
 import dev.holdmytrack.android.net.HoldMyTrackApi
+import dev.holdmytrack.android.net.SyncActivityJson
+import dev.holdmytrack.android.net.SyncPointJson
 import dev.holdmytrack.android.recording.db.RecordedActivityStore
-import dev.holdmytrack.android.recording.db.toSyncJson
+import dev.holdmytrack.android.recording.db.toSyncActivity
 import java.io.IOException
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
 
 /** One ticked activity the server refused, or that it could never accept, with the reason why. */
 data class Rejection(val key: String, val startedAt: Instant, val activityType: String, val reason: String)
@@ -161,28 +161,18 @@ class SyncRunner(
      *
      * Built off the main thread: a long ride is tens of thousands of points.
      */
-    private suspend fun prepare(candidate: Candidate): JSONObject = withContext(Dispatchers.Default) {
+    private suspend fun prepare(candidate: Candidate): SyncActivityJson = withContext(Dispatchers.Default) {
         when (val origin = candidate.origin) {
-            is Recording -> origin.record.toSyncJson()
-            is HealthConnectSession -> JSONObject()
-                .put("external_id", candidate.externalId)
-                .put("activity_type", candidate.activityType)
-                .put("points", points(origin.route))
+            is Recording -> origin.record.toSyncActivity()
+            is HealthConnectSession -> SyncActivityJson(
+                externalId = candidate.externalId,
+                activityType = candidate.activityType,
+                points = origin.route.map {
+                    SyncPointJson(lat = it.latitude, lon = it.longitude, elevationM = it.altitude?.inMeters, time = it.time.toString())
+                },
+            )
             null -> error("candidate ${candidate.key} has nothing to send")
         }
-    }
-
-    private fun points(route: List<ExerciseRoute.Location>): JSONArray {
-        val array = JSONArray()
-        for (point in route) {
-            val json = JSONObject()
-                .put("lat", point.latitude)
-                .put("lon", point.longitude)
-                .put("time", point.time.toString())
-            point.altitude?.let { json.put("elevation_m", it.inMeters) }
-            array.put(json)
-        }
-        return array
     }
 
     private companion object {

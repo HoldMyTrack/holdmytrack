@@ -32,8 +32,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okio.BufferedSink
 import okio.source
-import org.json.JSONArray
-import org.json.JSONObject
 
 /**
  * The account's latest copy of its data (root `docs/SPEC.md` FR-1.12), as
@@ -45,22 +43,7 @@ data class ExportStatus(
     val expiresAt: java.time.Instant?,
     val totalSize: Long,
     val parts: List<ExportPart>,
-) {
-    companion object {
-        fun parse(json: JSONObject): ExportStatus {
-            val parts = json.optJSONArray("parts")
-            return ExportStatus(
-                state = json.optString("state", "none"),
-                expiresAt = json.optString("expires_at").takeIf { it.isNotEmpty() }?.let(java.time.Instant::parse),
-                totalSize = json.optLong("total_size"),
-                parts = List(parts?.length() ?: 0) { i ->
-                    val p = parts!!.getJSONObject(i)
-                    ExportPart(p.optInt("n"), p.optLong("size"), p.optString("name"), p.optString("url"))
-                },
-            )
-        }
-    }
-}
+)
 
 /** One zip archive of an export: [url] is relative to the site, [name] what it saves as. */
 data class ExportPart(val n: Int, val size: Long, val name: String, val url: String)
@@ -84,20 +67,7 @@ data class Profile(
     val timezone: String,
     val locale: String,
     val avatarUrl: String,
-) {
-    companion object {
-        fun parse(json: JSONObject) = Profile(
-            email = json.optString("email"),
-            isDemo = json.optBoolean("isDemo"),
-            emailVerified = json.optBoolean("email_verified", true),
-            displayName = json.optString("display_name"),
-            country = json.optString("country"),
-            timezone = json.optString("timezone"),
-            locale = json.optString("locale"),
-            avatarUrl = json.optString("avatar_url"),
-        )
-    }
-}
+)
 
 /** An account with a live session — what a successful sign-in, sign-up or demo start yields. */
 data class Account(val token: String, val profile: Profile)
@@ -368,9 +338,9 @@ class ApiException(val code: Int, message: String, val errorCode: String? = null
          */
         fun from(code: Int, body: String): ApiException {
             val text = body.trim()
-            val json = if (text.startsWith("{")) runCatching { JSONObject(text) }.getOrNull() else null
-            if (json != null && (json.has("error") || json.has("message"))) {
-                return ApiException(code, json.optString("message"), json.optString("error").takeIf { it.isNotEmpty() })
+            val json = if (text.startsWith("{")) runCatching { apiJson.decodeFromString<ErrorJson>(text) }.getOrNull() else null
+            if (json != null && (json.error != null || json.message.isNotEmpty())) {
+                return ApiException(code, json.message, json.error?.takeIf { it.isNotEmpty() })
             }
             return ApiException(code, text)
         }
@@ -517,27 +487,16 @@ object HoldMyTrackApi {
      * them off its list. A non-2xx status is the whole request failing and throws instead;
      * nothing in the batch was decided.
      */
-    suspend fun syncActivities(activities: List<JSONObject>, source: String): List<SyncResult> =
+    internal suspend fun syncActivities(activities: List<SyncActivityJson>, source: String): List<SyncResult> =
         withContext(Dispatchers.IO) {
-            val body = JSONObject()
-                .put("source", source)
-                .put("activities", JSONArray(activities))
             val request = Request.Builder()
                 .url(BuildConfig.API_BASE_URL + API_V1 + "/sync/activities")
-                .post(body.toString().toRequestBody(JSON))
+                .post(jsonBody(SyncActivitiesRequestJson(source, activities)))
                 .build()
             val response = client.newCall(request).execute()
             val text = response.use { it.body?.string().orEmpty() }
             if (!response.isSuccessful) throw ApiException.from(response.code, text)
-            val results = JSONObject(text).getJSONArray("results")
-            List(results.length()) { i ->
-                val result = results.getJSONObject(i)
-                SyncResult(
-                    externalId = result.optString("external_id"),
-                    status = result.optString("status"),
-                    error = result.optString("error"),
-                )
-            }
+            decode<SyncResultsJson>(text).results.map { SyncResult(it.externalId, it.status, it.error) }
         }
 
     /**
@@ -552,21 +511,16 @@ object HoldMyTrackApi {
             val known = mutableSetOf<String>()
             val processing = mutableSetOf<String>()
             for (chunk in externalIds.chunked(MAX_KNOWN_IDS)) {
-                val body = JSONObject()
-                    .put("source", source)
-                    .put("external_ids", JSONArray(chunk))
                 val request = Request.Builder()
                     .url(BuildConfig.API_BASE_URL + API_V1 + "/sync/known")
-                    .post(body.toString().toRequestBody(JSON))
+                    .post(jsonBody(SyncKnownRequestJson(source, chunk)))
                     .build()
                 val response = client.newCall(request).execute()
                 val text = response.use { it.body?.string().orEmpty() }
                 if (!response.isSuccessful) throw ApiException.from(response.code, text)
-                val json = JSONObject(text)
-                val ids = json.getJSONArray("known")
-                for (i in 0 until ids.length()) known += ids.getString(i)
-                // Absent from an older server: nothing reads as still processing.
-                json.optJSONArray("processing")?.let { for (i in 0 until it.length()) processing += it.getString(i) }
+                val json = decode<SyncKnownJson>(text)
+                known += json.known
+                processing += json.processing
             }
             SyncKnown(known, processing)
         }
@@ -581,27 +535,16 @@ object HoldMyTrackApi {
         withContext(Dispatchers.IO) {
             val found = mutableMapOf<String, ActivityOverlap>()
             for (chunk in spans.chunked(MAX_KNOWN_IDS)) {
-                val array = JSONArray()
-                for (span in chunk) {
-                    array.put(JSONObject().put("key", span.key).put("start", span.start.toString()).put("end", span.end.toString()))
-                }
+                val spansJson = chunk.map { OverlapSpanJson(it.key, it.start.toString(), it.end.toString()) }
                 val request = Request.Builder()
                     .url(BuildConfig.API_BASE_URL + API_V1 + "/activities/overlaps")
-                    .post(JSONObject().put("spans", array).toString().toRequestBody(JSON))
+                    .post(jsonBody(OverlapsRequestJson(spansJson)))
                     .build()
                 val response = client.newCall(request).execute()
                 val text = response.use { it.body?.string().orEmpty() }
                 if (!response.isSuccessful) throw ApiException.from(response.code, text)
-                val rows = JSONObject(text).getJSONArray("overlaps")
-                for (i in 0 until rows.length()) {
-                    val row = rows.getJSONObject(i)
-                    found[row.getString("key")] = ActivityOverlap(
-                        id = row.getString("activity_id"),
-                        name = row.optString("name"),
-                        activityType = row.optString("activity_type"),
-                        startedAt = row.getString("started_at"),
-                        timezone = if (row.isNull("timezone")) null else row.optString("timezone"),
-                    )
+                for (row in decode<OverlapsJson>(text).overlaps) {
+                    found[row.key] = ActivityOverlap(row.activityId, row.name, row.activityType, row.startedAt, row.timezone)
                 }
             }
             found
@@ -647,8 +590,7 @@ object HoldMyTrackApi {
         val response = uploadClient.newCall(request).execute()
         val text = response.use { it.body?.string().orEmpty() }
         if (!response.isSuccessful) throw ApiException.from(response.code, text)
-        val json = runCatching { JSONObject(text) }.getOrDefault(JSONObject())
-        UploadOutcome(status = json.optString("status"))
+        UploadOutcome(status = decode<UploadResultJson>(text).status)
     }
 
     /** A picked file as a request body, read as it's sent. Opened afresh on every [writeTo], so
@@ -682,12 +624,8 @@ object HoldMyTrackApi {
     fun providers(onResult: (Result<Providers>) -> Unit) {
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/auth/providers").build()
         call(request, { body ->
-            val json = JSONObject(body)
-            Providers(
-                google = json.optBoolean("google"),
-                facebook = json.optBoolean("facebook"),
-                googleClientId = json.optString("google_client_id"),
-            )
+            val json = decode<ProvidersJson>(body)
+            Providers(google = json.google, facebook = json.facebook, googleClientId = json.googleClientId)
         }, onResult)
     }
 
@@ -697,8 +635,7 @@ object HoldMyTrackApi {
      * anything in it (`docs/IMPLEMENTATION.md` §4.15).
      */
     fun signInWithGoogle(idToken: String, timezone: String, onResult: (Result<Account>) -> Unit) {
-        val body = JSONObject().put("id_token", idToken).put("tz", timezone)
-        authenticate("/auth/google/token", body.toString().toRequestBody(JSON), onResult)
+        authenticate("/auth/google/token", jsonBody(GoogleTokenJson(idToken, timezone)), onResult)
     }
 
     /**
@@ -718,22 +655,17 @@ object HoldMyTrackApi {
 
     /** `POST /v1/auth/handoff` — redeems a browser-tab round trip's one-time code, once. */
     fun exchangeHandoff(code: String, verifier: String, onResult: (Result<Account>) -> Unit) {
-        val body = JSONObject().put("code", code).put("verifier", verifier)
-        authenticate("/auth/handoff", body.toString().toRequestBody(JSON), onResult)
+        authenticate("/auth/handoff", jsonBody(HandoffJson(code, verifier)), onResult)
     }
 
     fun signIn(email: String, password: String, onResult: (Result<Account>) -> Unit) {
-        authenticate("/auth/login", credentials(email, password), onResult)
+        authenticate("/auth/login", jsonBody(CredentialsJson(email, password)), onResult)
     }
 
     /** Sends the phone's IANA zone as `timezone`, as the web's sign-up sends the browser's, so
      *  a new account starts on it rather than on UTC (Google and Facebook already send it). */
     fun signUp(email: String, password: String, onResult: (Result<Account>) -> Unit) {
-        val body = JSONObject()
-            .put("email", email)
-            .put("password", password)
-            .put("timezone", ZoneId.systemDefault().id)
-        authenticate("/auth/signup", body.toString().toRequestBody(JSON), onResult)
+        authenticate("/auth/signup", jsonBody(CredentialsJson(email, password, ZoneId.systemDefault().id)), onResult)
     }
 
     /**
@@ -780,26 +712,19 @@ object HoldMyTrackApi {
      */
     fun verifySession(onResult: (Result<Profile>) -> Unit) {
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/auth/me").build()
-        call(request, { body -> Profile.parse(JSONObject(body)) }, onResult)
+        call(request, { body -> decode<AccountJson>(body).toProfile() }, onResult)
     }
 
     /** `GET /v1/account/settings/options` — see [SettingsOptions]. */
     fun settingsOptions(onResult: (Result<SettingsOptions>) -> Unit) {
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/account/settings/options").build()
         call(request, { body ->
-            val json = JSONObject(body)
-            fun options(array: JSONArray?) = List(array?.length() ?: 0) { i ->
-                val o = array!!.getJSONObject(i)
-                SettingsOption(o.optString("value"), o.optString("label"))
-            }
-            val groups = json.optJSONArray("timezones")
+            val json = decode<SettingsOptionsJson>(body)
+            fun options(list: List<SettingsOptionJson>) = list.map { SettingsOption(it.value, it.label) }
             SettingsOptions(
-                countries = options(json.optJSONArray("countries")),
-                timezones = List(groups?.length() ?: 0) { i ->
-                    val g = groups!!.getJSONObject(i)
-                    TimezoneGroup(g.optString("label").ifBlank { g.optString("region") }, options(g.optJSONArray("options")))
-                },
-                languages = options(json.optJSONArray("languages")),
+                countries = options(json.countries),
+                timezones = json.timezones.map { TimezoneGroup(it.label.ifBlank { it.region }, options(it.options)) },
+                languages = options(json.languages),
             )
         }, onResult)
     }
@@ -816,16 +741,11 @@ object HoldMyTrackApi {
         locale: String,
         onResult: (Result<Profile>) -> Unit,
     ) {
-        val body = JSONObject()
-            .put("display_name", displayName)
-            .put("country", country)
-            .put("timezone", timezone)
-            .put("locale", locale)
         val request = Request.Builder()
             .url(BuildConfig.API_BASE_URL + API_V1 + "/account/settings")
-            .patch(body.toString().toRequestBody(JSON))
+            .patch(jsonBody(SettingsJson(displayName, country, timezone, locale)))
             .build()
-        call(request, { text -> Profile.parse(JSONObject(text)) }, onResult)
+        call(request, { text -> decode<AccountJson>(text).toProfile() }, onResult)
     }
 
     /**
@@ -834,10 +754,9 @@ object HoldMyTrackApi {
      * The caller clears what this device holds for the account ([Session.clear] and the rest).
      */
     fun deleteAccount(email: String, onResult: (Result<Unit>) -> Unit) {
-        val body = JSONObject().put("email", email)
         val request = Request.Builder()
             .url(BuildConfig.API_BASE_URL + API_V1 + "/account")
-            .delete(body.toString().toRequestBody(JSON))
+            .delete(jsonBody(EmailJson(email)))
             .build()
         call(request, { }, onResult)
     }
@@ -845,7 +764,7 @@ object HoldMyTrackApi {
     /** `GET /v1/account/export` — where the account's latest copy of its data stands. */
     fun exportStatus(onResult: (Result<ExportStatus>) -> Unit) {
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/account/export").build()
-        call(request, { body -> ExportStatus.parse(JSONObject(body)) }, onResult)
+        call(request, { body -> decode<ExportStatusJson>(body).toExportStatus() }, onResult)
     }
 
     /** `POST /v1/account/export` — asks for a copy; one already being prepared is returned
@@ -855,7 +774,7 @@ object HoldMyTrackApi {
             .url(BuildConfig.API_BASE_URL + API_V1 + "/account/export")
             .post(EMPTY_BODY)
             .build()
-        call(request, { body -> ExportStatus.parse(JSONObject(body)) }, onResult)
+        call(request, { body -> decode<ExportStatusJson>(body).toExportStatus() }, onResult)
     }
 
     /** An export part's download URL, absolute — for Android's DownloadManager. */
@@ -909,7 +828,7 @@ object HoldMyTrackApi {
             .url(BuildConfig.API_BASE_URL + API_V1 + "/auth/resend-verification")
             .post(EMPTY_BODY)
             .build()
-        call(request, { body -> JSONObject(body).optString("message") }, onResult)
+        call(request, { body -> decode<MessageJson>(body).message }, onResult)
     }
 
     /**
@@ -930,7 +849,7 @@ object HoldMyTrackApi {
             var latest: Instant? = null
             var box: DoubleArray? = null
             forEachDrawn(body) { row, bbox ->
-                val startedAt = runCatching { OffsetDateTime.parse(row.optString("started_at")).toInstant() }.getOrNull()
+                val startedAt = runCatching { OffsetDateTime.parse(row.startedAt).toInstant() }.getOrNull()
                 if (startedAt != null && (latest == null || startedAt > latest)) {
                     latest = startedAt
                     box = bbox
@@ -953,10 +872,7 @@ object HoldMyTrackApi {
             .apply { if (to != null) addQueryParameter("to", to) }
             .apply { if (story != null) addQueryParameter("story", story) }
             .build()
-        call(Request.Builder().url(url).build(), { body ->
-            val rows = JSONObject(body).getJSONArray("activities")
-            List(rows.length()) { i -> parseActivity(rows.getJSONObject(i)) }
-        }, onResult)
+        call(Request.Builder().url(url).build(), { body -> decode<ActivitiesJson>(body).activities.map { it.toActivity() } }, onResult)
     }
 
     /**
@@ -966,15 +882,11 @@ object HoldMyTrackApi {
      * wording, in the app's language.
      */
     fun updateActivity(id: String, activityType: String, name: String, description: String, onResult: (Result<Activity>) -> Unit) {
-        val body = JSONObject()
-            .put("activity_type", activityType)
-            .put("name", name)
-            .put("description", description)
         val request = Request.Builder()
             .url(BuildConfig.API_BASE_URL + API_V1 + "/activities/" + id)
-            .patch(body.toString().toRequestBody(JSON))
+            .patch(jsonBody(ActivityPatchJson(activityType, name, description)))
             .build()
-        call(request, { text -> parseActivity(JSONObject(text)) }, onResult)
+        call(request, { text -> decode<ActivityRowJson>(text).toActivity() }, onResult)
     }
 
     /** `DELETE /v1/activities/{id}` (`docs/IMPLEMENTATION.md` §4.7.5) — the activity, its
@@ -992,8 +904,8 @@ object HoldMyTrackApi {
     fun coverageStatus(onResult: (Result<CoverageStatus>) -> Unit) {
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/coverage/status").build()
         call(request, { text ->
-            val json = JSONObject(text)
-            CoverageStatus(json.optBoolean("rendering"), json.optLong("version"), json.optString("tile_version"))
+            val json = decode<CoverageStatusJson>(text)
+            CoverageStatus(json.rendering, json.version, json.tileVersion)
         }, onResult)
     }
 
@@ -1009,20 +921,19 @@ object HoldMyTrackApi {
             .addQueryParameter("categories", categories.joinToString(","))
             .build()
         call(Request.Builder().url(url).build(), { text ->
-            val json = JSONObject(text)
-            val rows = json.optJSONArray("spots") ?: JSONArray()
-            SpotsInArea(List(rows.length()) { parseSpot(rows.getJSONObject(it)) }, json.optInt("total"))
+            val json = decode<SpotsInAreaJson>(text)
+            SpotsInArea(json.spots.map { it.toSpot() }, json.total)
         }, onResult)
     }
 
     /** `GET /v1/spots/{id}` (`docs/IMPLEMENTATION.md` §4.25) — see [SpotDetail]. */
     fun spotDetail(id: Long, onResult: (Result<SpotDetail>) -> Unit) {
         call(Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/spots/" + id).build(), { text ->
-            val json = JSONObject(text)
+            val json = decode<SpotDetailJson>(text)
             SpotDetail(
-                spot = parseSpot(json),
-                area = parseMultiPolygon(json.getJSONObject("area")),
-                capturedAt = json.optString("captured_at").takeIf { it.isNotEmpty() }?.let(::parseInstant),
+                spot = Spot(json.id, json.category, json.name, json.address, json.description, json.inscription, json.memorial, json.startDate, json.wikipedia, json.lon, json.lat),
+                area = json.area.coordinates.map { polygon -> polygon.map { ring -> ring.map { GeoPoint(lat = it[1], lon = it[0]) } } },
+                capturedAt = json.capturedAt?.let(::parseInstant),
             )
         }, onResult)
     }
@@ -1032,80 +943,33 @@ object HoldMyTrackApi {
     fun spotCaptures(since: Instant?, onResult: (Result<List<SpotCapture>>) -> Unit) {
         val url = (BuildConfig.API_BASE_URL + API_V1 + "/spots/captures").toHttpUrl().newBuilder()
         if (since != null) url.addQueryParameter("since", since.toString())
-        call(Request.Builder().url(url.build()).build(), { text ->
-            val rows = JSONObject(text).optJSONArray("captures") ?: JSONArray()
-            List(rows.length()) { parseSpotCapture(rows.getJSONObject(it)) }
-        }, onResult)
+        call(Request.Builder().url(url.build()).build(), { text -> decode<SpotCapturesJson>(text).captures.map { it.toSpotCapture() } }, onResult)
     }
 
     /** `POST /v1/spots/{id}/captures` — captures the place at the position last measured inside
      *  it; the server checks it against the area. A place already captured answers the first
      *  capture. Outside the area is an [ApiException] with code 422. */
     fun captureSpot(id: Long, lat: Double, lon: Double, onResult: (Result<SpotCapture>) -> Unit) {
-        val body = JSONObject().put("lat", lat).put("lon", lon)
         val request = Request.Builder()
             .url(BuildConfig.API_BASE_URL + API_V1 + "/spots/" + id + "/captures")
-            .post(body.toString().toRequestBody(JSON))
+            .post(jsonBody(SpotCaptureRequestJson(lat, lon)))
             .build()
-        call(request, { text -> parseSpotCapture(JSONObject(text)) }, onResult)
+        call(request, { text -> decode<SpotCaptureJson>(text).toSpotCapture() }, onResult)
     }
 
-    private fun parseSpotCapture(json: JSONObject) =
-        SpotCapture(json.getLong("spot_id"), parseInstant(json.getString("captured_at")))
+    private fun SpotCaptureJson.toSpotCapture() = SpotCapture(spotId, parseInstant(capturedAt))
 
     private fun parseInstant(text: String): Instant = OffsetDateTime.parse(text).toInstant()
 
-    /** A GeoJSON MultiPolygon's coordinates, `[[[[lon, lat], …], …], …]`, as polygons of rings. */
-    private fun parseMultiPolygon(json: JSONObject): SpotArea {
-        val polygons = json.getJSONArray("coordinates")
-        return List(polygons.length()) { p ->
-            val rings = polygons.getJSONArray(p)
-            List(rings.length()) { r ->
-                val points = rings.getJSONArray(r)
-                List(points.length()) { i ->
-                    val point = points.getJSONArray(i)
-                    GeoPoint(lat = point.getDouble(1), lon = point.getDouble(0))
-                }
-            }
-        }
-    }
-
-    private fun parseSpot(json: JSONObject): Spot {
-        fun text(key: String) = json.optString(key).takeIf { it.isNotEmpty() }
-        return Spot(
-            id = json.optLong("id"),
-            category = json.optString("category"),
-            name = text("name"),
-            address = text("address"),
-            description = text("description"),
-            inscription = text("inscription"),
-            memorial = text("memorial"),
-            startDate = text("start_date"),
-            wikipedia = text("wikipedia"),
-            lon = json.optDouble("lon"),
-            lat = json.optDouble("lat"),
-        )
-    }
+    private fun SpotJson.toSpot() = Spot(id, category, name, address, description, inscription, memorial, startDate, wikipedia, lon, lat)
 
     /** `GET /v1/activities/track-metrics/{id}` (`docs/IMPLEMENTATION.md` §4.3.1) — see
      *  [TrackMetrics]. */
     fun trackMetrics(id: String, onResult: (Result<TrackMetrics>) -> Unit) {
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/activities/track-metrics/" + id).build()
         call(request, { text ->
-            val json = JSONObject(text)
-            val rows = json.getJSONArray("points")
-            TrackMetrics(
-                activityId = json.optString("activity_id", id),
-                points = List(rows.length()) { i ->
-                    val p = rows.getJSONObject(i)
-                    TrackMetricPoint(
-                        lon = p.getDouble("lon"),
-                        lat = p.getDouble("lat"),
-                        speedMps = p.optDouble("speed_mps", 0.0),
-                        timeS = p.optLong("time_s"),
-                    )
-                },
-            )
+            val json = decode<TrackMetricsJson>(text)
+            TrackMetrics(json.activityId, json.points.map { TrackMetricPoint(it.lon, it.lat, it.speedMps, it.timeS) })
         }, onResult)
     }
 
@@ -1115,15 +979,8 @@ object HoldMyTrackApi {
     fun trackPoints(id: String, onResult: (Result<TrackPoints>) -> Unit) {
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/activities/track-points/" + id).build()
         call(request, { text ->
-            val json = JSONObject(text)
-            val rows = json.getJSONArray("points")
-            TrackPoints(
-                points = List(rows.length()) { i ->
-                    val p = rows.getJSONArray(i)
-                    TrackPoint(p.getDouble(0), p.getDouble(1), p.getLong(2))
-                },
-                edit = if (json.isNull("edit")) null else parseTrackEdit(json.getJSONObject("edit")),
-            )
+            val json = decode<TrackPointsJson>(text)
+            TrackPoints(json.points.map { TrackPoint(it[0], it[1], it[2].toLong()) }, json.edit?.toTrackEdit())
         }, onResult)
     }
 
@@ -1136,43 +993,28 @@ object HoldMyTrackApi {
      * which goes ahead when sent again with [allowHidden].
      */
     fun trackEdit(id: String, edit: TrackEdit?, splitAt: Long? = null, allowHidden: Boolean = false, onResult: (Result<Unit>) -> Unit) {
-        val body = JSONObject().put("edit", edit?.let(::trackEditJson) ?: JSONObject.NULL)
-        if (splitAt != null) {
-            body.put("split_at", splitAt)
-            if (allowHidden) body.put("allow_hidden", true)
-        }
+        val body = TrackEditRequestJson(edit?.toJson(), splitAt, allowHidden = splitAt != null && allowHidden)
         val request = Request.Builder()
             .url(BuildConfig.API_BASE_URL + API_V1 + "/activities/track-edit/" + id)
-            .post(body.toString().toRequestBody(JSON))
+            .post(jsonBody(body))
             .build()
         call(request, { }, onResult)
     }
 
-    private fun parseTrackEdit(json: JSONObject): TrackEdit {
-        fun pair(a: JSONArray) = a.getLong(0) to a.getLong(1)
-        val remove = json.optJSONArray("remove")
-        val drop = json.optJSONArray("drop")
+    private fun TrackEditJson.toTrackEdit() = TrackEdit(
+        keep = keep?.let { it[0] to it[1] },
+        remove = remove.orEmpty().map { it[0] to it[1] },
+        drop = drop.orEmpty(),
         // Keyed by time, which JSON can only carry as an object key.
-        val move = json.optJSONObject("move")
-        return TrackEdit(
-            keep = json.optJSONArray("keep")?.let(::pair),
-            remove = List(remove?.length() ?: 0) { pair(remove!!.getJSONArray(it)) },
-            drop = List(drop?.length() ?: 0) { drop!!.getLong(it) },
-            move = move?.keys()?.asSequence()?.associate { t ->
-                val at = move.getJSONArray(t)
-                t.toLong() to (at.getDouble(0) to at.getDouble(1))
-            }.orEmpty(),
-        )
-    }
+        move = move.orEmpty().entries.associate { (t, at) -> t.toLong() to (at[0] to at[1]) },
+    )
 
-    private fun trackEditJson(edit: TrackEdit): JSONObject = JSONObject().apply {
-        edit.keep?.let { put("keep", JSONArray().put(it.first).put(it.second)) }
-        if (edit.remove.isNotEmpty()) put("remove", JSONArray(edit.remove.map { JSONArray().put(it.first).put(it.second) }))
-        if (edit.drop.isNotEmpty()) put("drop", JSONArray(edit.drop))
-        if (edit.move.isNotEmpty()) {
-            put("move", JSONObject().apply { edit.move.forEach { (t, at) -> put(t.toString(), JSONArray().put(at.first).put(at.second)) } })
-        }
-    }
+    private fun TrackEdit.toJson() = TrackEditJson(
+        keep = keep?.let { listOf(it.first, it.second) },
+        remove = remove.map { listOf(it.first, it.second) }.ifEmpty { null },
+        drop = drop.ifEmpty { null },
+        move = move.entries.associate { (t, at) -> t.toString() to listOf(at.first, at.second) }.ifEmpty { null },
+    )
 
     /**
      * `GET /v1/photos?activity=` or `?story=` (`docs/SPEC.md` FR-16.3) — one activity's photos,
@@ -1183,10 +1025,7 @@ object HoldMyTrackApi {
             .apply { if (activity != null) addQueryParameter("activity", activity) }
             .apply { if (story != null) addQueryParameter("story", story) }
             .build()
-        call(Request.Builder().url(url).build(), { text ->
-            val rows = JSONObject(text).optJSONArray("photos") ?: JSONArray()
-            List(rows.length()) { parsePhoto(rows.getJSONObject(it)) }
-        }, onResult)
+        call(Request.Builder().url(url).build(), { text -> decode<PhotosJson>(text).photos.map { it.toPhoto() } }, onResult)
     }
 
     /**
@@ -1195,15 +1034,19 @@ object HoldMyTrackApi {
      * [PhotoNeedsPlaceException] when the server can't tell, for the user to choose.
      */
     fun checkPhotoPlace(activityId: String, exif: PhotoExif, onResult: (Result<Instant>) -> Unit) {
-        val body = JSONObject().put("activity_id", activityId)
-        exif.takenAt?.let { body.put("taken_at", it.toString()) }
-        if (exif.takenAt == null) exif.takenLocal?.let { body.put("taken_local", it) }
-        if (exif.lat != null && exif.lon != null) body.put("lat", exif.lat).put("lon", exif.lon)
+        val placed = exif.lat != null && exif.lon != null
+        val body = PhotoPlaceRequestJson(
+            activityId = activityId,
+            takenAt = exif.takenAt?.toString(),
+            takenLocal = exif.takenLocal.takeIf { exif.takenAt == null },
+            lat = exif.lat.takeIf { placed },
+            lon = exif.lon.takeIf { placed },
+        )
         val request = Request.Builder()
             .url(BuildConfig.API_BASE_URL + API_V1 + "/photos/place")
-            .post(body.toString().toRequestBody(JSON))
+            .post(jsonBody(body))
             .build()
-        call(request, { text -> parseInstant(JSONObject(text).getString("route_at")) }) { result ->
+        call(request, { text -> parseInstant(decode<PhotoPlaceJson>(text).routeAt) }) { result ->
             onResult(result.recoverCatching { throw needsPlace(it) })
         }
     }
@@ -1239,7 +1082,7 @@ object HoldMyTrackApi {
             }
             .build()
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/photos").post(body).build()
-        call(request, { text -> parsePhoto(JSONObject(text)) }) { result ->
+        call(request, { text -> decode<PhotoJson>(text).toPhoto() }) { result ->
             onResult(result.recoverCatching { throw needsPlace(it) })
         }
     }
@@ -1247,14 +1090,11 @@ object HoldMyTrackApi {
     /** `PATCH /v1/photos/{id}` (FR-16.4) — a field given changes: [caption] (empty clears it),
      *  [routeAt] the photo's new moment on its track, which the server clamps to the track. */
     fun updatePhoto(id: String, caption: String?, routeAt: Instant?, onResult: (Result<Photo>) -> Unit) {
-        val body = JSONObject()
-        caption?.let { body.put("caption", it) }
-        routeAt?.let { body.put("route_at", it.toString()) }
         val request = Request.Builder()
             .url(BuildConfig.API_BASE_URL + API_V1 + "/photos/" + id)
-            .patch(body.toString().toRequestBody(JSON))
+            .patch(jsonBody(PhotoPatchJson(caption, routeAt?.toString())))
             .build()
-        call(request, { text -> parsePhoto(JSONObject(text)) }, onResult)
+        call(request, { text -> decode<PhotoJson>(text).toPhoto() }, onResult)
     }
 
     /** `DELETE /v1/photos/{id}` (FR-16.5) — the photo and both its images. */
@@ -1271,28 +1111,25 @@ object HoldMyTrackApi {
             failure
         }
 
-    private fun parsePhoto(json: JSONObject) = Photo(
-        id = json.getString("id"),
-        activityId = json.optString("activity_id"),
-        takenAt = json.optNullableString("taken_at")?.let(::parseInstant),
-        routeAt = parseInstant(json.getString("route_at")),
-        lon = json.optNullableDouble("lon"),
-        lat = json.optNullableDouble("lat"),
-        caption = json.optNullableString("caption")?.takeIf { it.isNotEmpty() },
-        width = json.optInt("width"),
-        height = json.optInt("height"),
-        url = json.optString("url"),
-        thumbUrl = json.optString("thumb_url"),
-        timezone = json.optString("timezone"),
+    private fun PhotoJson.toPhoto() = Photo(
+        id = id,
+        activityId = activityId,
+        takenAt = takenAt?.let(::parseInstant),
+        routeAt = parseInstant(routeAt),
+        lon = lon,
+        lat = lat,
+        caption = caption?.takeIf { it.isNotEmpty() },
+        width = width,
+        height = height,
+        url = url,
+        thumbUrl = thumbUrl,
+        timezone = timezone,
     )
 
     /** `GET /v1/private-locations` — every one, oldest first. */
     fun privateLocations(onResult: (Result<List<PrivateLocation>>) -> Unit) {
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/private-locations").build()
-        call(request, { text ->
-            val rows = JSONArray(text)
-            List(rows.length()) { parsePrivateLocation(rows.getJSONObject(it)) }
-        }, onResult)
+        call(request, { text -> decode<List<PrivateLocationJson>>(text).map { it.toPrivateLocation() } }, onResult)
     }
 
     /**
@@ -1309,11 +1146,10 @@ object HoldMyTrackApi {
         radiusM: Int,
         onResult: (Result<PrivateLocation>) -> Unit,
     ) {
-        val body = JSONObject().put("name", name).put("lon", lon).put("lat", lat).put("radius_m", radiusM)
-            .toString().toRequestBody(JSON)
+        val body = jsonBody(PrivateLocationInputJson(name, lon, lat, radiusM))
         val url = BuildConfig.API_BASE_URL + API_V1 + "/private-locations" + (id?.let { "/$it" } ?: "")
         val request = Request.Builder().url(url).apply { if (id == null) post(body) else patch(body) }.build()
-        call(request, { text -> parsePrivateLocation(JSONObject(text)) }, onResult)
+        call(request, { text -> decode<PrivateLocationJson>(text).toPrivateLocation() }, onResult)
     }
 
     /** `DELETE /v1/private-locations/{id}`. */
@@ -1322,52 +1158,38 @@ object HoldMyTrackApi {
         call(request, { }, onResult)
     }
 
-    private fun parsePrivateLocation(json: JSONObject) = PrivateLocation(
-        id = json.getString("id"),
-        name = json.optString("name"),
-        lon = json.getDouble("lon"),
-        lat = json.getDouble("lat"),
-        radiusM = json.getInt("radius_m"),
-    )
+    private fun PrivateLocationJson.toPrivateLocation() = PrivateLocation(id, name, lon, lat, radiusM)
 
     /** `GET /v1/stories` — every Story of the account, newest first (`docs/SPEC.md` FR-14). */
     fun stories(onResult: (Result<List<Story>>) -> Unit) {
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/stories").build()
-        call(request, { text ->
-            val rows = JSONObject(text).optJSONArray("stories") ?: JSONArray()
-            List(rows.length()) { parseStory(rows.getJSONObject(it)) }
-        }, onResult)
+        call(request, { text -> decode<StoriesJson>(text).stories.map { it.toStory() } }, onResult)
     }
 
     /** `GET /v1/stories/{id}` — one Story. A `404` ([ApiException]) is one that doesn't exist
      *  or isn't this account's, which the server doesn't tell apart (FR-14.5). */
     fun story(id: String, onResult: (Result<Story>) -> Unit) {
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/stories/" + id).build()
-        call(request, { text -> parseStory(JSONObject(text)) }, onResult)
+        call(request, { text -> decode<StoryJson>(text).toStory() }, onResult)
     }
 
     /** `POST /v1/stories` — a new Story with [activityIds] in it, in one step (FR-14.2). A
      *  refusal (a blank or long name, a demo account) is the server's own wording. */
     fun createStory(name: String, description: String, activityIds: Collection<String>, onResult: (Result<Story>) -> Unit) {
-        val body = JSONObject()
-            .put("name", name)
-            .put("description", description)
-            .put("activity_ids", JSONArray(activityIds))
         val request = Request.Builder()
             .url(BuildConfig.API_BASE_URL + API_V1 + "/stories")
-            .post(body.toString().toRequestBody(JSON))
+            .post(jsonBody(StoryCreateJson(name, description, activityIds.toList())))
             .build()
-        call(request, { text -> parseStory(JSONObject(text)) }, onResult)
+        call(request, { text -> decode<StoryJson>(text).toStory() }, onResult)
     }
 
     /** `PATCH /v1/stories/{id}` — both fields every time: an empty [description] clears it. */
     fun updateStory(id: String, name: String, description: String, onResult: (Result<Story>) -> Unit) {
-        val body = JSONObject().put("name", name).put("description", description)
         val request = Request.Builder()
             .url(BuildConfig.API_BASE_URL + API_V1 + "/stories/" + id)
-            .patch(body.toString().toRequestBody(JSON))
+            .patch(jsonBody(StoryInputJson(name, description)))
             .build()
-        call(request, { text -> parseStory(JSONObject(text)) }, onResult)
+        call(request, { text -> decode<StoryJson>(text).toStory() }, onResult)
     }
 
     /** `DELETE /v1/stories/{id}` — the Story alone; its activities stay. */
@@ -1379,12 +1201,12 @@ object HoldMyTrackApi {
     /** `POST` ([add]) or `DELETE /v1/stories/{id}/activities` with [activityIds] (FR-14.3): puts
      *  them in the Story, or takes them out. Answers with the Story as it now is. */
     fun changeStoryActivities(id: String, activityIds: Collection<String>, add: Boolean, onResult: (Result<Story>) -> Unit) {
-        val body = JSONObject().put("activity_ids", JSONArray(activityIds)).toString().toRequestBody(JSON)
+        val body = jsonBody(StoryActivitiesJson(activityIds.toList()))
         val request = Request.Builder()
             .url(BuildConfig.API_BASE_URL + API_V1 + "/stories/" + id + "/activities")
             .apply { if (add) post(body) else delete(body) }
             .build()
-        call(request, { text -> parseStory(JSONObject(text)) }, onResult)
+        call(request, { text -> decode<StoryJson>(text).toStory() }, onResult)
     }
 
     /** `POST /v1/stories/{id}/send` — a copy of the Story to [email] (FR-14.7). Succeeds
@@ -1392,7 +1214,7 @@ object HoldMyTrackApi {
     fun sendStory(id: String, email: String, onResult: (Result<Unit>) -> Unit) {
         val request = Request.Builder()
             .url(BuildConfig.API_BASE_URL + API_V1 + "/stories/" + id + "/send")
-            .post(JSONObject().put("email", email).toString().toRequestBody(JSON))
+            .post(jsonBody(EmailJson(email)))
             .build()
         call(request, { }, onResult)
     }
@@ -1401,18 +1223,10 @@ object HoldMyTrackApi {
     fun storySends(onResult: (Result<StoryInbox>) -> Unit) {
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/story-sends").build()
         call(request, { text ->
-            val json = JSONObject(text)
-            val sends = json.optJSONArray("sends") ?: JSONArray()
-            val copying = json.optJSONArray("copying") ?: JSONArray()
+            val json = decode<StoryInboxJson>(text)
             StoryInbox(
-                sends = List(sends.length()) { i ->
-                    sends.getJSONObject(i).let {
-                        StorySend(it.getString("id"), it.optString("story_name"), it.optString("from"), it.optInt("activity_count"))
-                    }
-                },
-                copying = List(copying.length()) { i ->
-                    copying.getJSONObject(i).let { StoryCopying(it.optString("story_name"), it.optString("from")) }
-                },
+                sends = json.sends.map { StorySend(it.id, it.storyName, it.from, it.activityCount) },
+                copying = json.copying.map { StoryCopying(it.storyName, it.from) },
             )
         }, onResult)
     }
@@ -1426,48 +1240,40 @@ object HoldMyTrackApi {
         call(request, { }, onResult)
     }
 
-    private fun parseStory(json: JSONObject): Story {
-        fun totals(t: JSONObject) = StoryTotals(
-            activityType = t.optString("activity_type"),
-            count = t.optInt("count"),
-            distanceMeters = t.optDouble("distance_meters", 0.0),
-            movingSeconds = t.optLong("moving_seconds"),
-        )
-        val stats = json.optJSONObject("stats") ?: JSONObject()
-        val byType = stats.optJSONArray("by_type") ?: JSONArray()
-        val ids = json.optJSONArray("activity_ids") ?: JSONArray()
-        return Story(
-            id = json.getString("id"),
-            name = json.optString("name"),
-            description = json.optNullableString("description").orEmpty(),
-            from = json.optNullableString("from"),
-            activityIds = List(ids.length()) { ids.getString(it) },
-            stats = totals(stats),
-            byType = List(byType.length()) { totals(byType.getJSONObject(it)) },
-        )
-    }
+    private fun StoryJson.toStory() = Story(
+        id = id,
+        name = name,
+        description = description.orEmpty(),
+        from = from,
+        activityIds = activityIds,
+        stats = StoryTotals("", stats.count, stats.distanceMeters, stats.movingSeconds),
+        byType = stats.byType.map { StoryTotals(it.activityType, it.count, it.distanceMeters, it.movingSeconds) },
+    )
 
-    private fun parseActivity(row: JSONObject): Activity {
-        val box = row.optJSONArray("bbox")?.takeIf { it.length() == 4 }
-        val stories = row.optJSONArray("stories") ?: JSONArray()
-        return Activity(
-            id = row.getString("id"),
-            startedAt = row.optString("started_at"),
-            activityType = row.optString("activity_type"),
-            timezone = row.optString("timezone"),
-            name = row.optNullableString("name"),
-            distanceMeters = row.optNullableDouble("distance_meters"),
-            durationSeconds = row.optNullableDouble("duration_seconds")?.toLong(),
-            description = row.optNullableString("description"),
-            bbox = box?.let { b -> List(4) { b.getDouble(it) } },
-            pending = row.optBoolean("pending"),
-            edited = row.optBoolean("edited"),
-            isPrivate = row.optBoolean("private"),
-            stories = List(stories.length()) { i ->
-                stories.getJSONObject(i).let { StoryRef(it.getString("id"), it.optString("name")) }
-            },
-        )
-    }
+    private fun ActivityRowJson.toActivity() = Activity(
+        id = id,
+        startedAt = startedAt,
+        activityType = activityType,
+        timezone = timezone,
+        name = name,
+        distanceMeters = distanceMeters,
+        durationSeconds = durationSeconds,
+        description = description,
+        bbox = bbox?.takeIf { it.size == 4 },
+        pending = pending,
+        edited = edited,
+        isPrivate = private,
+        stories = stories.map { StoryRef(it.id, it.name) },
+    )
+
+    private fun AccountJson.toProfile() = Profile(email, isDemo, emailVerified, displayName, country, timezone, locale, avatarUrl)
+
+    private fun ExportStatusJson.toExportStatus() = ExportStatus(
+        state = state,
+        expiresAt = expiresAt?.let(::parseInstant),
+        totalSize = totalSize,
+        parts = parts.map { ExportPart(it.n, it.size, it.name, it.url) },
+    )
 
     /**
      * `GET /v1/activities/histogram?days=&before=` — one page of the days that have activity
@@ -1497,15 +1303,8 @@ object HoldMyTrackApi {
     }
 
     private fun parseActivityDays(body: String): ActivityDayPage {
-        val json = JSONObject(body)
-        val buckets = json.getJSONArray("buckets")
-        return ActivityDayPage(
-            days = List(buckets.length()) { i ->
-                val bucket = buckets.getJSONObject(i)
-                ActivityDay(bucket.getString("date"), bucket.optInt("count"), bucket.optDouble("distance_meters", 0.0))
-            },
-            earliest = json.optString("earliest").ifEmpty { null },
-        )
+        val json = decode<HistogramJson>(body)
+        return ActivityDayPage(json.buckets.map { ActivityDay(it.date, it.count, it.distanceMeters) }, json.earliest?.ifEmpty { null })
     }
 
     /**
@@ -1517,11 +1316,9 @@ object HoldMyTrackApi {
     fun activityTypeCounts(onResult: (Result<Map<String, Int>>) -> Unit) {
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + "/activities").build()
         call(request, { body ->
-            val activities = JSONObject(body).getJSONArray("activities")
             buildMap {
-                for (i in 0 until activities.length()) {
-                    val type = activities.getJSONObject(i).optString("activity_type")
-                    if (type.isNotEmpty()) merge(type, 1, Int::plus)
+                for (row in decode<ActivitiesJson>(body).activities) {
+                    if (row.activityType.isNotEmpty()) merge(row.activityType, 1, Int::plus)
                 }
             }
         }, onResult)
@@ -1529,25 +1326,20 @@ object HoldMyTrackApi {
 
     /** Each row of a `GET /v1/activities` body the tracks tile draws — one with a bbox and
      *  not Pending — with that bbox as `[minLon, minLat, maxLon, maxLat]`. */
-    private fun forEachDrawn(body: String, action: (JSONObject, DoubleArray) -> Unit) {
-        val activities = JSONObject(body).getJSONArray("activities")
-        for (i in 0 until activities.length()) {
-            val row = activities.getJSONObject(i)
-            if (row.optBoolean("pending")) continue
-            val box = row.optJSONArray("bbox") ?: continue
-            if (box.length() != 4) continue
-            action(row, DoubleArray(4) { box.getDouble(it) })
+    private fun forEachDrawn(body: String, action: (ActivityRowJson, DoubleArray) -> Unit) {
+        for (row in decode<ActivitiesJson>(body).activities) {
+            if (row.pending) continue
+            val box = row.bbox ?: continue
+            if (box.size != 4) continue
+            action(row, box.toDoubleArray())
         }
     }
 
-    private fun JSONObject.optNullableString(key: String): String? =
-        if (isNull(key)) null else optString(key)
+    /** A response body as its wire class (Wire.kt). */
+    private inline fun <reified T> decode(text: String): T = apiJson.decodeFromString(text)
 
-    private fun JSONObject.optNullableDouble(key: String): Double? =
-        if (isNull(key)) null else optDouble(key).takeUnless { it.isNaN() }
-
-    private fun credentials(email: String, password: String): RequestBody =
-        JSONObject().put("email", email).put("password", password).toString().toRequestBody(JSON)
+    /** A request body from its wire class (Wire.kt). */
+    private inline fun <reified T> jsonBody(value: T): RequestBody = apiJson.encodeToString(value).toRequestBody(JSON)
 
     private val EMPTY_BODY: RequestBody = ByteArray(0).toRequestBody(null, 0, 0)
 
@@ -1559,10 +1351,9 @@ object HoldMyTrackApi {
     private fun authenticate(path: String, body: RequestBody, onResult: (Result<Account>) -> Unit) {
         val request = Request.Builder().url(BuildConfig.API_BASE_URL + API_V1 + path).post(body).build()
         call(request, { text ->
-            val json = JSONObject(text)
-            val token = json.optString("session_token")
+            val token = decode<SessionTokenJson>(text).sessionToken
             if (token.isEmpty()) throw IOException("the server returned no session token")
-            Account(token = token, profile = Profile.parse(json))
+            Account(token = token, profile = decode<AccountJson>(text).toProfile())
         }, onResult)
     }
 
