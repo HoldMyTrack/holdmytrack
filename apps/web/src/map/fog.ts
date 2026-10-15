@@ -1,10 +1,12 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { API_BASE_URL, TILES_V1 } from '../api';
 import { versionedTileURL } from './coverageVersion';
-import { BOUNDARIES_ATTRIBUTION, CITY_MIN_ZOOM, COUNTRY_MAX_ZOOM, PIXELS_MAX_ZOOM, REGION_MAX_ZOOM, REGION_MIN_ZOOM } from './zoomTiers';
+import { BOUNDARIES_ATTRIBUTION, CITY_MIN_ZOOM, COUNTRY_MAX_ZOOM, FOG_MAX_ZOOM, REGION_MAX_ZOOM, REGION_MIN_ZOOM } from './zoomTiers';
 
 /**
- * The Fog of War raster layer (IMPLEMENTATION.md §4.2). Unlike tracks, Fog of War is never
+ * The Fog of War layers (IMPLEMENTATION.md §4.2): from city zoom in, the veil as vector shapes the
+ * server traces from its stored coverage — a fill, crisp at every zoom, and a blurred line along
+ * its edges, so the veil fades into each cleared corridor over a few screen pixels. Unlike tracks, Fog of War is never
  * scoped by the date range/TYPE/DISTANCE/hidden-track state that drives Normal mode — it
  * shows true all-time coverage, unconditionally (a place once cleared stays cleared, which is
  * the whole point of the mechanic). There is therefore no query to build: one fixed tile URL,
@@ -12,24 +14,31 @@ import { BOUNDARIES_ATTRIBUTION, CITY_MIN_ZOOM, COUNTRY_MAX_ZOOM, PIXELS_MAX_ZOO
  * coverage does. See heatmap.ts, which has its own fixed URL for the
  * same reason, just a different fixed rolling window computed server-side.
  *
- * Below city zoom (§4.2.4), this per-pixel raster is replaced entirely by the Country/Region
+ * Below city zoom (§4.2.4), the veil is replaced entirely by the Country/Region
  * fill layers below — the two tiers are mutually exclusive by MapLibre `minzoom`/`maxzoom`,
  * not layered, so there's nothing here reconciling "unlocked" with "actually explored": at
  * country/region zoom you can't see fine-grained detail anyway, so the coarse reveal is
  * already the whole truth at that scale.
  */
-export const FOG_SOURCE_ID = 'fog';
-export const FOG_LAYER_ID = 'fog-raster';
+export const FOG_SOURCE_ID = 'fog-vector';
+/** The veil's fill: the lowest Fog layer, which paths.ts lifts the trails above. */
+export const FOG_LAYER_ID = 'fog-veil';
+export const FOG_EDGE_LAYER_ID = 'fog-edge';
 export const COUNTRY_FOG_SOURCE_ID = 'country-fog';
 export const COUNTRY_FOG_LAYER_ID = 'country-fog-fill';
 export const REGION_FOG_SOURCE_ID = 'region-fog';
 export const REGION_FOG_LAYER_ID = 'region-fog-fill';
 
-const FOG_TILE_URL = `${API_BASE_URL}${TILES_V1}/fog/{z}/{x}/{y}.png`;
+const FOG_TILE_URL = `${API_BASE_URL}${TILES_V1}/fog-vector/{z}/{x}/{y}.mvt`;
+
+/** The blurred edge's width, and its blur, by zoom: about as wide as a cleared corridor itself
+ *  when zoomed out, where a wider one would smudge it, to 14 px close in — the fade from veil to
+ *  clear the same few screen pixels at every zoom. */
+const FOG_EDGE_WIDTH = ['interpolate', ['exponential', 2], ['zoom'], 10, 1, 13, 5, 15, 14, 18, 20];
 const COUNTRY_FOG_TILE_URL = `${API_BASE_URL}${TILES_V1}/country-fog/{z}/{x}/{y}.mvt`;
 const REGION_FOG_TILE_URL = `${API_BASE_URL}${TILES_V1}/region-fog/{z}/{x}/{y}.mvt`;
 
-// The same two veils as the raster tier's (internal/fog/raster.go's LightVeil/DarkVeil) — kept
+// The same two veils as the server's (internal/fog/raster.go's LightVeil/DarkVeil) — kept
 // identical so nothing shifts hue when a pan/zoom crosses the Region/City boundary. Each is the
 // opposite of the basemap it sits on: dark ink over a light map, a cream mist over a dark one.
 const LIGHT_VEIL = { color: '#202b25', opacity: 0.82 };
@@ -38,13 +47,6 @@ const DARK_VEIL = { color: '#f7f4ec', opacity: 0.6 };
 /** Which veil each map currently has, so a coverage refresh keeps it and a theme swap that
  *  somehow left the fog in place can still repaint it. */
 const darkVeil = new WeakMap<MapLibreMap, boolean>();
-
-/** The raster tile URL at the current coverage version, plus `theme=dark` for the cream veil
- *  (the server's fog.VeilForTheme). */
-function fogRasterURL(dark: boolean): string {
-  const url = versionedTileURL(FOG_TILE_URL);
-  return dark ? `${url}${url.includes('?') ? '&' : '?'}theme=dark` : url;
-}
 
 /**
  * Adds the fog source and layer if not already present — idempotent for the same reason
@@ -66,25 +68,46 @@ export function ensureFogLayer(map: MapLibreMap, beforeId: string | undefined, d
 
   if (!map.getSource(FOG_SOURCE_ID)) {
     map.addSource(FOG_SOURCE_ID, {
-      type: 'raster',
-      tiles: [fogRasterURL(dark)],
-      tileSize: 512,
+      type: 'vector',
+      tiles: [versionedTileURL(FOG_TILE_URL)],
       minzoom: 0,
-      maxzoom: 14,
+      // The coverage stops at z14; its outlines are enlarged past it, staying crisp.
+      maxzoom: FOG_MAX_ZOOM,
     });
   }
   if (!map.getLayer(FOG_LAYER_ID)) {
     map.addLayer(
       {
         id: FOG_LAYER_ID,
-        type: 'raster',
+        type: 'fill',
         source: FOG_SOURCE_ID,
+        'source-layer': 'fog',
         minzoom: CITY_MIN_ZOOM,
+        filter: ['==', ['get', 'kind'], 'veil'],
         layout: { visibility: 'none' }, // starts hidden — Normal is the default mode
-        // Square pixels below z14, where each tile pixel shows 8 screen pixels wide however far out
-        // the map is; smoothed from z14, where there's no finer tile and the z14 one is stretched
-        // further with every zoom (IMPLEMENTATION.md §4.2).
-        paint: { 'raster-resampling': ['step', ['zoom'], 'nearest', PIXELS_MAX_ZOOM, 'linear'] },
+        paint: { 'fill-color': veil.color, 'fill-opacity': veil.opacity },
+      },
+      beforeId,
+    );
+  }
+  if (!map.getLayer(FOG_EDGE_LAYER_ID)) {
+    map.addLayer(
+      {
+        id: FOG_EDGE_LAYER_ID,
+        type: 'line',
+        source: FOG_SOURCE_ID,
+        'source-layer': 'fog',
+        minzoom: CITY_MIN_ZOOM,
+        filter: ['==', ['get', 'kind'], 'edge'],
+        // Butt ends: the server carries each edge just past the tile, where the next tile's own
+        // takes over, so a cap would double up at the join.
+        layout: { visibility: 'none', 'line-join': 'round', 'line-cap': 'butt' },
+        paint: {
+          'line-color': veil.color,
+          'line-opacity': veil.opacity,
+          'line-width': FOG_EDGE_WIDTH as never,
+          'line-blur': FOG_EDGE_WIDTH as never,
+        },
       },
       beforeId,
     );
@@ -141,11 +164,12 @@ export function ensureFogLayer(map: MapLibreMap, beforeId: string | undefined, d
   }
 
   if (veilChanged) {
-    (map.getSource(FOG_SOURCE_ID) as { setTiles?: (tiles: string[]) => unknown } | undefined)?.setTiles?.([fogRasterURL(dark)]);
-    for (const layerId of [COUNTRY_FOG_LAYER_ID, REGION_FOG_LAYER_ID]) {
+    for (const layerId of [FOG_LAYER_ID, COUNTRY_FOG_LAYER_ID, REGION_FOG_LAYER_ID]) {
       map.setPaintProperty(layerId, 'fill-color', veil.color);
       map.setPaintProperty(layerId, 'fill-opacity', veil.opacity);
     }
+    map.setPaintProperty(FOG_EDGE_LAYER_ID, 'line-color', veil.color);
+    map.setPaintProperty(FOG_EDGE_LAYER_ID, 'line-opacity', veil.opacity);
   }
 }
 
@@ -154,7 +178,7 @@ export function ensureFogLayer(map: MapLibreMap, beforeId: string | undefined, d
  *  that isn't on the map yet; ensureFogLayer will create it at the current version. */
 export function refreshFogLayers(map: MapLibreMap): void {
   for (const [sourceId, url] of [
-    [FOG_SOURCE_ID, fogRasterURL(darkVeil.get(map) ?? false)],
+    [FOG_SOURCE_ID, versionedTileURL(FOG_TILE_URL)],
     [COUNTRY_FOG_SOURCE_ID, versionedTileURL(COUNTRY_FOG_TILE_URL)],
     [REGION_FOG_SOURCE_ID, versionedTileURL(REGION_FOG_TILE_URL)],
   ] as const) {

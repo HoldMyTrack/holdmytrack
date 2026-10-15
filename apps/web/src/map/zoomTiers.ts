@@ -15,9 +15,9 @@ export const COUNTRY_MAX_ZOOM = 3;
 export const REGION_MIN_ZOOM = 3;
 export const REGION_MAX_ZOOM = 7;
 export const CITY_MIN_ZOOM = 7;
-/** Fog tiles show as square pixels below this zoom and are smoothed from it up: the zoom their
- *  finest tiles are stored at (IMPLEMENTATION.md §4.2). */
-export const PIXELS_MAX_ZOOM = 14;
+/** The zoom Fog's finest tiles are stored at; past it the client enlarges those
+ *  (IMPLEMENTATION.md §4.2). */
+export const FOG_MAX_ZOOM = 14;
 
 /** Which of the three tiers Fog draws at `zoom` — the same bands the layers above switch on (a
  *  layer shows at minzoom <= zoom < maxzoom), for anything that has to name the tier in view,
