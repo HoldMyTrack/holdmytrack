@@ -1076,10 +1076,12 @@ Being free means costs scale with users while donations scale with goodwill (`VI
 **Metrics** (`internal/metrics`) are served on a listener of their own, because Caddy sends every path it doesn't serve to the API, so a route on the API's listener would be public. Rules and traps:
 - Requests are labelled by the `ServeMux` pattern that matched and by status class, so the series count stays bounded; **a metric label only ever takes values from a fixed set, never an id**, to stay inside the free tier's series limit.
 - The same middleware recovers a handler's panic, logs it with its stack and answers `500`; otherwise `net/http` drops the connection and writes a plain-text line the log shipping can't parse.
+- The same middleware logs every `500` with the build of the app that made the call, read from the Android app's User-Agent, because a handler's own error line doesn't know which install hit it and a fault only old builds hit looks different. A browser's User-Agent is never logged: it says more about the person than the build.
 - The queue gauges are collected in `serve`, not `work`, so they keep reporting while the worker is down, which is when the queue grows. They report nothing when the query fails, so a failed read doesn't look like an empty queue.
 
 **Log and metric shipping** (`ops/alloy/config.alloy`, `docs/DEPLOY.md` §13) goes to Grafana Cloud rather than a monitoring stack on the droplet, which would take about a quarter of the memory Postgres needs and couldn't report the box itself going down.
 - **Scrubbing is a list of known leaks**, from the log audit: mail lines, Postgres `DETAIL:` lines and client IPs in Caddy's logs. A new log line must keep to ids, job kinds and errors, or it ships as it is.
+- **Every server line carries `version`**, the build's commit (the same one `/healthz` reports), so an error in Loki can be tied to the deploy that logged it. It stays a JSON field rather than a label: the level is the only label the app's lines get.
 - The Postgres exporter is limited to database-wide collectors: the per-table ones were most of the series.
 - The external label is `deployment`, not `instance`: every scraped series already has an `instance`, so an external label of that name would never apply.
 - Alloy mounts the Docker socket, which makes it as trusted as root on the host, so its image is pinned and its own UI listens on loopback only.

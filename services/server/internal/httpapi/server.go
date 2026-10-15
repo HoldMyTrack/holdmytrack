@@ -281,12 +281,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// A handler's panic is answered here rather than by net/http, which would only drop
 		// the connection and print a plain-text line the log shipping can't parse. Recorded
 		// as a 500 like any other, and counted on its own for the alert.
-		if p := recover(); p != nil {
+		p := recover()
+		if p != nil {
 			if p == http.ErrAbortHandler {
 				panic(p)
 			}
 			metrics.HTTPPanics.Inc()
-			s.log.Error("handler panicked", "method", r.Method, "route", r.Pattern, "panic", p, "stack", string(debug.Stack()))
+			s.log.Error("handler panicked", "method", r.Method, "route", r.Pattern, "client", appClient(r.UserAgent()), "panic", p, "stack", string(debug.Stack()))
 			if !rec.wroteHeader {
 				if isAPIPath(r.URL.Path) {
 					writeAPIError(rec, "internal error", http.StatusInternalServerError)
@@ -306,10 +307,31 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if status == 0 {
 			status = http.StatusOK
 		}
+		// Any other 500, whoever logged its cause: the handler's own error line doesn't know
+		// which build of the app made the call, and a fault only old installs hit looks
+		// different. A 503 is left out: the daily-capacity gate and /healthz answer it on purpose.
+		if status == http.StatusInternalServerError && p == nil {
+			s.log.Error("request failed", "method", r.Method, "route", route, "status", status, "client", appClient(r.UserAgent()))
+		}
 		metrics.HTTPRequests.WithLabelValues(route, metrics.StatusClass(status)).Inc()
 		metrics.HTTPDuration.WithLabelValues(route).Observe(time.Since(start).Seconds())
 	}()
 	s.serve(rec, r)
+}
+
+// appClient is the User-Agent when one of HoldMyTrack's own apps sent it — the Android app's
+// "HoldMyTrack-Android/0.13 (62da50b)" — and "" for anything else. A browser's agent stays out
+// of the logs: it says more about the person than the build, and the web app is the server's
+// own build anyway. Cut to a length a real one never reaches, since any client can claim it.
+func appClient(userAgent string) string {
+	const prefix, maxLen = "HoldMyTrack-", 64
+	if !strings.HasPrefix(userAgent, prefix) {
+		return ""
+	}
+	if len(userAgent) > maxLen {
+		return userAgent[:maxLen]
+	}
+	return userAgent
 }
 
 // statusRecorder keeps the status a handler answered with, for ServeHTTP's metrics. Unwrap
