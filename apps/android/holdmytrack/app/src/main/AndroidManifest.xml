@@ -98,6 +98,13 @@
 
         <!-- Not exported, like SignInActivity: MainActivity and SignInActivity send an account
              whose email isn't confirmed here instead of to the map. -->
+        <!-- Opened over everything when the server refuses this build (net/AppOutdated.kt). -->
+        <activity
+            android:name=".UpdateAppActivity"
+            android:exported="false"
+            android:label="@string/update_app_title"
+            android:theme="@style/Theme.HoldMyTrack.NoActionBar" />
+
         <activity
             android:name=".VerifyEmailActivity"
             android:exported="false"

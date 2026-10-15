@@ -40,6 +40,9 @@
     <string name="profile_card_longest_streak">Самая длинная серия</string>
 
     <string name="verify_email_title">Подтвердите почту</string>
+    <string name="update_app_title">Обновите HoldMyTrack</string>
+    <string name="update_app_body">Эта версия приложения слишком старая. Обновите её, чтобы и дальше пользоваться HoldMyTrack. Всё, что ждёт синхронизации, останется на телефоне до тех пор.</string>
+    <string name="update_app_open">Обновить</string>
     <string name="verify_email_hint">Мы отправили ссылку для подтверждения на %1$s. Перейдите по ней, чтобы открыть доступ к аккаунту, — карта и синхронизация заработают сразу после этого.</string>
     <string name="verify_email_continue">Продолжить</string>
     <string name="verify_email_resend">Отправить письмо ещё раз</string>

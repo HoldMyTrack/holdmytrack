@@ -130,6 +130,15 @@ The Privacy screen (`apps/android/docs/SPEC.md` FR-1.7).
 - **A row and Add a location open the map's editor and finish this screen**, so Back from the editor doesn't land on a list it may have changed.
 - **Download your data** (`privacy/DataExportActivity`) polls while an archive is being prepared, only while the screen is resumed. Each part is handed to Android's `DownloadManager` with the session's `Authorization` header: the download outlives the screen, resumes on its own, and needs no storage permission at minSdk 34.
 
+### 2.9 `UpdateAppActivity` and `net/AppOutdated`
+
+The Update screen (`apps/android/docs/SPEC.md` FR-1.8), opened when the server refuses this build (root `docs/IMPLEMENTATION.md` §4.33).
+
+- **One place notices the refusal**: an interceptor on the shared client, so every call, the map's own included, leads to the same screen and no screen checks for `426` itself.
+- **It opens over the app, not in place of it.** The interceptor runs before the refused call's callback, so clearing the task first would hand that callback a fragment already destroyed, and `MapFragment`'s callbacks assume they're attached. Back closes the whole task with `finishAffinity` for the same effect a cleared task would have had.
+- **A refused call's callback is never delivered** (`HoldMyTrackApi.refusedBuild`): Back can tear the screens down while another refused call is still in flight. Suspending callers still get their exception, since their scopes end with their screens.
+- **What it decides is in `AppBuild`**, plain functions with unit tests: the User-Agent, which responses are the refusal, and where Update leads, chosen from the installer the system records.
+
 ## 3. Map Rendering
 
 ### 3.1 `map/MapOverlays`
@@ -332,7 +341,7 @@ The Android counterpart of the web's `ActivityTypePicker.tsx`, with `SearchPicke
 
 **The API's address is the one build-time value from outside the build**, set per build type from a Gradle property, so the Play build can't pick up a dev stack's address. The release signing config reads the upload keystore from properties kept outside the repository (`apps/android/holdmytrack/README.md`). Pointing a physical device at a host dev stack needs `adb reverse` for both the API port and the web dev server port the style's asset URLs resolve against (`apps/android/holdmytrack/README.md`). **Donate is in debug builds only**, the APK the website offers, since Play's payments policy doesn't allow a link to payment outside its billing.
 
-**The version comes from git.** `versionCode` is the commit count, so it rises with every commit and never needs bumping — Play refuses an upload whose code isn't higher than the last — and the short SHA is baked in, the same one the server's `/healthz` reports. Outside a git checkout the code is 1.
+**The version comes from git.** `versionCode` is the commit count, so it rises with every commit and never needs bumping — Play refuses an upload whose code isn't higher than the last — and the short SHA is baked in, the same one the server's `/healthz` reports. Outside a git checkout the code is 1. The User-Agent carries all three, so the server's logs name the build and it can refuse one older than its minimum (§2.9).
 
 **Cleartext `http://` traffic is permitted in debug builds only**, so a release build cannot be pointed at a plaintext dev endpoint by accident — the network security configuration enforces this, not a code-review convention.
 

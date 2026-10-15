@@ -1,6 +1,7 @@
 package dev.holdmytrack.android
 
 import android.app.Application
+import dev.holdmytrack.android.net.AppOutdated
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.settings.AppTheme
@@ -26,6 +27,7 @@ class HoldMyTrackApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         Session.init(this)
+        AppOutdated.init(this)
         // Before any screen inflates, so the first one already has the chosen theme's colors.
         AppTheme.applySaved(this)
         // Loads the native library and installs the module provider a MapView's constructor

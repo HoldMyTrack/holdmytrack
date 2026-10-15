@@ -395,6 +395,7 @@ object HoldMyTrackApi {
         .addInterceptor(UserAgentInterceptor)
         .addInterceptor(LanguageInterceptor)
         .addInterceptor(OriginInterceptor)
+        .addInterceptor(OutdatedInterceptor)
         .build()
 
     /**
@@ -422,15 +423,39 @@ object HoldMyTrackApi {
     }
 
     /**
-     * Names the app and its build — `HoldMyTrack-Android/0.13 (62da50b)` — on HoldMyTrack's own
-     * requests, so the server's logs say which build made a call. Other origins keep what the
-     * request already had: MapLibre's own agent on the basemap's assets.
+     * Names the app and its build — `HoldMyTrack-Android/0.13 (62da50b; 812)` — on HoldMyTrack's
+     * own requests, so the server's logs say which build made a call and the server can turn
+     * away one older than its minimum. Other origins keep what the request already had:
+     * MapLibre's own agent on the basemap's assets.
      */
     private object UserAgentInterceptor : Interceptor {
+        private val agent = AppBuild.userAgent(BuildConfig.VERSION_NAME, BuildConfig.GIT_SHA, BuildConfig.VERSION_CODE)
+
         override fun intercept(chain: Interceptor.Chain): Response {
             val request = chain.request()
             if (!request.url.toString().startsWith(BuildConfig.API_BASE_URL)) return chain.proceed(request)
-            return chain.proceed(request.newBuilder().header("User-Agent", "HoldMyTrack-Android/$appVersion").build())
+            return chain.proceed(request.newBuilder().header("User-Agent", agent).build())
+        }
+    }
+
+    /**
+     * Whether [response] is the server refusing this build, which [OutdatedInterceptor] has
+     * already handed to the Update screen. A callback caller isn't told: the screen that made
+     * the call may be gone by the time it would run, and nothing it could show is still seen.
+     * A suspending caller still gets its exception, and its lifecycle's scope is cancelled with
+     * the screen.
+     */
+    private fun refusedBuild(response: Response): Boolean =
+        AppBuild.isRefusal(response.request.url.toString(), BuildConfig.API_BASE_URL, response.code)
+
+    /** Hands the server's refusal of this build to [AppOutdated], whichever call met it. */
+    private object OutdatedInterceptor : Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val response = chain.proceed(chain.request())
+            if (AppBuild.isRefusal(response.request.url.toString(), BuildConfig.API_BASE_URL, response.code)) {
+                AppOutdated.refused()
+            }
+            return response
         }
     }
 
@@ -798,6 +823,7 @@ object HoldMyTrackApi {
             }
 
             override fun onResponse(call: Call, response: Response) {
+                if (refusedBuild(response)) return response.close()
                 val result = response.use {
                     if (!it.isSuccessful) return@use Result.failure(ApiException(it.code, ""))
                     val bytes = it.body?.bytes() ?: ByteArray(0)
@@ -1365,6 +1391,7 @@ object HoldMyTrackApi {
 
             override fun onResponse(call: Call, response: Response) {
                 val body = response.use { it.body?.string().orEmpty() }
+                if (refusedBuild(response)) return
                 deliver(
                     if (response.isSuccessful) runCatching { parse(body) }
                     else Result.failure(ApiException.from(response.code, body)),

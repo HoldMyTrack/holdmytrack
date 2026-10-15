@@ -151,6 +151,9 @@ services:
       SIGNUPS_PER_HOUR: ${SIGNUPS_PER_HOUR:-5}
       # Daily R2 budget in US dollars, read by api and worker (docs/DEPLOY.md §4).
       R2_DAILY_BUDGET_USD: ${R2_DAILY_BUDGET_USD:-2}
+      # The oldest Android versionCode /v1/ answers (docs/DEPLOY.md §4); set it above this
+      # checkout's commit count to see the app's Update screen.
+      MIN_ANDROID_BUILD: ${MIN_ANDROID_BUILD:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-}
