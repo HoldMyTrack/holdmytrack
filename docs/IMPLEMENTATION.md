@@ -1076,6 +1076,7 @@ Being free means costs scale with users while donations scale with goodwill (`VI
 **Metrics** (`internal/metrics`) are served on a listener of their own, because Caddy sends every path it doesn't serve to the API, so a route on the API's listener would be public. Rules and traps:
 - Requests are labelled by the `ServeMux` pattern that matched and by status class, so the series count stays bounded; **a metric label only ever takes values from a fixed set, never an id**, to stay inside the free tier's series limit.
 - The same middleware recovers a handler's panic, logs it with its stack and answers `500`; otherwise `net/http` drops the connection and writes a plain-text line the log shipping can't parse.
+- The same middleware logs every `500` with the build of the app that made the call, read from the Android app's User-Agent, because a handler's own error line doesn't know which install hit it and a fault only old builds hit looks different. A browser's User-Agent is never logged: it says more about the person than the build.
 - The queue gauges are collected in `serve`, not `work`, so they keep reporting while the worker is down, which is when the queue grows. They report nothing when the query fails, so a failed read doesn't look like an empty queue.
 
 **Log and metric shipping** (`ops/alloy/config.alloy`, `docs/DEPLOY.md` §13) goes to Grafana Cloud rather than a monitoring stack on the droplet, which would take about a quarter of the memory Postgres needs and couldn't report the box itself going down.

@@ -1,9 +1,12 @@
 package httpapi
 
 import (
+	"bytes"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
@@ -68,5 +71,49 @@ func TestServeHTTPRecoversPanic(t *testing.T) {
 	}
 	if got := testutil.ToFloat64(errs) - before; got != 1 {
 		t.Errorf("the panic counted %v times as a 5xx response, want 1", got)
+	}
+}
+
+func TestAppClient(t *testing.T) {
+	long := "HoldMyTrack-Android/0.13 (62da50b) " + strings.Repeat("x", 100)
+	for _, tc := range []struct{ ua, want string }{
+		{"HoldMyTrack-Android/0.13 (62da50b)", "HoldMyTrack-Android/0.13 (62da50b)"},
+		{"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15", ""},
+		{"", ""},
+		{"okhttp/4.12.0", ""},
+		{long, long[:64]},
+	} {
+		if got := appClient(tc.ua); got != tc.want {
+			t.Errorf("appClient(%q) = %q, want %q", tc.ua, got, tc.want)
+		}
+	}
+}
+
+func TestServeHTTPLogsTheAppBuildOnAFailure(t *testing.T) {
+	var buf bytes.Buffer
+	s := newMetricsTestServer()
+	s.log = slog.New(slog.NewJSONHandler(&buf, nil))
+	s.mux.HandleFunc("GET /v1/test/fail", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	for _, path := range []string{"/v1/test/fail", "/v1/test/panic"} {
+		req := httptest.NewRequest("GET", path, nil)
+		req.Header.Set("User-Agent", "HoldMyTrack-Android/0.13 (62da50b)")
+		s.ServeHTTP(httptest.NewRecorder(), req)
+	}
+	s.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/v1/test/teapot", nil))
+
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("logged %d lines, want one per failed request:\n%s", len(lines), buf.String())
+	}
+	for i, msg := range []string{"request failed", "handler panicked"} {
+		var line map[string]any
+		if err := json.Unmarshal([]byte(lines[i]), &line); err != nil {
+			t.Fatal(err)
+		}
+		if line["msg"] != msg || line["client"] != "HoldMyTrack-Android/0.13 (62da50b)" {
+			t.Errorf("line %d = %s, want %q with the app's build", i, lines[i], msg)
+		}
 	}
 }
