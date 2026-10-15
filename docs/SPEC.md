@@ -40,6 +40,8 @@ Engineers implementing against or modifying this system, QA deriving test cases,
 
 Every error the JSON API (`/v1`) and the tiles (`/tiles/v1`) answer with is `application/json` `{"error": code, "message": text}` (ADR-0045). `error` is a stable code: a failure's own (`photo_needs_place`, `demo_read_only`, `account_limit`) or its status's generic one (`invalid_request`, `unauthenticated`, `forbidden`, `not_found`, `conflict`, `gone`, `payload_too_large`, `unsupported_type`, `unprocessable`, `rate_limited`, `unavailable`, `internal`). `message` is text for a person (FR-13.1). Where this document gives a status with a code — `403` `demo_read_only` — the code is the `error` field. The exceptions are the `405` for a known path asked with the wrong method, and `/healthz`, which answers the deployment's health check in plain text.
 
+An Android build older than the deployment's minimum (`MIN_ANDROID_BUILD`, `DEPLOY.md` §4) gets `426` `app_outdated` from every `/v1` request, before anything else about the request is checked, with a message saying to update the app (`apps/android/docs/SPEC.md` FR-1.8). The tiles, the pages and every other client are never refused for their version. With no minimum set, no build is refused.
+
 ## 2. Actors
 
 | Actor | Description |

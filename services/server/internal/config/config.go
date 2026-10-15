@@ -102,6 +102,10 @@ type Config struct {
 	// §4): what every account together may spend on object store requests in a UTC day before
 	// the service starts giving things up. Read by `serve` and `work`.
 	R2DailyBudgetUSD float64
+	// MinAndroidBuild is the oldest Android versionCode /v1/ still answers (internal/httpapi's
+	// SetMinAndroidBuild, docs/DEPLOY.md §4); 0, the default, answers every build. Only read
+	// by `serve`.
+	MinAndroidBuild int
 }
 
 func Load() (Config, error) {
@@ -154,6 +158,11 @@ func Load() (Config, error) {
 	}
 	if c.R2DailyBudgetUSD, err = positiveFloat("R2_DAILY_BUDGET_USD", 2); err != nil {
 		return c, err
+	}
+	if v := env("MIN_ANDROID_BUILD", ""); v != "" {
+		if c.MinAndroidBuild, err = strconv.Atoi(v); err != nil || c.MinAndroidBuild < 0 {
+			return c, fmt.Errorf("config: MIN_ANDROID_BUILD must be a versionCode, 0 or more, got %q", v)
+		}
 	}
 	c.WebDevDir = env("WEB_DEV_DIR", "")
 	c.GoogleClientID = env("GOOGLE_CLIENT_ID", "")
