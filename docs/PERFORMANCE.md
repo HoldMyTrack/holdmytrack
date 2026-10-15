@@ -354,3 +354,23 @@ Whether encoding heat-points tiles in Go, in place of PostGIS's `ST_AsMVT`, and 
 - A tile's database transactions fell by about a quarter, one round trip each; no request failed at any step. Latency and the database's CPU didn't move: the round trip removed was cheap, and the laptop's database was far from saturated at 200 users (about 70 views a second).
 - About one of the two transactions left on every tile request is the session lookup every authenticated request makes, on every tile route alike, which is now the larger part of a heat tile's database work.
 - The first Go encoder allocated per point and took 281 µs for a full tile; writing each feature into reused buffers took it to 123 µs.
+
+### 2026-10-15 — dev stack, Fog as vector tiles
+
+What tracing Fog into vector tiles at request time (`IMPLEMENTATION.md` §4.2, Vector serving) costs against the PNG route, which only rewrites the stored bytes' header. The laptop's dev stack with 5 `signup` accounts `seed`ed with the 45 demo tracks and fully rendered; `browse` with every visitor in Fog (`-mode fog`) for 2 minutes a step, asking for the vector tiles the clients now draw, or the PNG with `-fog-png` (which the driver gained for this); both routes on the same build. Database transactions from `pg_stat_database.xact_commit` cover every request, Country and Region tiles included; CPU from `docker stats` every 3 s.
+
+| Fog-only browse | City-zoom Fog tiles, PNG / vector | Database transactions, PNG → vector | p50 / p95, PNG → vector | API CPU mean (max), PNG → vector | Database CPU mean, PNG → vector |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| 100 users | 5,864 / 6,508 | 28,857 → 28,749 | 3 / 8 → 3 / 8 ms | 6 (13) → 8 (23)% | 33 → 25% |
+| 200 users | 12,990 / 12,884 | 57,660 → 56,434 | 2 / 5 → 2 / 5 ms | 10 (16) → 14 (57)% | 36 → 34% |
+| 50 users, no tile cache | 7,727 / 6,959 | 38,135 → 38,786 | 3 / 8 → 3 / 9 ms | 8 (11) → 10 (21)% | 31 → 29% |
+
+| Per tile, development laptop | PNG | Vector |
+| :-- | :-- | :-- |
+| Served bytes, median of 23 z14 tiles with coverage | 1,743 | 234 |
+| Served bytes, median of 6 z12 tiles | 1,498 | 216 |
+| Make a tile from the stored PNG (`BenchmarkEncodeFogTile`, three roads) | under 1 µs | ~210 µs, plus ~38 µs to decode |
+
+- Latency didn't move and no request failed at any step. The trace is the API's CPU, not the database's: about 2–4 points more on average, with short peaks while many first views trace together; the database's work is the same row and object read either way.
+- A vector tile is about a seventh of the PNG's size, so a view downloads less.
+- The first trace took ~640 µs a tile, most of it garbage: reusing the sample grid between requests and simplifying an outline in one pass instead of by Douglas-Peucker took it to ~210 µs.

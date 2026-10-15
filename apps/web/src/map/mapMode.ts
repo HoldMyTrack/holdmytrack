@@ -1,5 +1,5 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { COUNTRY_FOG_LAYER_ID, FOG_LAYER_ID, REGION_FOG_LAYER_ID } from './fog';
+import { COUNTRY_FOG_LAYER_ID, FOG_EDGE_LAYER_ID, FOG_LAYER_ID, REGION_FOG_LAYER_ID } from './fog';
 import { HEAT_POINTS_LAYER_ID, HEATMAP_DIM_LAYER_ID } from './heatmap';
 import { SPOTS_LAYER_ID } from './spots';
 import { BAND_LAYER_ID } from './trackBands';
@@ -27,6 +27,7 @@ export type MapMode = 'normal' | 'fog' | 'heatmap';
  */
 export function setMapMode(map: MapLibreMap, mode: MapMode, editingTrack = false): void {
   setVisible(map, FOG_LAYER_ID, mode === 'fog');
+  setVisible(map, FOG_EDGE_LAYER_ID, mode === 'fog');
   setVisible(map, COUNTRY_FOG_LAYER_ID, mode === 'fog');
   setVisible(map, REGION_FOG_LAYER_ID, mode === 'fog');
   setVisible(map, HEAT_POINTS_LAYER_ID, mode === 'heatmap');
