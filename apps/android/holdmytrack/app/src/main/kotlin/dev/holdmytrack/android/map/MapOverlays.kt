@@ -124,7 +124,7 @@ object MapOverlays {
      * at z7 had nothing drawn once the camera fit it. Mirrors `apps/web/src/map/tracks.ts`'s
      * `TRACKS_MIN_ZOOM` (`docs/IMPLEMENTATION.md` §5.3 has the tile-size measurement).
      */
-    private const val TRACKS_MIN_ZOOM = 4f
+    const val TRACKS_MIN_ZOOM = 4f
 
     /**
      * The basemap archive's own maximum zoom (`docs/IMPLEMENTATION.md` §5.4), and the same

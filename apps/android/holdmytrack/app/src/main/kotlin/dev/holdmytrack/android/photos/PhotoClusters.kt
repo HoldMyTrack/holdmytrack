@@ -1,5 +1,10 @@
 package dev.holdmytrack.android.photos
 
+import dev.holdmytrack.android.map.MapOverlays
+
+/** How photo markers are drawn at a zoom ([PhotoClusters.markerSize]). */
+enum class MarkerSize { HIDDEN, SMALL, FULL }
+
 /** A marker's place on screen, in pixels. */
 data class ScreenPoint(val id: String, val x: Float, val y: Float)
 
@@ -18,6 +23,22 @@ object PhotoClusters {
     /** How close two markers' centres may be, in dp, before they're one group: a little under
      *  a marker's width (36dp), so markers that would merely touch stay apart. */
     const val RADIUS_DP = 32f
+
+    /** The same for a small marker (22dp). */
+    const val SMALL_RADIUS_DP = 18f
+
+    /** From this zoom up a marker is drawn full size; below it, small, so the tracks — thin
+     *  lines across a whole region at that scale — still show under the photos. */
+    const val FULL_ZOOM = 10.0
+
+    /** How photo markers are drawn at [zoom], as the web's `photoMarkerSize`: not at all where
+     *  tracks aren't either (below [MapOverlays.TRACKS_MIN_ZOOM]) — a photo would sit over a
+     *  continent with no route under it — small below [FULL_ZOOM], full size from it. */
+    fun markerSize(zoom: Double): MarkerSize = when {
+        zoom < MapOverlays.TRACKS_MIN_ZOOM -> MarkerSize.HIDDEN
+        zoom < FULL_ZOOM -> MarkerSize.SMALL
+        else -> MarkerSize.FULL
+    }
 
     /**
      * Greedy grouping in the given order: each point joins the first group whose anchor — its

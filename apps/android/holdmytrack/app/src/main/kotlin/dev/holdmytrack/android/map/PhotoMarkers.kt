@@ -16,6 +16,7 @@ import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.widget.FrameLayout
 import dev.holdmytrack.android.R
+import dev.holdmytrack.android.photos.MarkerSize
 import dev.holdmytrack.android.photos.PhotoClusters
 import dev.holdmytrack.android.photos.PhotoImages
 import dev.holdmytrack.android.photos.ScreenPoint
@@ -48,7 +49,8 @@ data class PhotoMarkerOverlay(
  * the track — or, where several would overlap on screen, one marker for the group: its first
  * photo, stacked, with a count ([PhotoClusters]). The groups are worked out again whenever the
  * camera comes to rest ([regroup]), so zooming in splits them; meanwhile [place] keeps every
- * marker on its point as the camera moves.
+ * marker on its point as the camera moves. Zoomed out the markers are small, and below the zoom
+ * tracks start at there are none ([PhotoClusters.markerSize]).
  *
  * Views in [layer] — a pass-through layer over the map, under its chrome — rather than a symbol
  * layer, as the web's are HTML markers: there are tens of them, not thousands, and each shows
@@ -81,10 +83,12 @@ class PhotoMarkers(private val layer: FrameLayout, private val onOpen: (List<Str
     /** The groups again, from where the photos are on screen now. */
     fun regroup() {
         val instance = map
-        if (instance == null || items.isEmpty()) {
+        val size = instance?.let { PhotoClusters.markerSize(it.cameraPosition.zoom) } ?: MarkerSize.HIDDEN
+        if (instance == null || items.isEmpty() || size == MarkerSize.HIDDEN) {
             clear()
             return
         }
+        val small = size == MarkerSize.SMALL
         val projection = instance.projection
         val byId = items.associateBy { it.id }
         val groups = PhotoClusters.cluster(
@@ -92,7 +96,7 @@ class PhotoMarkers(private val layer: FrameLayout, private val onOpen: (List<Str
                 val p = projection.toScreenLocation(LatLng(it.lat, it.lon))
                 ScreenPoint(it.id, p.x, p.y)
             },
-            PhotoClusters.RADIUS_DP * density,
+            (if (small) PhotoClusters.SMALL_RADIUS_DP else PhotoClusters.RADIUS_DP) * density,
         ).map { it.ids }.toMutableList()
         loneId?.takeIf { it in byId }?.let { groups += listOf(it) }
 
@@ -106,7 +110,7 @@ class PhotoMarkers(private val layer: FrameLayout, private val onOpen: (List<Str
                     layer.addView(view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
                 }
             }
-            view.bind(item, ids, activeId != null && activeId in ids)
+            view.bind(item, ids, activeId != null && activeId in ids, small)
         }
         // The one in hand or open over the rest.
         markers.values.filter { it.active }.forEach { it.bringToFront() }
@@ -135,8 +139,10 @@ class PhotoMarkers(private val layer: FrameLayout, private val onOpen: (List<Str
  * One marker, drawn: the photo's thumbnail cropped into a 36dp circle (52dp while open or in
  * hand) in a 2dp ring — the surface's colour, the accent's when active — and, for a group, two
  * cards' edges showing behind it and the count on its corner (the web's `.photo-marker--group`
- * and `.photo-marker__count`). The view is a square [side] wide with room around the circle for
- * those, so its touch target is never under 48dp.
+ * and `.photo-marker__count`). Small, zoomed out (the web's `.photo-marker--small`), the circle
+ * is 22dp (36dp while open or in hand), and the ring, the stack and the count shrink with it.
+ * The view is a square [side] wide with room around the circle for those, so its touch target
+ * is never under 48dp.
  */
 @SuppressLint("ViewConstructor")
 private class PhotoMarkerView(context: Context) : View(context) {
@@ -148,6 +154,7 @@ private class PhotoMarkerView(context: Context) : View(context) {
         private set
     var active = false
         private set
+    private var small = false
     private var bitmap: Bitmap? = null
 
     private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
@@ -163,11 +170,19 @@ private class PhotoMarkerView(context: Context) : View(context) {
     }
 
     private val diameter: Float
-        get() = (if (active) ACTIVE_DP else MARKER_DP) * density
+        get() = when {
+            small -> if (active) MARKER_DP else SMALL_DP
+            else -> if (active) ACTIVE_DP else MARKER_DP
+        } * density
 
-    /** The view's width and height: the circle and room for the stack and the count. */
+    /** How much the ring, the stack and the count are scaled: a small marker's against a full one's. */
+    private val scale: Float
+        get() = if (small) SMALL_DP / MARKER_DP else 1f
+
+    /** The view's width and height: the circle and room for the stack and the count, and never
+     *  under a 48dp touch target. */
     val side: Int
-        get() = (diameter + 2 * PAD_DP * density).toInt()
+        get() = maxOf(diameter + 2 * PAD_DP * density, TARGET_DP * density).toInt()
 
     init {
         isClickable = true
@@ -183,8 +198,10 @@ private class PhotoMarkerView(context: Context) : View(context) {
         }
     }
 
-    fun bind(next: PhotoMarkerItem, groupIds: List<String>, isActive: Boolean) {
-        val resized = isActive != active
+    fun bind(next: PhotoMarkerItem, groupIds: List<String>, isActive: Boolean, isSmall: Boolean) {
+        val resized = isActive != active || isSmall != small
+        small = isSmall
+        count.textSize = resources.getDimension(R.dimen.hmt_text_xs) * scale
         val sameImage = item?.let { it.thumbPath == next.thumbPath && it.thumb === next.thumb } == true
         item = next
         ids = groupIds
@@ -222,14 +239,14 @@ private class PhotoMarkerView(context: Context) : View(context) {
         if (ids.size > 1) {
             // Two cards behind, up and to the right, as the web's stacked box-shadows.
             for (step in intArrayOf(2, 1)) {
-                val d = STACK_DP * step * density
+                val d = STACK_DP * scale * step * density
                 fill.color = surface
                 canvas.drawCircle(c + d, c - d, r, fill)
                 edge.color = context.getColor(R.color.hmt_border_strong)
                 canvas.drawCircle(c + d, c - d, r, edge)
             }
         }
-        val ringWidth = RING_DP * density
+        val ringWidth = (if (small && !active) SMALL_RING_DP else RING_DP) * density
         fill.color = context.getColor(R.color.hmt_surface_tint_strong)
         canvas.drawCircle(c, c, r, fill)
         bitmap?.let { b ->
@@ -247,11 +264,11 @@ private class PhotoMarkerView(context: Context) : View(context) {
         canvas.drawCircle(c, c, r - ringWidth / 2, ring)
         if (ids.size > 1) {
             val text = ids.size.toString()
-            val h = BADGE_DP * density
-            val w = maxOf(h, count.measureText(text) + 8 * density)
-            // The web's top: -8px, right: -10px, from the circle's box.
-            val right = c + r + 10 * density
-            val top = c - r - 8 * density
+            val h = BADGE_DP * scale * density
+            val w = maxOf(h, count.measureText(text) + 8 * scale * density)
+            // The web's top: -8px, right: -10px, from the circle's box (-7, -9 small).
+            val right = c + r + (if (small) 9 else 10) * density
+            val top = c - r - (if (small) 7 else 8) * density
             canvas.drawRoundRect(RectF(right - w, top, right, top + h), h / 2, h / 2, badge)
             canvas.drawText(text, right - w / 2, top + h / 2 - (count.descent() + count.ascent()) / 2, count)
         }
@@ -260,10 +277,13 @@ private class PhotoMarkerView(context: Context) : View(context) {
     private companion object {
         const val MARKER_DP = 36f
         const val ACTIVE_DP = 52f
+        const val SMALL_DP = 22f
         const val RING_DP = 2f
+        const val SMALL_RING_DP = 1.5f
         const val STACK_DP = 3f
         const val BADGE_DP = 18f
         /** Room around the circle: the stack's 6dp and the badge's overhang, and a 48dp target. */
         const val PAD_DP = 12f
+        const val TARGET_DP = 48f
     }
 }
