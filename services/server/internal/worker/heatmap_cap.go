@@ -8,7 +8,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
 )
 
 // recomputeHeatmapCaps is what keeps each account's users.heatmap_cap (migrations/
@@ -57,16 +56,11 @@ func recomputeHeatmapCaps(ctx context.Context, pool *pgxpool.Pool, log *slog.Log
 			log.Error("heatmap cap: update failed", "user_id", userID, "err", err)
 			continue
 		}
-		// Every z14 tile the account has ever touched already has a fog_tiles row (it's
-		// created the first time an activity touches it) — marking all of them dirty, rather
-		// than recomputing the account's full touched-tile list again, is simpler and exactly
-		// as correct.
-		if _, err := pool.Exec(ctx, `UPDATE fog_tiles SET dirty = true, dirty_gen = dirty_gen + 1 WHERE user_id = $1`, userID); err != nil {
-			log.Error("heatmap cap: mark dirty failed", "user_id", userID, "err", err)
-			continue
-		}
-		if err := ingest.EnqueueRenderFog(ctx, pool, userID); err != nil {
-			log.Error("heatmap cap: enqueue render failed", "user_id", userID, "err", err)
+		// The cap weighs the stored counts as each heat-points tile is served (fog.HeatPoints),
+		// so nothing is re-rendered: a new tile version is all it takes for the clients to
+		// fetch tiles at the new weights.
+		if err := fog.BumpMapVersion(ctx, pool, userID); err != nil {
+			log.Error("heatmap cap: bump map version failed", "user_id", userID, "err", err)
 			continue
 		}
 		changedCount++

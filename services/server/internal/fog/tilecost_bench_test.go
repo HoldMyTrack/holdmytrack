@@ -49,10 +49,36 @@ func BenchmarkCompositeFog(b *testing.B) {
 	}
 }
 
-func BenchmarkCompositeHeatmap(b *testing.B) {
+func BenchmarkHeatCounts(b *testing.B) {
 	masks := []*image.Gray{benchStroke(), benchStroke(), benchStroke()}
 	for b.Loop() {
-		compositeHeatmapMask(masks, 8)
+		heatCounts(masks)
+	}
+}
+
+func BenchmarkDownsampleCounts(b *testing.B) {
+	c := [4]*image.Gray16{heatCounts([]*image.Gray{benchStroke()}), blankCounts(), blankCounts(), blankCounts()}
+	for b.Loop() {
+		downsampleCounts(c)
+	}
+}
+
+// A heat-points tile from a busy count tile: the decode, then the points.
+func BenchmarkHeatPoints(b *testing.B) {
+	masks := make([]*image.Gray, 40)
+	for i := range masks {
+		masks[i] = benchStroke()
+	}
+	png, err := encodeTilePNG(heatCounts(masks))
+	if err != nil {
+		b.Fatal(err)
+	}
+	for b.Loop() {
+		counts, err := DecodeCounts(png)
+		if err != nil {
+			b.Fatal(err)
+		}
+		HeatPoints(counts, 0, 0, 40)
 	}
 }
 

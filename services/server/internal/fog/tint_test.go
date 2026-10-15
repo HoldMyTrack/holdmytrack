@@ -57,7 +57,6 @@ func TestTintMatchesPerPixelColouring(t *testing.T) {
 		{"fog dark", mustTile(FogTile(encodeMask(t, mask), DarkVeil)), func(v uint8) color.NRGBA {
 			return color.NRGBA{R: DarkVeil.R, G: DarkVeil.G, B: DarkVeil.B, A: uint8(DarkVeil.Opacity * float64(255-v))}
 		}},
-		{"heatmap", mustTile(HeatmapTile(encodeMask(t, mask))), heatmapNRGBA},
 	} {
 		img := decodeTile(t, tc.tile)
 		if _, ok := img.(*image.Paletted); !ok {
@@ -83,9 +82,6 @@ func TestTintBlank(t *testing.T) {
 	}
 	if _, _, _, a := fog.At(10, 10).RGBA(); a>>8 != uint32(LightVeil.Opacity*255) {
 		t.Errorf("blank Fog alpha = %d, want the veil's", a>>8)
-	}
-	if _, _, _, a := decodeTile(t, mustTile(HeatmapTile(nil))).At(10, 10).RGBA(); a != 0 {
-		t.Errorf("blank Heatmap alpha = %d, want 0", a)
 	}
 }
 

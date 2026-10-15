@@ -65,10 +65,6 @@ func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, u
 		}
 	}()
 
-	heatmapCap, err := userHeatmapCap(ctx, pool, userID)
-	if err != nil {
-		return fmt.Errorf("fog: load heatmap cap: %w", err)
-	}
 	// Masks a z14 tile was composited without (renderAndStoreTile): logged once per pass, so
 	// coverage missing after a restore isn't silent.
 	var skipped atomic.Int64
@@ -93,7 +89,7 @@ func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, u
 			t := dirty[i]
 			var err error
 			if z == Zoom {
-				err = renderAndStoreTile(ctx, pool, store, userID, z, t[0], t[1], heatmapCap, &skipped)
+				err = renderAndStoreTile(ctx, pool, store, userID, z, t[0], t[1], &skipped)
 			} else {
 				err = renderPyramidLevel(ctx, pool, store, userID, z, t[0], t[1])
 			}
@@ -105,6 +101,10 @@ func RenderUser(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, u
 		if err != nil {
 			return err
 		}
+	}
+	if rendered {
+		// Before the version bump, so a client refetching on it reads the new scale too.
+		return StoreHeatPointCaps(ctx, pool, userID)
 	}
 	return nil
 }
@@ -145,18 +145,6 @@ func lockRenders(ctx context.Context, pool *pgxpool.Pool, userID string) (unlock
 // re-parsing raw payloads. A location change goes through the `reprivacy` job instead, which
 // re-renders each affected activity's own masks from freshly clipped points (internal/ingest's
 // ProcessReprivacy) before this recomposites.
-
-// userHeatmapCap reads the account's own users.heatmap_cap (migrations/0001_users_and_auth.sql)
-// — kept current by internal/worker/heatmap_cap.go's daily sweep (cap.go's
-// RecomputeHeatmapCap), never derived here. A render pass always uses whatever value is
-// currently stored, even if a recompute is mid-flight elsewhere; the next render after that
-// sweep's own dirty-marking picks up the new value, the same eventual-consistency the rest of
-// this package's dirty-tile model already relies on.
-func userHeatmapCap(ctx context.Context, pool *pgxpool.Pool, userID string) (float64, error) {
-	var cap float64
-	err := pool.QueryRow(ctx, `SELECT heatmap_cap FROM users WHERE id = $1`, userID).Scan(&cap)
-	return cap, err
-}
 
 func dirtyTiles(ctx context.Context, pool *pgxpool.Pool, userID string, zoom int) ([][2]int, error) {
 	rows, err := pool.Query(ctx,
@@ -205,7 +193,7 @@ func dirtyTiles(ctx context.Context, pool *pgxpool.Pool, userID string, zoom int
 // Neither includes a Pending activity (edit_pending, §4.7.7): its masks are the pre-reprocess
 // ones, or mid-rewrite. The reprocess marks its tiles dirty when it goes Pending and renders
 // them again after clearing the flag, so it drops out of both rasters for the duration.
-func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string, zoom, x, y int, heatmapCap float64, skipped *atomic.Int64) error {
+func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string, zoom, x, y int, skipped *atomic.Int64) error {
 	gen, err := tileDirtyGen(ctx, pool, userID, zoom, x, y)
 	if err != nil {
 		return err
@@ -265,17 +253,16 @@ func renderAndStoreTile(ctx context.Context, pool *pgxpool.Pool, store *storage.
 		}
 	}
 
-	// Both rasters composite the same shape of input differently (§4.2.2: max vs sum) — see
-	// compositeFogMask/compositeHeatmapMask in raster.go — but, per the window above, not
-	// necessarily the same *set* of masks.
+	// Both are built from the same shape of input, differently (§4.2.2: coverage vs counts) —
+	// see compositeFogMask in raster.go and heatCounts in heat.go — but, per the window above,
+	// not necessarily from the same *set* of masks.
 	fogMask := compositeFogMask(fogMasks)
-	heatmapMask := compositeHeatmapMask(heatmapMasks, heatmapCap)
-	sizes, err := storeTilePair(ctx, store, userID, zoom, x, y, fogMask, heatmapMask)
+	heatmapMask := heatCounts(heatmapMasks)
+	heatKey, sizes, err := storeTilePair(ctx, store, userID, zoom, x, y, fogMask, heatmapMask)
 	if err != nil {
 		return err
 	}
-	return upsertTileRendered(ctx, pool, userID, zoom, x, y, gen,
-		fogObjectKey(userID, zoom, x, y), heatmapObjectKey(userID, zoom, x, y), sizes)
+	return upsertTileRendered(ctx, pool, userID, zoom, x, y, gen, fogObjectKey(userID, zoom, x, y), heatKey, sizes)
 }
 
 // errTileSize is decodeGray's refusal of a PNG that isn't TileSize square.
@@ -441,26 +428,31 @@ func renderPyramidLevel(ctx context.Context, pool *pgxpool.Pool, store *storage.
 	if err != nil {
 		return err
 	}
-	fogMask := downsampleQuadrants([4]*image.Gray{children[0], children[1], children[2], children[3]})
-	heatmapMask := downsampleQuadrants([4]*image.Gray{children[4], children[5], children[6], children[7]})
-	sizes, err := storeTilePair(ctx, store, userID, zoom, x, y, fogMask, heatmapMask)
+	fogMask := downsampleQuadrants(children.fog)
+	heatmapMask := downsampleCounts(children.heat)
+	heatKey, sizes, err := storeTilePair(ctx, store, userID, zoom, x, y, fogMask, heatmapMask)
 	if err != nil {
 		return err
 	}
-	return upsertTileRendered(ctx, pool, userID, zoom, x, y, gen,
-		fogObjectKey(userID, zoom, x, y), heatmapObjectKey(userID, zoom, x, y), sizes)
+	return upsertTileRendered(ctx, pool, userID, zoom, x, y, gen, fogObjectKey(userID, zoom, x, y), heatKey, sizes)
 }
 
-// loadChildren reads the four children at zoom of parent (px, py), in downsampleQuadrants'
-// order (top left, top right, bottom left, bottom right): their Fog masks, then their Heatmap
-// masks. A child with no fog_tiles row, or not rendered on one side, is a blank tile — the
-// correct stand-in for "nothing here", not an error, since a user's history need not touch
-// every sibling tile. A blank mask is all-zero either way; FogTile and HeatmapTile each
-// interpret zero correctly for their own mode (fully fogged vs. fully transparent).
-func loadChildren(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string, zoom, px, py int) ([8]*image.Gray, error) {
-	var out [8]*image.Gray
-	for i := range out {
-		out[i] = blankTile()
+// childTiles are a parent's four children, in downsampleQuadrants' order (top left, top
+// right, bottom left, bottom right): their Fog masks and their Heatmap counts.
+type childTiles struct {
+	fog  [4]*image.Gray
+	heat [4]*image.Gray16
+}
+
+// loadChildren reads the four children at zoom of parent (px, py). A child with no fog_tiles
+// row, or not rendered on one side, is blank — the correct stand-in for "nothing here", not an
+// error, since a user's history need not touch every sibling tile: fully fogged for Fog, no
+// passes for Heatmap. So is a Heatmap child still in the 8-bit raster from before the counts,
+// until the deploy's rerender-coverage redraws it (decodeCounts).
+func loadChildren(ctx context.Context, pool *pgxpool.Pool, store *storage.Store, userID string, zoom, px, py int) (childTiles, error) {
+	var out childTiles
+	for i := range 4 {
+		out.fog[i], out.heat[i] = blankTile(), blankCounts()
 	}
 	rows, err := pool.Query(ctx, `
 		SELECT tile_x, tile_y, object_key, heatmap_object_key FROM fog_tiles
@@ -498,32 +490,57 @@ func loadChildren(ctx context.Context, pool *pgxpool.Pool, store *storage.Store,
 			return err
 		}
 		defer obj.Close()
-		img, err := decodeGray(obj)
+		if i < 4 {
+			img, err := decodeGray(obj)
+			if err != nil {
+				return err
+			}
+			out.fog[i] = img
+			return nil
+		}
+		b, err := io.ReadAll(obj)
 		if err != nil {
 			return err
 		}
-		out[i] = img
+		counts, err := DecodeCounts(b)
+		if err != nil {
+			return err
+		}
+		out.heat[i-4] = counts
 		return nil
 	})
 	return out, err
 }
 
-// storeTilePair stores one tile's Fog and Heatmap masks, side by side, and returns their
-// sizes in that order, for fog_tiles' storage statistics (IMPLEMENTATION.md §4.32).
-func storeTilePair(ctx context.Context, store *storage.Store, userID string, zoom, x, y int, fogMask, heatmapMask *image.Gray) ([2]int, error) {
-	keys := [2]string{fogObjectKey(userID, zoom, x, y), heatmapObjectKey(userID, zoom, x, y)}
-	masks := [2]*image.Gray{fogMask, heatmapMask}
+// storeTilePair stores one tile's Fog mask and Heatmap counts, side by side, and returns the
+// Heatmap's key and both sizes, for fog_tiles' storage statistics (IMPLEMENTATION.md §4.32).
+// Counts with no passes aren't stored — most of an account's tiles once its history has aged
+// out of the window — and any the tile had are removed: the key comes back nil, which every
+// reader takes as no heat, and a deleted activity's counts don't linger in the bucket.
+func storeTilePair(ctx context.Context, store *storage.Store, userID string, zoom, x, y int, fogMask *image.Gray, heatmapCounts *image.Gray16) (*string, [2]int, error) {
+	fogKey, heatKey := fogObjectKey(userID, zoom, x, y), heatmapObjectKey(userID, zoom, x, y)
+	heat := !isBlankCounts(heatmapCounts)
 	var sizes [2]int
 	err := parallel.ForEach(ctx, 2, 2, func(ctx context.Context, i int) error {
-		n, err := storeTilePNG(ctx, store, keys[i], masks[i])
-		sizes[i] = n
+		var err error
+		switch {
+		case i == 0:
+			sizes[0], err = storeTilePNG(ctx, store, fogKey, fogMask)
+		case heat:
+			sizes[1], err = storeTilePNG(ctx, store, heatKey, heatmapCounts)
+		default:
+			err = store.Remove(ctx, heatKey)
+		}
 		return err
 	})
-	return sizes, err
+	if !heat {
+		return nil, sizes, err
+	}
+	return &heatKey, sizes, err
 }
 
 // storeTilePNG stores mask as a PNG at key and returns its size.
-func storeTilePNG(ctx context.Context, store *storage.Store, key string, mask *image.Gray) (int, error) {
+func storeTilePNG(ctx context.Context, store *storage.Store, key string, mask image.Image) (int, error) {
 	b, err := encodeTilePNG(mask)
 	if err != nil {
 		return 0, err
@@ -531,7 +548,7 @@ func storeTilePNG(ctx context.Context, store *storage.Store, key string, mask *i
 	return len(b), store.Put(ctx, key, bytes.NewReader(b), int64(len(b)))
 }
 
-func encodeTilePNG(mask *image.Gray) ([]byte, error) {
+func encodeTilePNG(mask image.Image) ([]byte, error) {
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, mask); err != nil {
 		return nil, fmt.Errorf("encode png: %w", err)
@@ -573,7 +590,7 @@ func tileDirtyGen(ctx context.Context, pool *pgxpool.Pool, userID string, zoom, 
 // composited in — marks the tile again (bumping dirty_gen), and the tile stays dirty for the
 // render the change enqueued, instead of keeping the deleted track until something else
 // touches that tile.
-func upsertTileRendered(ctx context.Context, pool *pgxpool.Pool, userID string, zoom, x, y int, gen int64, fogKey, heatmapKey string, sizes [2]int) error {
+func upsertTileRendered(ctx context.Context, pool *pgxpool.Pool, userID string, zoom, x, y int, gen int64, fogKey string, heatmapKey *string, sizes [2]int) error {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -581,7 +598,7 @@ func upsertTileRendered(ctx context.Context, pool *pgxpool.Pool, userID string, 
 	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO fog_tiles (user_id, zoom, tile_x, tile_y, object_key, heatmap_object_key, bytes, heatmap_bytes, dirty, rendered_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $8, $9, false, NOW())
+		VALUES ($1, $2, $3, $4, $5, $6, $8, CASE WHEN $6::text IS NULL THEN NULL ELSE $9::int END, false, NOW())
 		ON CONFLICT (user_id, zoom, tile_x, tile_y)
 		DO UPDATE SET object_key = EXCLUDED.object_key, heatmap_object_key = EXCLUDED.heatmap_object_key,
 			bytes = EXCLUDED.bytes, heatmap_bytes = EXCLUDED.heatmap_bytes,

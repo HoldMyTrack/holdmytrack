@@ -107,7 +107,7 @@ func TestRenderedMaskIsReadBackWithoutTheStore(t *testing.T) {
 
 	markDirty(t, pool, userID, tile)
 	var skipped atomic.Int64
-	if err := renderAndStoreTile(ctx, pool, store, userID, Zoom, tile[0], tile[1], 1, &skipped); err != nil {
+	if err := renderAndStoreTile(ctx, pool, store, userID, Zoom, tile[0], tile[1], &skipped); err != nil {
 		t.Fatal(err)
 	}
 	if n := gets.Load(); n != 0 {
@@ -138,7 +138,7 @@ func TestRenderCountsMasksWithoutPNG(t *testing.T) {
 	markDirty(t, pool, userID, tile)
 
 	var skipped atomic.Int64
-	if err := renderAndStoreTile(ctx, pool, store, userID, Zoom, tile[0], tile[1], 1, &skipped); err != nil {
+	if err := renderAndStoreTile(ctx, pool, store, userID, Zoom, tile[0], tile[1], &skipped); err != nil {
 		t.Fatal(err)
 	}
 	if n := skipped.Load(); n != 1 {
@@ -183,5 +183,49 @@ func TestMaskBytesGoWithTheirRow(t *testing.T) {
 	}
 	if n := count(deleted); n != 0 {
 		t.Errorf("deleted activity left %d mask PNGs", n)
+	}
+}
+
+// A tile whose activities are all out of Heatmap's window has no counts to store: its Heatmap
+// key is cleared and the counts it had are removed from the store, so nothing of them lingers.
+func TestRenderDropsEmptyHeat(t *testing.T) {
+	pool, userID := testAccount(t)
+	ctx := context.Background()
+	store, mem, _ := maskStore(t)
+	activityID := insertActivity(t, pool, userID)
+	pts, tile := walkInOneTile()
+	if err := RenderActivityMasks(ctx, pool, activityID, pts, [][2]int{tile}); err != nil {
+		t.Fatal(err)
+	}
+	markDirty(t, pool, userID, tile)
+	var skipped atomic.Int64
+	render := func() *string {
+		t.Helper()
+		if err := renderAndStoreTile(ctx, pool, store, userID, Zoom, tile[0], tile[1], &skipped); err != nil {
+			t.Fatal(err)
+		}
+		var key *string
+		if err := pool.QueryRow(ctx,
+			`SELECT heatmap_object_key FROM fog_tiles WHERE user_id = $1 AND zoom = $2 AND tile_x = $3 AND tile_y = $4`,
+			userID, Zoom, tile[0], tile[1]).Scan(&key); err != nil {
+			t.Fatal(err)
+		}
+		return key
+	}
+	key := render()
+	if key == nil {
+		t.Fatal("no Heatmap stored for an in-window activity")
+	}
+	if _, err := pool.Exec(ctx, `UPDATE activities SET in_heatmap_window = false WHERE id = $1`, activityID); err != nil {
+		t.Fatal(err)
+	}
+	if got := render(); got != nil {
+		t.Errorf("Heatmap key %q once the activity aged out, want none", *got)
+	}
+	if _, ok := mem.Object(*key); ok {
+		t.Error("the aged-out activity's counts are still in the store")
+	}
+	if !fogTileLit(t, mem, userID, tile) {
+		t.Error("Fog lost the activity with Heatmap")
 	}
 }

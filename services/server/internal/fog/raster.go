@@ -5,9 +5,7 @@ package fog
 
 import (
 	"image"
-	"image/color"
 	"image/draw"
-	"math"
 
 	"github.com/fogleman/gg"
 )
@@ -51,9 +49,8 @@ type pixelPoint struct{ x, y float64 }
 // renderActivityMask draws one activity's segments through this tile as opaque,
 // anti-aliased, round-capped strokes on an initially-empty (black) canvas — crisp, i.e.
 // *unblurred*: this is the per-activity artifact stored in activity_tile_masks and shared by
-// both fog and heatmap compositing (compositeFogMask, compositeHeatmapMask below), each of
-// which applies feathering at its own appropriate point in its own compositing order rather
-// than baking it in here. Each of lines is the track in one copy of the world (projectToTile).
+// both fog compositing (compositeFogMask below) and heat counting (heat.go's heatCounts),
+// each of which treats the stroke its own way rather than having it baked in here. Each of lines is the track in one copy of the world (projectToTile).
 func renderActivityMask(lines ...[]pixelPoint) *image.Gray {
 	dc := gg.NewContext(TileSize, TileSize)
 	dc.SetRGBA(0, 0, 0, 1) // nothing here yet: opaque black = coverage 0
@@ -186,78 +183,6 @@ const (
 	// and recorded here the same way defaultHeatmapCap above is, equally open to retuning.
 	HeatmapWindowDays = 365
 )
-
-// compositeHeatmapMask builds §4.2.2's additive intensity mask from several activities' crisp
-// masks: each is added into a shared accumulator, rather than maxed on one canvas — a shared canvas would give the same max-not-sum result fog relies on
-// (§4.2.1), which is exactly wrong for a heatmap. Summing per-activity masks means two
-// activities crossing the same pixel genuinely add, and a single activity's own
-// self-intersection (a loop ridden past twice) adds too, which is correct: it really was
-// visited twice.
-func compositeHeatmapMask(masks []*image.Gray, cap float64) *image.Gray {
-	accum := make([]float64, TileSize*TileSize)
-	for _, m := range masks {
-		for i, px := range m.Pix {
-			accum[i] += float64(px) / 255.0
-		}
-	}
-
-	out := image.NewGray(image.Rect(0, 0, TileSize, TileSize))
-	for i, v := range accum {
-		normalized := v / cap
-		if normalized > 1 {
-			normalized = 1
-		}
-		// sqrt, not linear: a single pass should already read as visibly warm rather than
-		// needing to approach the cap before showing up — the same "don't blow out the
-		// range, but don't bury the common case either" tradeoff §4.2.2 calls for.
-		out.Pix[i] = uint8(math.Sqrt(normalized) * 255)
-	}
-	return out
-}
-
-// heatmapRamp is a small set of (position, colour, alpha) control points, linearly
-// interpolated between neighbours. Two rules shape it:
-//
-//   - Anywhere visited is plainly visible. Intensity is sqrt(passes / heatmap_cap), and the cap
-//     is the account's busiest tile, so a place crossed once sits at an intensity of about
-//     5-20 of 255 on a real history — which the old ramp drew about 15% opaque, a remote place
-//     visited once all but invisible on the cream basemap. The floor stop at t = 0.02 (5/255)
-//     jumps straight to ~67% opaque, so frequency changes the colour, not whether it shows.
-//     Only the faintest fringe of the blurred edge stays below it, which keeps the edge soft.
-//   - Colours that stand off the basemap: deep red, through orange, to bright yellow at the
-//     cap. The old rust-to-yellow ramp sat too close to the cream land and yellow roads.
-//
-// Applied when a tile is served (HeatmapTile's palette), so a change here needs no re-render —
-// only the tile-version bump rerender-coverage gives every account, so browsers refetch.
-type rampStop struct {
-	t          float64
-	r, g, b, a uint8
-}
-
-var heatmapRamp = []rampStop{
-	{t: 0.00, r: 179, g: 38, b: 30, a: 0},
-	{t: 0.02, r: 179, g: 38, b: 30, a: 170},
-	{t: 0.45, r: 232, g: 116, b: 26, a: 215},
-	{t: 1.00, r: 255, g: 216, b: 74, a: 255},
-}
-
-// heatmapNRGBA is intensity's colour along heatmapRamp, not premultiplied: one entry of the
-// served tile's palette (tint.go).
-func heatmapNRGBA(intensity uint8) color.NRGBA {
-	t := float64(intensity) / 255.0
-	i := 1
-	for i < len(heatmapRamp)-1 && heatmapRamp[i].t < t {
-		i++
-	}
-	lo, hi := heatmapRamp[i-1], heatmapRamp[i]
-	span := hi.t - lo.t
-	f := 0.0
-	if span > 0 {
-		f = (t - lo.t) / span
-	}
-	lerp := func(a, b uint8) uint8 { return uint8(float64(a) + f*(float64(b)-float64(a))) }
-	return color.NRGBA{R: lerp(lo.r, hi.r), G: lerp(lo.g, hi.g), B: lerp(lo.b, hi.b), A: lerp(lo.a, hi.a)}
-}
 
 // Veil is one theme's fog treatment: the colour unexplored territory is painted in, and how
 // opaque it is where coverage is zero.

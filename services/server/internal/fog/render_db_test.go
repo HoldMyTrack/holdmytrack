@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/color"
 	"net/http/httptest"
 	"os"
 	"testing"
@@ -83,7 +84,7 @@ func TestUpsertTileRenderedKeepsAMidRenderMark(t *testing.T) {
 		userID, z, x, y); err != nil {
 		t.Fatal(err)
 	}
-	if err := upsertTileRendered(ctx, pool, userID, z, x, y, gen, "fog", "heat", [2]int{120, 340}); err != nil {
+	if err := upsertTileRendered(ctx, pool, userID, z, x, y, gen, "fog", ptr("heat"), [2]int{120, 340}); err != nil {
 		t.Fatal(err)
 	}
 	if !tileDirty(t, pool, userID, z, x, y) {
@@ -97,7 +98,7 @@ func TestUpsertTileRenderedKeepsAMidRenderMark(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := upsertTileRendered(ctx, pool, userID, z, x, y, gen, "fog", "heat", [2]int{120, 340}); err != nil {
+	if err := upsertTileRendered(ctx, pool, userID, z, x, y, gen, "fog", ptr("heat"), [2]int{120, 340}); err != nil {
 		t.Fatal(err)
 	}
 	if tileDirty(t, pool, userID, z, x, y) {
@@ -233,11 +234,19 @@ func TestRenderPyramidLevelReadsEachChild(t *testing.T) {
 		}
 		return m
 	}
-	var fog, heat [4]*image.Gray
-	for q := range 4 {
-		fog[q], heat[q] = blankTile(), blankTile()
+	counts := func(col int, v uint16) *image.Gray16 {
+		m := blankCounts()
+		for y := range TileSize {
+			m.SetGray16(col, y, color.Gray16{Y: v})
+		}
+		return m
 	}
-	put := func(key string, m *image.Gray) {
+	var fog [4]*image.Gray
+	var heat [4]*image.Gray16
+	for q := range 4 {
+		fog[q], heat[q] = blankTile(), blankCounts()
+	}
+	put := func(key string, m image.Image) {
 		b, err := encodeTilePNG(m)
 		if err != nil {
 			t.Fatal(err)
@@ -250,7 +259,7 @@ func TestRenderPyramidLevelReadsEachChild(t *testing.T) {
 		put(fogKey, fog[q])
 		var heatKey *string
 		if q < 2 {
-			heat[q] = child(15+q*20, 128)
+			heat[q] = counts(15+q*20, uint16(300+q))
 			k := heatmapObjectKey(userID, z+1, c[0], c[1])
 			put(k, heat[q])
 			heatKey = &k
@@ -265,24 +274,27 @@ func TestRenderPyramidLevelReadsEachChild(t *testing.T) {
 	if err := renderPyramidLevel(ctx, pool, store, userID, z, px, py); err != nil {
 		t.Fatal(err)
 	}
-	for _, c := range []struct {
-		key  string
-		want *image.Gray
-	}{
-		{fogObjectKey(userID, z, px, py), downsampleQuadrants(fog)},
-		{heatmapObjectKey(userID, z, px, py), downsampleQuadrants(heat)},
-	} {
-		b, ok := mem.Object(c.key)
-		if !ok {
-			t.Fatalf("%s not stored", c.key)
-		}
-		got, err := decodeGray(bytes.NewReader(b))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !bytes.Equal(got.Pix, c.want.Pix) {
-			t.Errorf("%s isn't the downsample of its children as stored", c.key)
-		}
+	b, ok := mem.Object(fogObjectKey(userID, z, px, py))
+	if !ok {
+		t.Fatal("parent Fog tile not stored")
+	}
+	gotFog, err := decodeGray(bytes.NewReader(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(gotFog.Pix, downsampleQuadrants(fog).Pix) {
+		t.Error("parent Fog tile isn't the downsample of its children as stored")
+	}
+	b, ok = mem.Object(heatmapObjectKey(userID, z, px, py))
+	if !ok {
+		t.Fatal("parent Heatmap tile not stored")
+	}
+	gotHeat, err := decodeCounts(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(gotHeat.Pix, downsampleCounts(heat).Pix) {
+		t.Error("parent Heatmap tile isn't the downsample of its children's counts as stored")
 	}
 }
 
@@ -322,3 +334,5 @@ func TestRenderPyramidLevelRefusesAChildOfAnotherSize(t *testing.T) {
 		t.Error("the parent was stored from a child it couldn't read")
 	}
 }
+
+func ptr(s string) *string { return &s }

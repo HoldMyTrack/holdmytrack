@@ -84,28 +84,6 @@ func TestDownsampleKeepsBlankBlank(t *testing.T) {
 	}
 }
 
-// Nothing is drawn where nothing was visited; anywhere visited at all — even the faintest
-// single pass on an account with a busy home tile — is plainly visible, and the ramp only
-// gets more opaque as it heats up.
-func TestHeatmapRampVisibleWhereVisited(t *testing.T) {
-	if a := heatmapNRGBA(0).A; a != 0 {
-		t.Errorf("intensity 0: alpha %d, want 0", a)
-	}
-	for _, i := range []uint8{5, 8, 20} {
-		if a := heatmapNRGBA(i).A; a < 160 {
-			t.Errorf("intensity %d (a single pass): alpha %d, want >= 160", i, a)
-		}
-	}
-	prev := uint8(0)
-	for i := 0; i <= 255; i++ {
-		a := heatmapNRGBA(uint8(i)).A
-		if a < prev {
-			t.Fatalf("alpha drops from %d to %d at intensity %d", prev, a, i)
-		}
-		prev = a
-	}
-}
-
 // downsampleReference is the pyramid step written plainly: the four children copied into one
 // double-size image, then each 2x2 block's brightest pixel.
 func downsampleReference(children [4]*image.Gray) *image.Gray {
