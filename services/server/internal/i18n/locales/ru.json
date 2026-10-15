@@ -46,6 +46,7 @@
   "auth.or": "или",
   "auth.email": "Эл. почта",
   "auth.password": "Пароль",
+  "auth.show_password": "Показать пароль",
   "signin.title": "Вход",
   "signin.forgot": "Забыли пароль?",
   "signin.submit": "Войти",

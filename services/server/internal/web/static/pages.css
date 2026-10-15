@@ -261,6 +261,49 @@ code {
   outline-offset: 1px;
 }
 
+.auth-card__password {
+  position: relative;
+  display: flex;
+}
+
+.auth-card__password input {
+  flex: 1;
+  min-width: 0;
+  padding-right: 40px;
+}
+
+.auth-card__reveal {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: rgb(var(--fm-ink-rgb) / 55%);
+  cursor: pointer;
+}
+
+.auth-card__reveal[hidden],
+.auth-card__reveal[aria-pressed='true'] .auth-card__reveal-show,
+.auth-card__reveal[aria-pressed='false'] .auth-card__reveal-hide {
+  display: none;
+}
+
+.auth-card__reveal:hover {
+  color: var(--fm-ink);
+}
+
+.auth-card__reveal:focus-visible {
+  outline: 2px solid var(--fm-accent);
+  outline-offset: -4px;
+  border-radius: 6px;
+}
+
 .auth-card__forgot {
   align-self: flex-end;
   margin-top: -6px;

@@ -168,12 +168,12 @@ func TestAuthPagesRenderSignedOut(t *testing.T) {
 		want []string
 		not  []string
 	}{
-		{"/signin", []string{`action="/signin"`, `action="/demo"`, `href="/forgot"`, `href="/signup"`}, []string{"Continue with Google", `role="alert"`}},
+		{"/signin", []string{`action="/signin"`, `action="/demo"`, `href="/forgot"`, `href="/signup"`, `data-password-reveal hidden`, "password.js"}, []string{"Continue with Google", `role="alert"`}},
 		{"/signin?error=google", []string{"Couldn&#39;t sign in with Google. Please try again."}, nil},
-		{"/signup", []string{`action="/signup"`, `name="timezone"`, "Intl.DateTimeFormat"}, []string{"Back to the map"}},
+		{"/signup", []string{`action="/signup"`, `name="timezone"`, "Intl.DateTimeFormat", `data-password-reveal hidden`, "password.js"}, []string{"Back to the map"}},
 		{"/forgot", []string{`action="/forgot"`, "Send reset link"}, nil},
-		{"/reset?token=abc", []string{`action="/reset"`, `name="token" value="abc"`}, nil},
-		{"/reset", []string{"This reset link is invalid or has expired.", `href="/forgot"`}, []string{`action="/reset"`}},
+		{"/reset?token=abc", []string{`action="/reset"`, `name="token" value="abc"`, `data-password-reveal hidden`, "password.js"}, nil},
+		{"/reset", []string{"This reset link is invalid or has expired.", `href="/forgot"`}, []string{`action="/reset"`, `data-password-reveal`}},
 	} {
 		rec := httptest.NewRecorder()
 		s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tc.path, nil))
