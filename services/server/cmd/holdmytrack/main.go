@@ -44,11 +44,12 @@ import (
 
 // gitSHA is set at link time via -ldflags "-X main.gitSHA=..." (services/server/Dockerfile's
 // GIT_SHA build arg) — /healthz reports it so a browser tab can detect it's running against a
-// stale build, and so a bug report can be tied to the exact commit that produced it.
+// stale build, and so a bug report can be tied to the exact commit that produced it. Every log
+// line carries it too, so an error in Grafana names the deploy that logged it.
 var gitSHA = "unknown"
 
 func main() {
-	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	log := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("version", gitSHA)
 	// For packages that log without a logger passed in (internal/fog's render warnings).
 	slog.SetDefault(log)
 

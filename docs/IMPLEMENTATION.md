@@ -1080,6 +1080,7 @@ Being free means costs scale with users while donations scale with goodwill (`VI
 
 **Log and metric shipping** (`ops/alloy/config.alloy`, `docs/DEPLOY.md` §13) goes to Grafana Cloud rather than a monitoring stack on the droplet, which would take about a quarter of the memory Postgres needs and couldn't report the box itself going down.
 - **Scrubbing is a list of known leaks**, from the log audit: mail lines, Postgres `DETAIL:` lines and client IPs in Caddy's logs. A new log line must keep to ids, job kinds and errors, or it ships as it is.
+- **Every server line carries `version`**, the build's commit (the same one `/healthz` reports), so an error in Loki can be tied to the deploy that logged it. It stays a JSON field rather than a label: the level is the only label the app's lines get.
 - The Postgres exporter is limited to database-wide collectors: the per-table ones were most of the series.
 - The external label is `deployment`, not `instance`: every scraped series already has an `instance`, so an external label of that name would never apply.
 - Alloy mounts the Docker socket, which makes it as trusted as root on the host, so its image is pinned and its own UI listens on loopback only.
