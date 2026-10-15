@@ -6,7 +6,7 @@
     {{if or .Google .Facebook}}{{template "providers" .}}{{end}}
     <form class="auth-card__form" method="post" action="/signin">
       <label class="auth-card__field"><span>{{t "auth.email"}}</span><input type="email" name="email" value="{{.Email}}" required autocomplete="email" /></label>
-      <label class="auth-card__field"><span>{{t "auth.password"}}</span><input type="password" name="password" required minlength="8" autocomplete="current-password" /></label>
+      <div class="auth-card__field"><label for="password">{{t "auth.password"}}</label><span class="auth-card__password"><input type="password" id="password" name="password" required minlength="8" autocomplete="current-password" />{{template "password-reveal"}}</span></div>
       <a class="auth-card__forgot" href="/forgot">{{t "signin.forgot"}}</a>
       {{with .Error}}<p class="auth-card__error" role="alert">{{.}}</p>{{end}}
       <button type="submit" class="auth-card__submit">{{t "signin.submit"}}</button>
@@ -18,4 +18,5 @@
     </form>
   </div>
 </main>
+<script src="{{asset "password.js"}}" defer></script>
 {{end}}{{end}}

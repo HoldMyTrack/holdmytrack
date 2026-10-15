@@ -46,6 +46,7 @@
   "auth.or": "or",
   "auth.email": "Email",
   "auth.password": "Password",
+  "auth.show_password": "Show password",
   "signin.title": "Sign in",
   "signin.forgot": "Forgot password?",
   "signin.submit": "Sign in",

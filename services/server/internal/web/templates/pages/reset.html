@@ -5,7 +5,7 @@
     {{if .Token}}
     <form class="auth-card__form" method="post" action="/reset">
       <input type="hidden" name="token" value="{{.Token}}" />
-      <label class="auth-card__field"><span>{{t "reset.password"}}</span><input type="password" name="password" required minlength="8" autocomplete="new-password" /></label>
+      <div class="auth-card__field"><label for="password">{{t "reset.password"}}</label><span class="auth-card__password"><input type="password" id="password" name="password" required minlength="8" autocomplete="new-password" />{{template "password-reveal"}}</span></div>
       {{with .Error}}<p class="auth-card__error" role="alert">{{.}}</p>{{end}}
       <button type="submit" class="auth-card__submit">{{t "reset.submit"}}</button>
     </form>
@@ -15,4 +15,5 @@
     {{end}}
   </div>
 </main>
+<script src="{{asset "password.js"}}" defer></script>
 {{end}}{{end}}
