@@ -197,7 +197,7 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("POST", "/sync/known"), s.requireNotDemo(s.handleSyncKnown))
 	s.tile("/tracks/{z}/{x}/{y}", s.handleTracksTile)
 	s.tile("/fog/{z}/{x}/{y}", s.budgeted(budget.ReadsPaused, s.handleFogTile))
-	s.tile("/heatmap/{z}/{x}/{y}", s.budgeted(budget.ReadsPaused, s.handleHeatmapTile))
+	s.tile("/heatmap/{z}/{x}/{y}", s.handleHeatmapTile)
 	s.tile("/spots/{z}/{x}/{y}", s.handleSpotsTile)
 	s.tile("/bike-paths/{z}/{x}/{y}", s.handleBikePathsTile)
 	s.mux.HandleFunc(route("GET", "/spots"), s.requireVerified(s.handleSpotsInArea))
@@ -211,6 +211,8 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.tile("/country-heatmap/{z}/{x}/{y}", s.handleCountryHeatmapTile)
 	s.tile("/region-fog/{z}/{x}/{y}", s.handleRegionFogTile)
 	s.tile("/region-heatmap/{z}/{x}/{y}", s.handleRegionHeatmapTile)
+	// §4.2.2's Heatmap: weighted points made from the stored count tiles.
+	s.tile("/heat-points/{z}/{x}/{y}", s.handleHeatPointsTile) // budgeted inside: only close in reads the store
 	// Deliberately not behind requireAuth, unlike every /v1 route above it. The style
 	// document is derived entirely from the public Protomaps basemap and contains no
 	// per-user data — only layer definitions and the asset URLs a client would need

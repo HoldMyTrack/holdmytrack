@@ -31,6 +31,7 @@ Numbered in rough order of how foundational the decision is, not strictly chrono
 | [0043](0043-per-account-limits.md) | Every account can keep up to 50,000 activities and 5 GB of original files, the same limits for all |
 | [0044](0044-daily-r2-budget.md) | A daily R2 budget the app enforces itself, giving up renders, then adding, then the map's reads |
 | [0045](0045-one-json-error-shape.md) | Every API error is JSON `{"error": code, "message": text}` |
+| [0046](0046-heatmap-drawn-by-the-clients.md) | The Heatmap is pass counts on the server, drawn by the clients as MapLibre heatmap circles |
 
 ## Writing a new one
 

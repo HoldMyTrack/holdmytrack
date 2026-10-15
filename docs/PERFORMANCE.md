@@ -26,7 +26,7 @@ Afterwards `loadtest cleanup` deletes them all; the purge (`IMPLEMENTATION.md` �
 ### Scenarios
 
 - **Seed**: `seed` uploads every demo track (`internal/httpapi/demo_data`, 45 files) to every account, about 945 jobs, then the queue is timed to empty. It includes the three long tracks (200+ z14 tiles each; the 1,478 km "2026-01-22 Vietnam" drive crosses 756), so it doubles as a worst case for them.
-- **Browse ramp**: `browse` with 10, 25, 50, 100 and 200 users for 3 minutes each, the worker idle. Each simulated person is in one mode at a time (Normal half the time, Fog about a third, Heatmap the rest), starts at city zoom over one of the account's places, and every 1.5–4 s pans about half a screen, zooms a level, pulls out to a country or region and back, or now and then switches mode. Each view requests what the web client would for a 1280×800 window: Tracks from z4 in Normal; Country tiles below z3, Region tiles below z7 and the Fog or Heatmap raster from z7 in those modes; Spots from z13 for the fifth of people who turn them on; never deeper than z14, which every source stops at. Six requests at a time, and a tile already fetched isn't fetched again, as a browser keeps each for good per tile version (`IMPLEMENTATION.md` §4.2.6). `-cold` drops that cache for a worst case.
+- **Browse ramp**: `browse` with 10, 25, 50, 100 and 200 users for 3 minutes each, the worker idle. Each simulated person is in one mode at a time (Normal half the time, Fog about a third, Heatmap the rest), starts at city zoom over one of the account's places, and every 1.5–4 s pans about half a screen, zooms a level, pulls out to a country or region and back, or now and then switches mode. Each view requests what the web client would for a 1280×800 window: Tracks from z4 in Normal; Country tiles below z3, Region tiles below z7 and the raster from z7 in Fog; heat points at every zoom in Heatmap; Spots from z13 for the fifth of people who turn them on; never deeper than z14, which every source but heat points (z15) stops at. `-mode` keeps every visitor in one mode. Six requests at a time, and a tile already fetched isn't fetched again, as a browser keeps each for good per tile version (`IMPLEMENTATION.md` §4.2.6). `-cold` drops that cache for a worst case.
 - **Import**: `gen 5 1000` then `import 5`: five accounts upload a 1,000-track set each at once, one file at a time, as the web's Upload menu does (archives were uploaded whole until ADR-0039, which the sessions below measured). Two minutes in, and again deep into the backlog, `probe` uploads one new track from a separate account and times it to processed — the fairness check. A 12-user `browse` runs meanwhile.
 - **Stop** a step on more than 2% errors, a p95 over 5 s on two consecutive steps, under 10% memory available, or an out-of-memory kill.
 
@@ -287,3 +287,70 @@ The laptop's dev stack, with the Ohio extract's bike paths imported (16,208 ways
 
 - The tiles came out the same size at every zoom from either storage; the table stores Web Mercator.
 - Ohio is sparse next to the Netherlands or Denmark, where a z9 tile holds many times the ways; no denser region was measured.
+
+### 2026-10-15 — dev stack, the Heatmap as pass counts and circles
+
+What storing the Heatmap as pass counts and drawing it as MapLibre heatmap circles (`IMPLEMENTATION.md` §4.2.2, ADR-0046) costs against `main`'s rendered raster: a full re-render of three dev accounts (`rerender-coverage --user`, queued to done, twice each); an upload replayed five times per account by marking an activity's z14 tiles dirty and queueing a render as ingest does, its object-store requests read off `r2_ops`; the stored Heatmap's size; heat-points tiles fetched over tl-semantic's home area; `go test -bench` on the development laptop; and panning on a Pixel 10a in Chrome, the dev web app over `adb reverse`, frame times read with `requestAnimationFrame`.
+
+| Full re-render | `main` | Counts |
+| :-- | :-- | :-- |
+| Demo Customer, 1,339 z14 tiles | 3.4 / 3.6 s | 3.4 / 3.7 s |
+| tl-semantic, 267 z14 tiles, 584 activities | 0.9 s | 0.8 / 1.0 s |
+| loadtest+01, 5,874 z14 tiles, none in the window | 14.7 / 15.1 s | 15.5 / 12.2 s |
+
+| Five uploads replayed, object-store requests A / B | `main` | Counts |
+| :-- | :-- | :-- |
+| 1@mail.com, through its busiest tile | 162 / 240 | 162 / 240 |
+| Demo Customer, its busiest area | 316 / 522 | 316 / 520 |
+| tl-semantic | 200 / 378 | 200 / 378 |
+
+| Stored Heatmap, z14 / zoomed out | `main` | Counts |
+| :-- | :-- | :-- |
+| Demo Customer | 1,041 / 753 KB | 679 / 634 KB |
+| tl-semantic | 280 / 181 KB | 220 / 152 KB |
+| loadtest+01 | 893 / 917 KB | none |
+
+| Per tile, development laptop | Time |
+| :-- | :-- |
+| Count a z14 tile, 3 activities | 136 µs |
+| A pyramid step of counts | 60 µs |
+| Decode a busy count tile and make its points | 89 µs |
+
+| Heat-points tiles served, tl-semantic's home | Tiles | Median | Largest |
+| :-- | :-- | :-- | :-- |
+| z9 | 1 | 5.3 ms | 9 KB |
+| z11 | 4 | 4.9 ms | 24 KB |
+| z13 | 9 | 4.6 ms | 34 KB |
+| z15 | 90 | 3.6 ms | 51 KB |
+
+| Panning on a Pixel 10a, 8 swipes | Frames | Median | 99th percentile | Over 33 ms |
+| :-- | :-- | :-- | :-- | :-- |
+| Circles, tl-semantic's points, z13 | 571 | 16.7 ms | 16.8 ms | 0 |
+| `main`'s raster, z13 | 554 | 16.7 ms | 16.8 ms | 0 |
+| Circles, z15 | 556 | 16.7 ms | 16.8 ms | 0 |
+
+- Renders cost what `main`'s did. Counting a tile is a narrowing and an increment per activity, about 45 µs each once the narrowing went from a bounds-checked 3×3 lookup per pixel (340 µs) to a row pass and a column pass. A tile with no passes isn't stored, which is all of loadtest+01's, so its second render was faster than `main`'s.
+- An upload's requests are `main`'s to the request: the counts are written where the raster was, and nothing around the changed tiles is touched.
+- Stored Heatmap is smaller than the raster for accounts with heat, and nothing for those without.
+- A heat-points tile is 3–6 ms to serve from z9, mostly the object read; the first tile of a cold connection took 74 ms. They're bigger on the wire than the raster's few-KB PNGs, up to 51 KB at z15 over a dense area. Up to z8, where cells count activities from the mask rows, a tile took 11–25 ms over tl-semantic's history (z8 to z0), a few tiles per view.
+- The phone held 60 fps either way.
+
+### 2026-10-15 — dev stack, heat-points tiles encoded in Go
+
+Whether encoding heat-points tiles in Go, in place of PostGIS's `ST_AsMVT`, and folding the zoom's scale into the zoomed-out cells query (`IMPLEMENTATION.md` §4.2.2) takes load off the database. The laptop's dev stack with 8 `signup` accounts `seed`ed with the 45 demo tracks; `browse` with every visitor in Heatmap (`-mode heatmap`, which the driver gained for this, along with requesting `heat-points` tiles at every zoom as the clients now do) for 2 minutes a step, on the build before and after; database transactions from `pg_stat_database.xact_commit`, CPU from `docker stats` every 3 s.
+
+| Heatmap-only browse | Heat tiles | Transactions a tile, before → after | p50 / p95, before → after | Database CPU mean, before → after |
+| :-- | :-- | :-- | :-- | :-- |
+| 25 users | 3,476 / 3,451 | — → 2.16 | 6 / 12 → 6 / 11 ms | 11 → 13% |
+| 50 users | 6,464 / 6,770 | — → 2.20 | 5 / 11 → 5 / 10 ms | 13 → 15% |
+| 100 users | 13,697 / 13,713 | 2.84 → 2.14 | 3 / 9 → 3 / 9 ms | 17 → 20% |
+| 200 users | 26,864 / 27,914 | 2.75 → 2.10 | 3 / 6 → 3 / 7 ms | 26 → 27% |
+| 50 users, no tile cache | 18,564 / 18,764 | — → 2.04 | 3 / 9 → 3 / 9 ms | 23 → 23% |
+
+| Per tile, development laptop | Time |
+| :-- | :-- |
+| Encode a full heat-points tile, 4,096 points | 123 µs |
+
+- A tile's database transactions fell by about a quarter, one round trip each; no request failed at any step. Latency and the database's CPU didn't move: the round trip removed was cheap, and the laptop's database was far from saturated at 200 users (about 70 views a second).
+- About one of the two transactions left on every tile request is the session lookup every authenticated request makes, on every tile route alike, which is now the larger part of a heat tile's database work.
+- The first Go encoder allocated per point and took 281 µs for a full tile; writing each feature into reused buffers took it to 123 µs.

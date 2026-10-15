@@ -10,6 +10,7 @@ import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.BackgroundLayer
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.FillLayer
+import org.maplibre.android.style.layers.HeatmapLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
@@ -26,8 +27,8 @@ import org.maplibre.geojson.Point
 
 /**
  * The three mutually exclusive views `docs/IMPLEMENTATION.md` §4.2.2 names — one toggle, not
- * three checkboxes. Both Fog and Heatmap hide the track lines: the raster already encodes
- * where the user has been, and lines drawn on top of it read as noise rather than as extra
+ * three checkboxes. Both Fog and Heatmap hide the track lines: the veil or the heat already
+ * shows where the user has been, and lines drawn on top of it read as noise rather than as extra
  * information.
  */
 enum class MapMode { NORMAL, FOG, HEATMAP }
@@ -70,17 +71,18 @@ object MapOverlays {
 
     private const val FOG_SOURCE_ID = "fog"
     private const val FOG_LAYER_ID = "fog-raster"
-    private const val HEATMAP_SOURCE_ID = "heatmap"
-    private const val HEATMAP_LAYER_ID = "heatmap-raster"
 
     private const val COUNTRY_FOG_SOURCE_ID = "country-fog"
     private const val COUNTRY_FOG_LAYER_ID = "country-fog-fill"
-    private const val COUNTRY_HEATMAP_SOURCE_ID = "country-heatmap"
-    private const val COUNTRY_HEATMAP_LAYER_ID = "country-heatmap-fill"
     private const val REGION_FOG_SOURCE_ID = "region-fog"
     private const val REGION_FOG_LAYER_ID = "region-fog-fill"
-    private const val REGION_HEATMAP_SOURCE_ID = "region-heatmap"
-    private const val REGION_HEATMAP_LAYER_ID = "region-heatmap-fill"
+
+    /** Heatmap below city zoom: the server's heat points drawn as heatmap circles, the web's
+     *  `heat-points` (`docs/IMPLEMENTATION.md` §4.2.4). */
+    private const val HEAT_POINTS_SOURCE_ID = "heat-points"
+    private const val HEAT_POINTS_LAYER_ID = "heat-points-circles"
+    /** Must match `ST_AsMVT(t, 'heat', ...)` in the backend's heat-points query. */
+    private const val HEAT_POINTS_SOURCE_LAYER = "heat"
 
     /** The Country/Region sources' credit, the web's `zoomTiers.ts` `BOUNDARIES_ATTRIBUTION`: their
      *  outlines are Overture Maps' divisions, built from OpenStreetMap (ODbL, root ADR-0034). */
@@ -94,9 +96,9 @@ object MapOverlays {
     private const val REGIONS_SOURCE_LAYER = "regions"
 
     /**
-     * The three zoom-dependent tiers Fog and Heatmap fall back to below city zoom
-     * (`docs/IMPLEMENTATION.md` §4.2.4), mirroring `apps/web/src/map/zoomTiers.ts` exactly so
-     * the boundary can't drift between the two clients. Adopted starting bands, tunable
+     * The three zoom-dependent tiers Fog falls back to below city zoom (`docs/IMPLEMENTATION.md`
+     * §4.2.4), mirroring `apps/web/src/map/zoomTiers.ts` exactly so the boundary can't drift
+     * between the two clients. Heatmap draws the same way at every zoom. Adopted starting bands, tunable
      * visually, not scientifically derived.
      */
     private const val COUNTRY_MAX_ZOOM = 3f
@@ -104,12 +106,11 @@ object MapOverlays {
     private const val REGION_MAX_ZOOM = 7f
     private const val CITY_MIN_ZOOM = 7f
 
-    /** Fog and Heatmap show as square pixels below this zoom and smoothed from it up — the zoom
-     *  their finest tiles are stored at, the web's `PIXELS_MAX_ZOOM`
-     *  (`docs/IMPLEMENTATION.md` §4.2). */
+    /** Fog shows as square pixels below this zoom and smoothed from it up — the zoom its finest
+     *  tiles are stored at, the web's `PIXELS_MAX_ZOOM` (`docs/IMPLEMENTATION.md` §4.2). */
     private const val PIXELS_MAX_ZOOM = 14f
 
-    /** Which [ZoomTier] Fog and Heatmap draw at [zoom] — the same bands the layers switch on (a
+    /** Which [ZoomTier] Fog draws at [zoom] — the same bands the layers switch on (a
      *  layer shows at minZoom <= zoom < maxZoom), the web's `zoomTier`, for what has to name the
      *  level in view (`ZoomLevelNotice`). */
     fun zoomTier(zoom: Double): ZoomTier = when {
@@ -188,11 +189,9 @@ object MapOverlays {
     /** Every Fog and Heatmap layer and the source under it — what [refreshCoverage] replaces. */
     private val COVERAGE_LAYERS = listOf(
         FOG_LAYER_ID to FOG_SOURCE_ID,
-        HEATMAP_LAYER_ID to HEATMAP_SOURCE_ID,
         COUNTRY_FOG_LAYER_ID to COUNTRY_FOG_SOURCE_ID,
-        COUNTRY_HEATMAP_LAYER_ID to COUNTRY_HEATMAP_SOURCE_ID,
+        HEAT_POINTS_LAYER_ID to HEAT_POINTS_SOURCE_ID,
         REGION_FOG_LAYER_ID to REGION_FOG_SOURCE_ID,
-        REGION_HEATMAP_LAYER_ID to REGION_HEATMAP_SOURCE_ID,
     )
 
     /** The same two veils as the raster tier's (`internal/fog/raster.go`'s LightVeil and
@@ -207,11 +206,28 @@ object MapOverlays {
      *  [addCoverage] uses, and keeps using across a [refreshCoverage]. */
     private var darkVeil = false
 
-    /** The heatmap ramp's own base colour (the server's `heatmapRamp`, the deep red a single
-     *  visit is drawn in) at a fixed opacity — "you've been somewhere in this country," not
-     *  graded by how much. The web's `heatmap.ts` uses the same pair. */
-    private const val HEATMAP_FILL_COLOR = "#b3261e"
-    private const val HEATMAP_FILL_OPACITY = 0.55f
+    /** The circles' colour by density, the web's `HEAT_RAMP`: green where the account went once,
+     *  through yellow and orange to red at its busiest. */
+    private val HEAT_RAMP = listOf(
+        0f to Expression.rgba(60, 200, 40, 0),
+        0.05f to Expression.rgba(60, 200, 40, 0),
+        0.1f to Expression.rgb(90, 210, 40),
+        0.3f to Expression.rgb(170, 225, 30),
+        0.5f to Expression.rgb(250, 220, 0),
+        0.68f to Expression.rgb(250, 120, 0),
+        0.8f to Expression.rgb(230, 30, 30),
+        1f to Expression.rgb(230, 30, 30),
+    )
+
+    /** The web's `HEAT_POINTS_INTENSITY`: lifts MapLibre's circle, which peaks at about 0.4 of
+     *  its weight, back to the weight, which the server has already divided by its neighbours'
+     *  overlap — so lone places, routes and busy areas all read their own counts. */
+    private const val HEAT_POINTS_INTENSITY = 2.5f
+
+    private fun heatPointsRadius(): Expression = Expression.interpolate(
+        Expression.exponential(2f), Expression.zoom(),
+        *heatPointsRadiusStops().map { (zoom, radius) -> Expression.stop(zoom, radius) }.toTypedArray(),
+    )
 
     /** The wash's two colors, the web's `LIGHT_DIM` and `DARK_DIM` (`heatmap.ts`): the heat
      *  reads against a quieter map, as Fog mode quiets the labels. Cream on the light flavor,
@@ -232,9 +248,7 @@ object MapOverlays {
 
     /** Every user layer [attach] adds — what [setRecording] hides wholesale. */
     private val USER_LAYER_IDS = listOf(
-        FOG_LAYER_ID, HEATMAP_LAYER_ID,
-        COUNTRY_FOG_LAYER_ID, COUNTRY_HEATMAP_LAYER_ID,
-        REGION_FOG_LAYER_ID, REGION_HEATMAP_LAYER_ID,
+        FOG_LAYER_ID, COUNTRY_FOG_LAYER_ID, REGION_FOG_LAYER_ID, HEAT_POINTS_LAYER_ID,
     ) + TRACK_LAYER_IDS + BAND_LAYER_ID
 
     private const val LIVE_TRACK_SOURCE_ID = "live-track"
@@ -321,23 +335,44 @@ object MapOverlays {
         val fogColor = if (darkVeil) FOG_FILL_COLOR_DARK else FOG_FILL_COLOR
         val fogOpacity = if (darkVeil) FOG_FILL_OPACITY_DARK else FOG_FILL_OPACITY
         addRaster(style, FOG_SOURCE_ID, FOG_LAYER_ID, fogUrl, beforeId, minZoom = CITY_MIN_ZOOM)
-        addRaster(style, HEATMAP_SOURCE_ID, HEATMAP_LAYER_ID, coverageUrl("heatmap", "png"), beforeId, minZoom = CITY_MIN_ZOOM)
         addFill(
             style, COUNTRY_FOG_SOURCE_ID, COUNTRY_FOG_LAYER_ID, COUNTRIES_SOURCE_LAYER,
             coverageUrl("country-fog", "mvt"), beforeId, 0f, COUNTRY_MAX_ZOOM, fogColor, fogOpacity,
         )
         addFill(
-            style, COUNTRY_HEATMAP_SOURCE_ID, COUNTRY_HEATMAP_LAYER_ID, COUNTRIES_SOURCE_LAYER,
-            coverageUrl("country-heatmap", "mvt"), beforeId, 0f, COUNTRY_MAX_ZOOM, HEATMAP_FILL_COLOR, HEATMAP_FILL_OPACITY,
-        )
-        addFill(
             style, REGION_FOG_SOURCE_ID, REGION_FOG_LAYER_ID, REGIONS_SOURCE_LAYER,
             coverageUrl("region-fog", "mvt"), beforeId, REGION_MIN_ZOOM, REGION_MAX_ZOOM, fogColor, fogOpacity,
         )
-        addFill(
-            style, REGION_HEATMAP_SOURCE_ID, REGION_HEATMAP_LAYER_ID, REGIONS_SOURCE_LAYER,
-            coverageUrl("region-heatmap", "mvt"), beforeId, REGION_MIN_ZOOM, REGION_MAX_ZOOM, HEATMAP_FILL_COLOR, HEATMAP_FILL_OPACITY,
-        )
+        addHeatPoints(style, beforeId)
+    }
+
+    /** Heatmap: the server's weighted points as heatmap circles at every zoom, the web's
+     *  `ensureHeatmapLayer` (`docs/IMPLEMENTATION.md` §4.2.2). */
+    private fun addHeatPoints(style: Style, beforeId: String?) {
+        if (style.getSource(HEAT_POINTS_SOURCE_ID) == null) {
+            val tiles = tileSet(coverageUrl("heat-points", "mvt")).apply {
+                minZoom = 0f
+                maxZoom = HEAT_POINTS_MAX_ZOOM.toFloat()
+            }
+            style.addSource(VectorSource(HEAT_POINTS_SOURCE_ID, tiles))
+        }
+        if (style.getLayer(HEAT_POINTS_LAYER_ID) == null) {
+            val layer = HeatmapLayer(HEAT_POINTS_LAYER_ID, HEAT_POINTS_SOURCE_ID)
+                .withSourceLayer(HEAT_POINTS_SOURCE_LAYER)
+                .withProperties(
+                    PropertyFactory.visibility(Property.NONE),
+                    PropertyFactory.heatmapWeight(Expression.get("w")),
+                    PropertyFactory.heatmapIntensity(HEAT_POINTS_INTENSITY),
+                    PropertyFactory.heatmapRadius(heatPointsRadius()),
+                    PropertyFactory.heatmapColor(
+                        Expression.interpolate(
+                            Expression.linear(), Expression.heatmapDensity(),
+                            *HEAT_RAMP.map { (at, color) -> Expression.stop(at, color) }.toTypedArray(),
+                        ),
+                    ),
+                )
+            insert(style, layer, beforeId)
+        }
     }
 
     /**
@@ -453,9 +488,7 @@ object MapOverlays {
         setVisible(style, COUNTRY_FOG_LAYER_ID, mode == MapMode.FOG)
         setVisible(style, REGION_FOG_LAYER_ID, mode == MapMode.FOG)
         setDim(style, mode == MapMode.HEATMAP)
-        setVisible(style, HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
-        setVisible(style, COUNTRY_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
-        setVisible(style, REGION_HEATMAP_LAYER_ID, mode == MapMode.HEATMAP)
+        setVisible(style, HEAT_POINTS_LAYER_ID, mode == MapMode.HEATMAP)
         val tracks = mode == MapMode.NORMAL && !editingTrack && !syncing
         TRACK_LAYER_IDS.forEach { setVisible(style, it, tracks) }
         setVisible(style, BAND_LAYER_ID, tracks)
@@ -675,4 +708,16 @@ object MapOverlays {
 
     private fun coverageUrl(kind: String, extension: String): String =
         tileUrl(kind, extension) + Session.tileVersion.let { if (it.isEmpty()) "" else "?cv=${Uri.encode(it)}" }
+}
+
+/** The last zoom the server makes heat-points tiles for, the web's `HEAT_POINTS_MAX_ZOOM`. */
+const val HEAT_POINTS_MAX_ZOOM = 15
+
+/** The web's `heatPointsRadius` stops, as (zoom, radius px): a cell is 8 px across at its tile's
+ *  own zoom and 16 one zoom in, a circle 1.6 cells, so the radius doubles across each zoom and
+ *  drops back where the next zoom's cells take over; past the last zoom it keeps growing. */
+fun heatPointsRadiusStops(): List<Pair<Float, Float>> {
+    val r = 8f * 1.6f
+    return (0 until HEAT_POINTS_MAX_ZOOM).flatMap { z -> listOf(z.toFloat() to r, z + 0.999f to 2 * r) } +
+        listOf(HEAT_POINTS_MAX_ZOOM.toFloat() to r, HEAT_POINTS_MAX_ZOOM + 9f to r * 512f)
 }

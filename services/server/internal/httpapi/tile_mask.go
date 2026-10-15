@@ -8,13 +8,12 @@ import (
 	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
 )
 
-// loadMaskPNG fetches a stored fog_tiles mask's PNG as it is, or nil when there is nothing
+// loadMaskPNG fetches a stored fog_tiles tile's PNG as it is, or nil when there is nothing
 // stored yet — "no coverage rendered here" is a normal state (a tile the user's history has
-// never touched, or one still waiting on render_fog), not an error condition, and fog.FogTile
-// and fog.HeatmapTile serve nil as a blank mask. Shared by handleFogTile (object_key) and
-// handleHeatmapTile (heatmap_object_key) — both plain precomputed-aggregate lookups, just
-// against different columns of the same row. The bytes go to the client recoloured but never
-// decoded (internal/fog's tint.go).
+// never touched, or one still waiting on render_fog), not an error condition: fog.FogTile and
+// fog.DecodeCounts take nil as a blank tile. Shared by handleFogTile (object_key), whose bytes
+// go to the client recoloured but never decoded (internal/fog's tint.go), and
+// handleHeatPointsTile (heatmap_object_key).
 func loadMaskPNG(ctx context.Context, store *storage.Store, objectKey *string) ([]byte, error) {
 	if objectKey == nil {
 		return nil, nil

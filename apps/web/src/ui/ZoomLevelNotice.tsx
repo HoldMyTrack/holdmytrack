@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import type { MapMode } from '../map/mapMode';
-import { zoomTier } from '../map/zoomTiers';
+import { levelNoticeKey, zoomTier } from '../map/zoomTiers';
 import { t } from '../i18n';
 
 /** How long the notice stays before it fades. */
@@ -13,12 +13,13 @@ export interface ZoomLevelNoticeProps {
 }
 
 /**
- * Fog and Heatmap draw at three levels by zoom (`SPEC.md` FR-4.2, FR-4.3): whole countries,
- * then whole states or provinces, then exactly where you've been (zoomTiers.ts). Nothing else
- * on the map says which is in view, and a veil lifted from a whole country reads as a bug when
- * you don't know that's the level you're at. So this names it — a pill under the mode toggle
- * (MapView renders it in `.map-toggles`, on a line of its own below however many rows those wrap to),
- * on entering either mode and whenever a zoom crosses into another level, faded after SHOW_MS.
+ * Fog draws at three levels by zoom (`SPEC.md` FR-4.2): whole countries, then whole states or
+ * provinces, then exactly where you've been (zoomTiers.ts). Nothing else on the map says which
+ * is in view, and a veil lifted from a whole country reads as a bug when you don't know that's
+ * the level you're at. So this names it — a pill under the mode toggle (MapView renders it in
+ * `.map-toggles`, on a line of its own below however many rows those wrap to), on entering the
+ * mode and whenever a zoom crosses into another level, faded after SHOW_MS. Heatmap gets the
+ * same pill with one message at every zoom (levelNoticeKey), shown on entering it.
  * Read on `zoomend`, not mid-gesture, so a pinch through two levels names only where it lands.
  * Never in Normal mode, which draws tracks at every zoom.
  */
@@ -35,16 +36,17 @@ export function ZoomLevelNotice({ map, mode }: ZoomLevelNoticeProps) {
     };
   }, [map]);
 
+  const key = mode === 'normal' ? null : levelNoticeKey(mode, tier);
   useEffect(() => {
-    if (mode === 'normal') {
+    if (key === null) {
       setVisible(false);
       return;
     }
-    setShown(t(`map.level.${mode}.${tier}`));
+    setShown(t(key));
     setVisible(true);
     const timer = window.setTimeout(() => setVisible(false), SHOW_MS);
     return () => window.clearTimeout(timer);
-  }, [mode, tier]);
+  }, [key]);
 
   if (shown === null) return null;
   return (

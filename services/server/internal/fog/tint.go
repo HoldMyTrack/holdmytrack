@@ -12,8 +12,8 @@ import (
 	"sync"
 )
 
-// A served Fog or Heatmap tile is its stored mask with a colour for each of the mask's 256
-// values: the veil's colour at an alpha falling with coverage, or the heat ramp. So it is
+// A served Fog tile is its stored mask with a colour for each of the mask's 256 values: the
+// veil's colour at an alpha falling with coverage. So it is
 // served as exactly that — the stored PNG rewritten as an 8-bit palette PNG over the same
 // pixel bytes. An 8-bit grayscale PNG and an 8-bit palette PNG store their pixels the same
 // way, one byte each, so only the header's colour type changes and a palette (PLTE) and its
@@ -30,29 +30,12 @@ func FogTile(maskPNG []byte, veil Veil) ([]byte, error) {
 	return tint(maskPNG, fogPalette(veil))
 }
 
-// HeatmapTile is the served Heatmap tile for a stored intensity mask (nil: no heat, fully
-// transparent), coloured along heatmapRamp.
-func HeatmapTile(maskPNG []byte) ([]byte, error) {
-	return tint(maskPNG, heatmapPalette())
-}
-
 type palette struct {
 	plte [256 * 3]byte
 	trns [256]byte
 }
 
-var (
-	fogPalettes   sync.Map // Veil -> *palette
-	heatmapPalOne = sync.OnceValue(func() *palette {
-		var p palette
-		for v := range 256 {
-			p.set(v, heatmapNRGBA(uint8(v)))
-		}
-		return &p
-	})
-)
-
-func heatmapPalette() *palette { return heatmapPalOne() }
+var fogPalettes sync.Map // Veil -> *palette
 
 func fogPalette(veil Veil) *palette {
 	if p, ok := fogPalettes.Load(veil); ok {

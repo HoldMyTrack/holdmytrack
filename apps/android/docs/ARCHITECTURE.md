@@ -39,7 +39,7 @@ graph TD
     MLN["MapLibre Native\n(own HTTP stack)"]
     Api["HoldMyTrack Server\n(docs/ARCHITECTURE.md)"]
     Style["GET /v1/map/style/{flavor}"]
-    Tiles["GET /tiles/v1/{tracks,fog,heatmap}"]
+    Tiles["GET /tiles/v1/{tracks,fog,heat-points}"]
     Sync["POST /v1/sync/activities"]
     Auth["POST /v1/auth/{signup,login,demo,logout}\nGET /v1/auth/me"]
     Store["Object Storage / Postgres\n(server-side, unchanged by this app)"]

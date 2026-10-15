@@ -21,9 +21,10 @@
 //	                tiles
 //	import K        upload set-1..K, one per account, all accounts at once, each set's files one
 //	                at a time as the web's Upload menu sends them
-//	browse VUS DUR  VUS people at the map for DUR, each in Normal, Fog or Heatmap mode, panning
-//	                and zooming and requesting the tiles the web client would; each keeps a
-//	                browser-like tile cache unless -cold. Latency per tile layer every 30 s
+//	browse VUS DUR  VUS people at the map for DUR, each in Normal, Fog or Heatmap mode (or all in
+//	                -mode), panning and zooming and requesting the tiles the web client would;
+//	                each keeps a browser-like tile cache unless -cold. Latency per tile layer
+//	                every 30 s
 //	probe           upload one new track from the last account and time it until it's processed
 //	cleanup         delete every account in tokens.json
 //
@@ -366,15 +367,17 @@ func tileXY(lat, lon float64, z int) (int, int) {
 }
 
 // The web client's tiers (apps/web/src/map/zoomTiers.ts and the layers' own zoom ranges): Fog
-// and Heatmap draw whole countries below z3 and whole regions below z7, their rasters from z7;
-// Normal draws tracks from z4. Every tile source stops at z14 and is stretched past it.
+// draws whole countries below z3 and whole regions below z7, its raster from z7; Heatmap draws
+// heat points at every zoom; Normal draws tracks from z4. Every tile source stops at z14 and is
+// stretched past it, except heat points, at z15.
 const (
-	countryMaxZoom = 3
-	regionMaxZoom  = 7
-	tracksMinZoom  = 4
-	spotsMinZoom   = 13
-	sourceMaxZoom  = 14
-	viewW, viewH   = 1280, 800 // a laptop browser window, CSS pixels; the clients draw tiles 512 px
+	countryMaxZoom    = 3
+	regionMaxZoom     = 7
+	tracksMinZoom     = 4
+	spotsMinZoom      = 13
+	heatPointsMaxZoom = 15
+	sourceMaxZoom     = 14
+	viewW, viewH      = 1280, 800 // a laptop browser window, CSS pixels; the clients draw tiles 512 px
 )
 
 // layers returns the tile layers the web client requests at whole zoom z in mode, each as
@@ -387,14 +390,17 @@ func layers(mode string, spots bool, z int) ([]string, int) {
 		if z >= tracksMinZoom {
 			out = append(out, "tracks:mvt")
 		}
-	default: // fog, heatmap
+	case "heatmap":
+		out = append(out, "heat-points:mvt")
+		tz = min(z, heatPointsMaxZoom)
+	default: // fog
 		switch {
 		case z < countryMaxZoom:
-			out = append(out, "country-"+mode+":mvt")
+			out = append(out, "country-fog:mvt")
 		case z < regionMaxZoom:
-			out = append(out, "region-"+mode+":mvt")
+			out = append(out, "region-fog:mvt")
 		default:
-			out = append(out, mode+":png")
+			out = append(out, "fog:png")
 		}
 	}
 	if spots && z >= spotsMinZoom {
@@ -416,7 +422,13 @@ type visitor struct {
 	cache map[string]bool
 }
 
+// onlyMode pins every visitor to one mode for the whole run, for a session measuring one.
+var onlyMode = flag.String("mode", "", "browse: keep every visitor in this mode (normal, fog or heatmap) instead of the usual mix")
+
 func pickMode(r *mrand.Rand) string {
+	if *onlyMode != "" {
+		return *onlyMode
+	}
 	switch n := r.Intn(100); {
 	case n < 50:
 		return "normal"

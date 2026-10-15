@@ -55,9 +55,7 @@
     <string name="map_level_fog_city">Город — открыто ровно там, где вы были</string>
     <string name="map_level_fog_country">Страны — страна открывается целиком, если вы были в ней хоть раз</string>
     <string name="map_level_fog_region">Регионы — штат или область открывается целиком, если вы были в нём хоть раз</string>
-    <string name="map_level_heatmap_city">Город — чем чаще вы где-то бываете, тем ярче это место</string>
-    <string name="map_level_heatmap_country">Страны — подсвечены страны, где вы были за последний год</string>
-    <string name="map_level_heatmap_region">Регионы — подсвечены штаты и области, где вы были за последний год</string>
+    <string name="map_level_heatmap">Чем чаще вы где-то бываете, тем ярче это место</string>
     <string name="layers_button">Слои</string>
     <string name="layers_master">Показывать слои</string>
     <string name="layers_master_empty">Сначала выберите тропы или места</string>

@@ -15,9 +15,8 @@ import (
 // Always reads the precomputed fog_tiles aggregate — Fog of War shows true all-time coverage,
 // unconditionally: it isn't scoped by date range, TYPE/DISTANCE, or hidden-track state (a
 // place once cleared stays cleared, which is the whole point of the mechanic), so there is no
-// per-request filter to honor and no on-the-fly compositing here. handleHeatmapTile is the
-// same shape now too — see its own doc comment for why it's a plain lookup as well, not a
-// live composite, despite Heatmap's rolling window.
+// per-request filter to honor and no on-the-fly compositing here. handleHeatPointsTile reads
+// the same rows' Heatmap counts.
 //
 // `?theme=dark` picks the cream veil drawn over dark basemaps; anything else gets the dark ink
 // veil (fog.VeilForTheme). The theme is part of the URL, so a cached tile is one theme's.

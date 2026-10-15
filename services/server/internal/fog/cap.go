@@ -18,17 +18,16 @@ const (
 	minTouchedTilesForAdaptiveCap = 20
 
 	// heatmapCapChangeThreshold: RecomputeHeatmapCap only reports a change when the newly
-	// computed cap differs from the stored one by more than this fraction. Changing the cap
-	// means re-rendering every one of the account's heatmap tiles (it's baked into the stored
-	// PNG, not applied at request time) — without a threshold, a still-growing account's cap
-	// would nudge on nearly every sweep, forcing a near-constant full re-render for a change
-	// too small to see.
+	// computed cap differs from the stored one by more than this fraction. A change is applied
+	// as tiles are served, but takes a new tile version, so every client refetches the
+	// account's Heatmap — without a threshold, a still-growing account's cap would nudge on
+	// nearly every sweep, refetching everything for a change too small to see.
 	heatmapCapChangeThreshold = 0.15
 )
 
 // RecomputeHeatmapCap computes what users.heatmap_cap *should* be for one account, from that
-// account's own coverage, without changing anything — persisting the result and marking tiles
-// dirty is the caller's job (internal/worker/heatmap_cap.go), keeping this a pure "what should
+// account's own coverage, without changing anything — persisting the result and bumping the
+// tile version is the caller's job (internal/worker/heatmap_cap.go), keeping this a pure "what should
 // the cap be" query, not a side-effecting sweep.
 //
 // The statistic: the single most-touched z14 tile's count — how many currently-in-window,
@@ -47,8 +46,8 @@ const (
 // Computed over tiles, not pixels — a GROUP BY over activity_tile_masks is cheap, where
 // per-pixel intensity statistics across a whole account's coverage would cost far more for
 // marginal extra accuracy. Scoped to in_heatmap_window activities specifically (not all-time,
-// the way Fog's own aggregate is) because that's exactly the population compositeHeatmapMask
-// sums when it builds the raster this cap normalizes — calibrating against a wider all-time
+// the way Fog's own aggregate is) because that's exactly the population heatCounts counts
+// when it builds the tiles this cap weighs — calibrating against a wider all-time
 // set would drift out of sync with what's actually rendered as activities age out of the
 // window over time.
 func RecomputeHeatmapCap(ctx context.Context, pool *pgxpool.Pool, userID string) (newCap float64, changed bool, err error) {
