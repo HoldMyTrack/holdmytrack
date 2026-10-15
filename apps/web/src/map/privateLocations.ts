@@ -1,3 +1,4 @@
+import { TRACKS_MIN_ZOOM } from './config';
 import type { ExpressionSpecification, GeoJSONSource, Map as MapLibreMap, MapLayerMouseEvent, MapLayerTouchEvent } from 'maplibre-gl';
 
 /**
@@ -58,7 +59,8 @@ function circlePolygon(c: Circle): number[][] {
   return ring;
 }
 
-/** Adds the source and layers if missing — idempotent for the same styledata reason every
+/** From the zoom tracks start at, like everything else on the map but Fog and Heatmap (FR-4.15).
+ *  Adds the source and layers if missing — idempotent for the same styledata reason every
  *  other overlay here is (a theme swap's setStyle discards custom layers). */
 export function ensurePrivateLocationsLayer(map: MapLibreMap, beforeId: string | undefined): void {
   if (!map.getSource(PRIVATE_LOCATIONS_SOURCE_ID)) {
@@ -69,6 +71,7 @@ export function ensurePrivateLocationsLayer(map: MapLibreMap, beforeId: string |
   };
   add({
     id: FILL_LAYER_ID,
+    minzoom: TRACKS_MIN_ZOOM,
     type: 'fill',
     source: PRIVATE_LOCATIONS_SOURCE_ID,
     filter: ['==', ['get', 'role'], 'circle'],
@@ -76,6 +79,7 @@ export function ensurePrivateLocationsLayer(map: MapLibreMap, beforeId: string |
   });
   add({
     id: OUTLINE_LAYER_ID,
+    minzoom: TRACKS_MIN_ZOOM,
     type: 'line',
     source: PRIVATE_LOCATIONS_SOURCE_ID,
     filter: ['==', ['get', 'role'], 'circle'],
@@ -85,6 +89,7 @@ export function ensurePrivateLocationsLayer(map: MapLibreMap, beforeId: string |
   // pixel when zoomed out, and this keeps each location visible and clickable at any zoom.
   add({
     id: CENTER_LAYER_ID,
+    minzoom: TRACKS_MIN_ZOOM,
     type: 'circle',
     source: PRIVATE_LOCATIONS_SOURCE_ID,
     filter: ['==', ['get', 'role'], 'center'],
@@ -92,6 +97,7 @@ export function ensurePrivateLocationsLayer(map: MapLibreMap, beforeId: string |
   });
   add({
     id: HANDLE_LAYER_ID,
+    minzoom: TRACKS_MIN_ZOOM,
     type: 'circle',
     source: PRIVATE_LOCATIONS_SOURCE_ID,
     filter: ['==', ['get', 'role'], 'handle'],
