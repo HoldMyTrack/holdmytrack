@@ -197,6 +197,7 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("POST", "/sync/known"), s.requireNotDemo(s.handleSyncKnown))
 	s.tile("/tracks/{z}/{x}/{y}", s.handleTracksTile)
 	s.tile("/fog/{z}/{x}/{y}", s.budgeted(budget.ReadsPaused, s.handleFogTile))
+	s.tile("/fog-vector/{z}/{x}/{y}", s.budgeted(budget.ReadsPaused, s.handleFogVectorTile))
 	s.tile("/heatmap/{z}/{x}/{y}", s.handleHeatmapTile)
 	s.tile("/spots/{z}/{x}/{y}", s.handleSpotsTile)
 	s.tile("/bike-paths/{z}/{x}/{y}", s.handleBikePathsTile)
