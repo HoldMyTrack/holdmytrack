@@ -1719,6 +1719,38 @@ button.activities-panel__story-badge:hover {
   border-color: var(--fm-accent);
 }
 
+/* Zoomed out (photoClusters.ts's photoMarkerSize): smaller, so the tracks show under the photos.
+   The stack and the count shrink with it; the one open or in hand is the full size. */
+.photo-marker--small {
+  width: 22px;
+  height: 22px;
+  border-width: 1.5px;
+}
+
+.photo-marker--small.photo-marker--group {
+  box-shadow:
+    2px -2px 0 -1px var(--fm-surface),
+    2px -2px 0 0 rgb(var(--fm-shadow-rgb) / 25%),
+    4px -4px 0 -1px var(--fm-surface),
+    4px -4px 0 0 rgb(var(--fm-shadow-rgb) / 25%),
+    var(--fm-shadow-md);
+}
+
+.photo-marker--small .photo-marker__count {
+  top: -7px;
+  right: -9px;
+  min-width: 14px;
+  padding: 0 3px;
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.photo-marker--small.photo-marker--active {
+  width: 36px;
+  height: 36px;
+  border-width: 2px;
+}
+
 /* PhotoPopup.tsx: a photo's popup at its marker — the spot popup's frame (.spot-popup), with
    the picture at the popup's width. */
 .photo-popup .maplibregl-popup-content {

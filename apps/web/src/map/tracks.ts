@@ -1,5 +1,6 @@
 import type { FilterSpecification, Map as MapLibreMap, VectorTileSource } from 'maplibre-gl';
 import { API_BASE_URL, TILES_V1, type ActivityQuery } from '../api';
+import { TRACKS_MIN_ZOOM } from './config';
 import { getTileVersion } from './coverageVersion';
 import { PHOTO_MARKER_CLASS } from './photos';
 import { spotAt } from './spots';
@@ -15,15 +16,6 @@ export const TRACKS_LAYER_ID = 'tracks-line';
 // The halo drawn under the selected (focused) track — see ensureTrackLayer.
 export const TRACKS_CASING_LAYER_ID = 'tracks-casing';
 const TRACKS_SOURCE_LAYER = 'tracks'; // must match ST_AsMVT(t, 'tracks', ...) in the backend query
-
-// Tracks draw from z4 — a few states on screen — down to street level. Below that a track is a
-// few pixels long; above it the only cost is tile payload, and ST_AsMVTGeom's 4096-unit grid
-// already bounds that: measured with the demo's 611 activities and no date filter, the tile
-// over Cleveland is 40KB at z4 against 44KB at z8 (IMPLEMENTATION.md §5.3). Not Fog/Heatmap's
-// CITY_MIN_ZOOM (z7): those switch to Country/Region fills below it, but Normal mode has no
-// such fallback, so tracks hidden there left an empty map — and a focused road trip too long
-// to fit at z7 flew to a view with nothing drawn on it.
-const TRACKS_MIN_ZOOM = 4;
 
 const NORMAL_WIDTH = 2.5;
 const EMPHASIS_WIDTH = 4.5; // selected (focused), plus the halo below

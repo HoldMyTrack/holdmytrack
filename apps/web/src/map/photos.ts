@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Marker, type Map as MapLibreMap } from 'maplibre-gl';
-import { clusterPoints, CLUSTER_RADIUS_PX } from './photoClusters';
+import { clusterPoints, CLUSTER_RADIUS_PX, photoMarkerSize, SMALL_CLUSTER_RADIUS_PX } from './photoClusters';
 
 /**
  * Photo markers (FR-16, IMPLEMENTATION.md §4.27): each photo of the selected activity or the
  * open Story, as its own thumbnail in a round frame, at its point on the track — or, where
  * several would overlap on screen, one marker for the group: its first photo, stacked, with a
  * count (photoClusters.ts). Groups are worked out again after every move of the map, so zooming
- * in splits them.
+ * in splits them. Zoomed out the markers are small, and below the zoom tracks start at there are
+ * none (photoMarkerSize).
  *
  * HTML markers rather than a symbol layer: there are tens of them, not thousands, and each shows
  * its own image (a symbol layer would need every thumbnail added to the style as an icon, and
@@ -96,15 +97,17 @@ export function usePhotoMarkers(
 
   useEffect(() => {
     if (!map) return;
-    const byId = new Map(items.map((item) => [item.id, item]));
+    const size = photoMarkerSize(map.getZoom());
+    const shown = size === 'hidden' ? [] : items;
+    const byId = new Map(shown.map((item) => [item.id, item]));
     const grouped = clusterPoints(
-      items
+      shown
         .filter((item) => item.id !== loneId)
         .map((item) => {
           const p = map.project([item.lon, item.lat]);
           return { id: item.id, x: p.x, y: p.y };
         }),
-      CLUSTER_RADIUS_PX,
+      size === 'small' ? SMALL_CLUSTER_RADIUS_PX : CLUSTER_RADIUS_PX,
     ).map((c) => c.ids);
     if (loneId !== null && byId.has(loneId)) grouped.push([loneId]);
 
@@ -121,13 +124,14 @@ export function usePhotoMarkers(
       const existing = current.get(key);
       if (existing && existing.item.thumbSrc === item.thumbSrc && existing.item.caption === item.caption) {
         existing.marker.setLngLat([item.lon, item.lat]);
+        existing.marker.getElement().classList.toggle(`${PHOTO_MARKER_CLASS}--small`, size === 'small');
         existing.item = item;
         continue;
       }
       existing?.marker.remove();
-      const marker = new Marker({ element: markerElement(item, ids, (opened) => onOpenRef.current(opened)) })
-        .setLngLat([item.lon, item.lat])
-        .addTo(map);
+      const element = markerElement(item, ids, (opened) => onOpenRef.current(opened));
+      element.classList.toggle(`${PHOTO_MARKER_CLASS}--small`, size === 'small');
+      const marker = new Marker({ element }).setLngLat([item.lon, item.lat]).addTo(map);
       current.set(key, { marker, item, ids });
     }
   }, [map, items, loneId, moves]);

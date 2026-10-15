@@ -44,6 +44,8 @@ object SyncCandidatesOverlay {
         val beforeId = style.layers.firstOrNull { it is SymbolLayer }?.id
         fun add(layer: LineLayer) {
             if (style.getLayer(layer.id) != null) return
+            // From the zoom tracks start at, like everything else but Fog and Heatmap (`docs/SPEC.md` FR-4.15).
+            layer.minZoom = MapOverlays.TRACKS_MIN_ZOOM
             if (beforeId != null) style.addLayerBelow(layer, beforeId) else style.addLayer(layer)
         }
         fun role(name: String) = Expression.eq(Expression.get("role"), name)

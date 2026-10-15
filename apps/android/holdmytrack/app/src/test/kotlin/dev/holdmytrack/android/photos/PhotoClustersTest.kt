@@ -34,4 +34,14 @@ class PhotoClustersTest {
         val groups = PhotoClusters.cluster(listOf(ScreenPoint("a", 0f, 0f), ScreenPoint("b", 32f, 0f)), radius = 32f)
         assertEquals(1, groups.size)
     }
+
+    @Test
+    fun markersHideWhereTracksDoAndAreSmallZoomedOut() {
+        assertEquals(MarkerSize.HIDDEN, PhotoClusters.markerSize(0.0))
+        assertEquals(MarkerSize.HIDDEN, PhotoClusters.markerSize(3.99))
+        assertEquals(MarkerSize.SMALL, PhotoClusters.markerSize(4.0))
+        assertEquals(MarkerSize.SMALL, PhotoClusters.markerSize(9.99))
+        assertEquals(MarkerSize.FULL, PhotoClusters.markerSize(10.0))
+        assertEquals(MarkerSize.FULL, PhotoClusters.markerSize(18.0))
+    }
 }
