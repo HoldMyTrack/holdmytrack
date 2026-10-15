@@ -84,6 +84,21 @@ spots_id:
                 area:
                   type: object
                   description: A GeoJSON MultiPolygon.
+                  required: [type, coordinates]
+                  properties:
+                    type: { type: string, enum: [MultiPolygon] }
+                    coordinates:
+                      type: array
+                      description: Polygons, each rings, each [lon, lat] points.
+                      items:
+                        type: array
+                        items:
+                          type: array
+                          items:
+                            type: array
+                            minItems: 2
+                            maxItems: 2
+                            items: { type: number }
                 captured_at:
                   type: string
                   format: date-time

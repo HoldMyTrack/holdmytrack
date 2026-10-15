@@ -3125,7 +3125,15 @@ export interface paths {
                             lon: number;
                             lat: number;
                             /** @description A GeoJSON MultiPolygon. */
-                            area: Record<string, never>;
+                            area: {
+                                /** @enum {string} */
+                                type: "MultiPolygon";
+                                /** @description Polygons, each rings, each [lon, lat] points. */
+                                coordinates: [
+                                    number,
+                                    number
+                                ][][][];
+                            };
                             /**
                              * Format: date-time
                              * @description Missing when the account hasn't captured it.
