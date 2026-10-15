@@ -2,6 +2,7 @@
 // not applied here and applying it is an error (see kotl.in/gradle/agp-built-in-kotlin).
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 /** `git <args>`'s output, trimmed — or null outside a git checkout (a source archive), where
@@ -95,6 +96,14 @@ android {
     sourceSets["test"].java.srcDirs("src/test/kotlin")
 }
 
+// WireContractTest reads the API contract, outside this project, so a change to it reruns the
+// unit tests rather than leaving them up to date.
+tasks.withType<Test>().configureEach {
+    inputs.files(rootProject.fileTree("../../../services/server/api"))
+        .withPropertyName("apiContract")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
 dependencies {
     implementation(libs.maplibre)
     implementation(libs.appcompat)
@@ -112,7 +121,7 @@ dependencies {
     implementation(libs.browser)
     implementation(libs.recyclerview)
     implementation(libs.fragment)
+    implementation(libs.serialization.json)
     testImplementation(libs.junit)
-    // Android's org.json is a stub off the device; the real one lets a unit test parse a body.
-    testImplementation(libs.json)
+    testImplementation(libs.snakeyaml)
 }
