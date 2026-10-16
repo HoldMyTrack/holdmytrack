@@ -7,6 +7,7 @@ import type {
   StyleSpecification,
 } from 'maplibre-gl';
 import { GLYPHS_PATH, PMTILES_PATH, SPRITE_BASE_PATH } from './config';
+import { globeProjection } from './globe';
 
 /**
  * Style construction, kept pure and DOM-free on purpose.
@@ -135,6 +136,9 @@ export interface BuildStyleOptions {
   satellite?: SatelliteSource | null;
   /** Whether satellite mode starts on. Ignored without `satellite`. */
   satelliteOn?: boolean;
+  /** A globe while zoomed out (GLOBE_MAX_ZOOM), flat from there in. Only the web's own maps:
+   *  the style served to Android leaves it out, since MapLibre Native has no globe. */
+  globe?: boolean;
 }
 
 /**
@@ -265,6 +269,7 @@ export function buildStyle(options: BuildStyleOptions): StyleSpecification {
     spriteBasePath = SPRITE_BASE_PATH,
     satellite = null,
     satelliteOn = false,
+    globe = false,
   } = options;
 
   const base = origin.replace(/\/$/, '');
@@ -297,6 +302,7 @@ export function buildStyle(options: BuildStyleOptions): StyleSpecification {
       },
     }),
     layers: satellite ? withSatelliteLayer(vector, hidden, dimmed, satelliteOn) : vector,
+    ...(globe && { projection: globeProjection() }),
   };
 }
 

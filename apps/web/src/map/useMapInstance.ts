@@ -73,13 +73,13 @@ export function useMapInstance({
         satellite: satelliteSource(),
         satelliteOn: initial.current.satellite,
         lang,
+        globe: true,
       }),
       center: [initial.current.view.longitude, initial.current.view.latitude],
       zoom: initial.current.view.zoom,
       // We render our own, positioned with the rest of the UI.
       attributionControl: false,
-      // Nothing here benefits from a globe, and a flat map keeps the
-      // fog raster and print export in one predictable projection.
+      // Zoomed out it's a globe (style.ts's GLOBE_MAX_ZOOM), never tilted.
       maxPitch: 0,
       // The session cookie for the API's own tiles, and nothing else (requestCredentials.ts).
       transformRequest: withApiCredentials(API_BASE_URL, window.location.href),

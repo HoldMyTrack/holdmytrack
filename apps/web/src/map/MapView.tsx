@@ -1402,7 +1402,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   useEffect(() => {
     if (!map || appliedFlavor.current === flavor) return;
     appliedFlavor.current = flavor;
-    map.setStyle(buildStyle({ flavor, origin: basemapOrigin(), satellite: satelliteSource(), satelliteOn: satellite, lang }), {
+    map.setStyle(buildStyle({ flavor, origin: basemapOrigin(), satellite: satelliteSource(), satelliteOn: satellite, lang, globe: true }), {
       diff: false,
     });
     // Only a flavor change swaps the style; the Satellite button flips layers in place (below).

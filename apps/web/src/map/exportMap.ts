@@ -313,6 +313,8 @@ async function renderOffscreen(
       satellite: satelliteSource(),
       satelliteOn: state.satellite,
       lang,
+      // The live map's projection, so a frame drawn on the globe exports as drawn.
+      globe: true,
     }),
     center: [view.center.lng, view.center.lat],
     zoom: liveMap.getZoom(),

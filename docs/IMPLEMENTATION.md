@@ -651,6 +651,8 @@ What the page shows is FR-1.7. Language is `users.locale`, written by the header
 
 **`countryView.ts` is a generated table, with hand overrides.** It was built once, offline, from Natural Earth's Admin-0 polygons, with `ST_PointOnSurface` per code (not `ST_Centroid`, which can land outside a concave or archipelago shape) and a zoom from the bbox. Overridden by hand: every antimeridian-crossing country, whose bbox breaks at ±180°, and France, the Netherlands and Norway, whose polygons bundle a far-flung dependency. It covers exactly the codes the Settings Country list can store.
 
+**A globe out to z3, flat from z4** (`map/globe.ts`). A flat map zoomed out on a wide screen repeats the world, two of every country and every heat circle side by side; a globe shows each once. Only that far out: closer in a globe and a flat map look alike, and everything nearer stays as it was. The projection is part of the style (`buildStyle`'s `globe`), so a flavor switch's `setStyle` keeps it, and the export builds its map with it too, or a frame drawn on the globe would export a different picture. The style served to Android (`scripts/build-style.mjs`) leaves it out: MapLibre Native has no globe.
+
 **Signed-out, there is no map.** Anonymous browsing is not offered in favor of the one-tap demo (`VISION.md` §8.2), which shows the product rather than a bare basemap.
 
 ---
