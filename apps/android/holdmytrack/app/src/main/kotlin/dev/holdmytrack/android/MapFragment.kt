@@ -16,8 +16,6 @@ import android.content.res.ColorStateList
 import android.os.SystemClock
 import android.view.HapticFeedbackConstants
 import android.view.View
-import android.view.ViewGroup.MarginLayoutParams
-import android.view.WindowInsets
 import android.widget.Button
 import android.widget.Chronometer
 import android.widget.TextView
@@ -31,7 +29,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.core.view.AccessibilityDelegateCompat
 import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.fragment.app.Fragment
@@ -42,6 +39,7 @@ import dev.holdmytrack.android.export.ExportViewfinder
 import dev.holdmytrack.android.map.ActivityDays
 import dev.holdmytrack.android.map.BoxUnion
 import dev.holdmytrack.android.map.CaptureMode
+import dev.holdmytrack.android.map.ChromeInsets
 import dev.holdmytrack.android.map.CoverageWatch
 import dev.holdmytrack.android.map.EditPreview
 import dev.holdmytrack.android.map.SyncCandidatesOverlay
@@ -62,7 +60,6 @@ import dev.holdmytrack.android.map.MapPaths
 import dev.holdmytrack.android.map.MapSatellite
 import dev.holdmytrack.android.map.MapSpots
 import dev.holdmytrack.android.map.PendingDiff
-import dev.holdmytrack.android.map.PhotoMarkerItem
 import dev.holdmytrack.android.map.PhotoMarkerOverlay
 import dev.holdmytrack.android.map.PhotoMarkers
 import dev.holdmytrack.android.map.PhotoPopup
@@ -82,7 +79,6 @@ import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.panel.ActivitiesPanel
 import dev.holdmytrack.android.panel.ActivityFacets
 import dev.holdmytrack.android.panel.EditActivityWindow
-import dev.holdmytrack.android.panel.PanelFormat
 import dev.holdmytrack.android.panel.PanelTab
 import dev.holdmytrack.android.panel.PrivateLocationEditor
 import dev.holdmytrack.android.panel.PanelState
@@ -285,22 +281,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private var style: Style? = null
     private var mode = MapMode.NORMAL
 
-    /** The status bar's height, for the floating chrome and MapLibre's compass
-     *  (`insetSystemBars`, `applyCompassMargin`). The inset and the map instance arrive in either
-     *  order, so both paths call `applyCompassMargin`. */
-    private var systemBarInsetTop = 0
-
-    /** The compass's default top margin, captured once so repeated inset callbacks don't
-     *  compound the status bar height. */
-    private var compassBaseMarginTop = 0
-    private var compassBaseMarginCaptured = false
-
-    /** The logo's and attribution's default bottom margins, captured once. Trap: MapLibre
-     *  restores its UI settings with the lift applied, so these are carried through
-     *  `onSaveInstanceState` rather than captured again, which would lift twice. */
-    private var logoBaseMarginBottom = 0
-    private var attributionBaseMarginBottom = 0
-    private var attributionBaseCaptured = false
+    /** The chrome's and MapLibre's controls' margins against the system bars and the panels. */
+    private lateinit var chrome: ChromeInsets
 
     /** Whether the user layers are on the style (`syncSession`). */
     private var overlaysAttached = false
@@ -494,8 +476,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         })
         modeButtons.forEach { (value, button) ->
             button.setOnClickListener { setMode(value) }
-            button.minWidth = minTouchTargetPx()
-            button.minimumWidth = minTouchTargetPx()
+            button.minWidth = ChromeInsets.minTouchTargetPx(button)
+            button.minimumWidth = ChromeInsets.minTouchTargetPx(button)
         }
         mapRail = findViewById(R.id.map_rail)
         layersPanel = findViewById(R.id.layers_panel)
@@ -609,7 +591,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             style = { style?.takeIf { overlaysAttached } },
             onEditorOpen = {
                 closePrivateOnBack.isEnabled = true
-                placeEditWindow()
+                chrome.placeEditors()
                 renderRail()
                 renderDateFooter()
                 host?.setBottomBarShown(false)
@@ -645,6 +627,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             onTabChanged = ::renderPhotoMarkers,
             onClose = ::onEditClosed,
         )
+        chrome = ChromeInsets(findViewById(R.id.map_root), findViewById(R.id.top_bar), topChrome, notice, sheet, panel) { map }
+        chrome.restore(savedInstanceState)
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, collapseSheetOnBack)
         // Added after the sheet's, so it's asked first: Back ends selecting before it closes the sheet.
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, endSelectingOnBack)
@@ -668,11 +652,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             dateSlider.value = selectedRange
             userChangedRange = savedInstanceState.getBoolean(STATE_RANGE_CHOSEN)
         }
-        if (savedInstanceState?.containsKey(STATE_LOGO_MARGIN) == true) {
-            logoBaseMarginBottom = savedInstanceState.getInt(STATE_LOGO_MARGIN)
-            attributionBaseMarginBottom = savedInstanceState.getInt(STATE_ATTRIBUTION_MARGIN)
-            attributionBaseCaptured = true
-        }
         // Carried through a recreation (a theme or language change), since the mode buttons
         // restore their own checked state and would otherwise show a mode the map isn't in.
         savedInstanceState?.getString(STATE_MODE)?.let { saved ->
@@ -680,7 +659,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
         setMode(mode)
 
-        insetSystemBars()
+        chrome.install()
         if (savedInstanceState == null) {
             handleStopIntent(requireActivity().intent)
             takeViewOnMap(requireActivity().intent)
@@ -709,9 +688,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
                     .zoom(1.0)
                     .build()
             }
-            applyCompassMargin()
-            applyAttributionMargin()
-            mapView.post { enlargeAttributionTarget() }
+            chrome.applyCompassMargin()
+            chrome.applyAttributionMargin()
+            mapView.post { chrome.enlargeAttributionTarget(mapView) }
             instance.addOnMapClickListener { point -> onMapTap(instance, point) }
             instance.addOnCameraMoveListener {
                 spotPopup.place()
@@ -741,30 +720,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
                 else -> false
             }
         }
-    }
-
-    /** [MIN_TOUCH_TARGET_DP] in pixels, rounded up. */
-    private fun minTouchTargetPx() = kotlin.math.ceil(MIN_TOUCH_TARGET_DP * resources.displayMetrics.density).toInt()
-
-    /**
-     * Pads MapLibre's 21dp attribution "i" out to the 48dp touch target. It has no id, so it's
-     * found by its content description. Padding goes on its right and top only, so the icon stays
-     * put. Trap: the margins belong to `applyAttributionMargin`; padding evenly through them put
-     * the icon over the MapLibre logo.
-     */
-    private fun enlargeAttributionTarget() {
-        val found = ArrayList<View>()
-        mapView.findViewsWithText(
-            found,
-            getString(org.maplibre.android.R.string.maplibre_attributionsIconContentDescription),
-            View.FIND_VIEWS_WITH_CONTENT_DESCRIPTION,
-        )
-        val icon = found.firstOrNull() ?: return
-        val target = minTouchTargetPx()
-        val padX = (target - icon.width).coerceAtLeast(0)
-        val padY = (target - icon.height).coerceAtLeast(0)
-        if (padX == 0 && padY == 0) return
-        icon.setPadding(0, padY, padX, 0)
     }
 
     /**
@@ -840,107 +795,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             .setNegativeButton(R.string.recording_keep, null)
             .setOnDismissListener { stopDialog = null }
             .show()
-    }
-
-    /**
-     * Keeps the floating chrome clear of the status bar. `MainActivity`'s bottom bar takes the
-     * gesture inset, so the bottom inset here is 0.
-     *
-     * Required from API 35, which draws every app edge to edge: the top row's `LinearLayout` has
-     * no `fitsSystemWindows`, so without this it sits under the status bar's icons. The map
-     * itself fills the screen. Insets are added to each view's laid-out margin, and returned
-     * unconsumed for anything else that wants them.
-     */
-    private fun insetSystemBars() {
-        val topBar: View = findViewById(R.id.top_bar)
-        val barTopMargin = (topBar.layoutParams as MarginLayoutParams).topMargin
-        val mapRoot = findViewById<View>(R.id.map_root)
-        mapRoot.setOnApplyWindowInsetsListener { _, insets ->
-            val bars = insets.getInsets(WindowInsets.Type.systemBars())
-            (topBar.layoutParams as MarginLayoutParams).topMargin = barTopMargin + bars.top
-            topBar.requestLayout()
-            systemBarInsetTop = bars.top
-            applyCompassMargin()
-            insets
-        }
-        // The attribution sits above an editor along the bottom, whose height is only known once
-        // it's laid out.
-        for (id in listOf(R.id.edit_window, R.id.private_editor)) {
-            findViewById<View>(id).addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyAttributionMargin() }
-        }
-        // The compass sits below the top row and any notice under it, whose heights are only
-        // known once they're laid out; the expanded sheet stops under the row likewise. The
-        // attribution follows the sheet's head (onSheetChanged).
-        topChrome.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            applyCompassMargin()
-            placeEditWindow()
-            panel.setExpandedOffset(topBar.bottom + resources.getDimensionPixelSize(R.dimen.hmt_space_8), mapRoot.height)
-        }
-        mapRoot.addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
-            if (bottom - top != oldBottom - oldTop) {
-                panel.setExpandedOffset(topBar.bottom + resources.getDimensionPixelSize(R.dimen.hmt_space_8), bottom - top)
-            }
-        }
-    }
-
-    /**
-     * Moves MapLibre's compass below the status bar and the top row, whose rail shares its
-     * top-end corner. Called from both `insetSystemBars` and `getMapAsync`: whichever fires
-     * second has everything it needs.
-     */
-    private fun applyCompassMargin() {
-        val instance = map ?: return
-        val settings = instance.uiSettings
-        if (!compassBaseMarginCaptured) {
-            compassBaseMarginTop = settings.compassMarginTop
-            compassBaseMarginCaptured = true
-        }
-        // Below the top row and any notice; before the row is laid out, below the status bar.
-        val belowTopBar = maxOf(
-            findViewById<View>(R.id.top_bar).bottom,
-            if (notice.isVisible) notice.bottom else 0,
-        )
-        settings.setCompassMargins(
-            settings.compassMarginLeft,
-            compassBaseMarginTop + maxOf(systemBarInsetTop, belowTopBar),
-            settings.compassMarginRight,
-            settings.compassMarginBottom,
-        )
-    }
-
-    /**
-     * Lifts MapLibre's logo and attribution above the collapsed sheet or an open editor: the
-     * attribution is the basemap's ODbL credit and must stay visible (`FR-2.4`). An expanded
-     * sheet covers them as it covers the map.
-     */
-    private fun applyAttributionMargin() {
-        val instance = map ?: return
-        val settings = instance.uiSettings
-        if (!attributionBaseCaptured) {
-            logoBaseMarginBottom = settings.logoMarginBottom
-            attributionBaseMarginBottom = settings.attributionMarginBottom
-            attributionBaseCaptured = true
-        }
-        // Above an editor open along the bottom, which has the screen meanwhile.
-        val root = findViewById<View>(R.id.map_root)
-        val editor = listOf(R.id.edit_window, R.id.private_editor).map { findViewById<View>(it) }.firstOrNull { it.isVisible }
-        val above = when {
-            editor != null -> root.height - editor.top
-            sheet.isVisible -> panel.peekHeight
-            else -> 0
-        }
-        settings.setLogoMargins(
-            settings.logoMarginLeft,
-            settings.logoMarginTop,
-            settings.logoMarginRight,
-            logoBaseMarginBottom + above,
-        )
-        settings.setAttributionMargins(
-            settings.attributionMarginLeft,
-            settings.attributionMarginTop,
-            settings.attributionMarginRight,
-            attributionBaseMarginBottom + above,
-        )
     }
 
     /**
@@ -1195,7 +1049,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         // The photos follow the window: its one activity's, which its Photos tab manages.
         refreshPhotos(force = false)
         closeEditOnBack.isEnabled = true
-        placeEditWindow()
+        chrome.placeEditors()
         renderDateFooter()
         host?.setBottomBarShown(false)
         renderSelectionBar()
@@ -1245,22 +1099,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         renderRail()
         renderTrackMetrics()
         if (saved) reloadList()
-    }
-
-    /** The Edit window and the Private location editor sit at the screen's bottom edge (the
-     *  bottom bar hides meanwhile), so their margin clears the gesture bar. */
-    private fun placeEditWindow() {
-        val insets = ViewCompat.getRootWindowInsets(requireView())
-        val gesture = insets?.getInsets(WindowInsetsCompat.Type.navigationBars())?.bottom ?: 0
-        val bottom = resources.getDimensionPixelSize(R.dimen.hmt_space_10) + gesture
-        for (id in listOf(R.id.edit_window, R.id.private_editor)) {
-            val card = findViewById<View>(id)
-            val params = card.layoutParams as MarginLayoutParams
-            if (params.bottomMargin != bottom) {
-                params.bottomMargin = bottom
-                card.layoutParams = params
-            }
-        }
     }
 
     /** Whether the Private location editor is open over the map. */
@@ -1564,7 +1402,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /** The sheet came to rest or its head changed height: the attribution follows its head, and
      *  Back closes it while it's open. */
     private fun onSheetChanged() {
-        applyAttributionMargin()
+        if (::chrome.isInitialized) chrome.applyAttributionMargin()
         collapseSheetOnBack.isEnabled = sheet.isVisible && panel.expanded && !editWindow.isOpen
     }
 
@@ -2184,10 +2022,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             outState.putString(STATE_RANGE_TO, it.to)
             outState.putBoolean(STATE_RANGE_CHOSEN, userChangedRange)
         }
-        if (attributionBaseCaptured) {
-            outState.putInt(STATE_LOGO_MARGIN, logoBaseMarginBottom)
-            outState.putInt(STATE_ATTRIBUTION_MARGIN, attributionBaseMarginBottom)
-        }
+        if (::chrome.isInitialized) chrome.save(outState)
     }
 
     override fun onLowMemory() {
@@ -2234,15 +2069,10 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         /** How long a session check runs before the notice shows, so a fast one doesn't flash it. */
         private const val CHECKING_DELAY_MS = 600L
 
-        /** Material's and the platform's minimum touch target. */
-        private const val MIN_TOUCH_TARGET_DP = 48
-
         private const val STATE_MODE = "mode"
         private const val STATE_FRAMED = "framed"
         private const val STATE_RANGE_FROM = "range_from"
         private const val STATE_RANGE_TO = "range_to"
         private const val STATE_RANGE_CHOSEN = "range_chosen"
-        private const val STATE_LOGO_MARGIN = "logo_margin"
-        private const val STATE_ATTRIBUTION_MARGIN = "attribution_margin"
     }
 }
