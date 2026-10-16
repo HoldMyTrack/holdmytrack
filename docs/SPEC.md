@@ -601,6 +601,7 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 3. An account with no activity history at all falls back to its Country setting (FR-1.7), at that country's own view, if one is set.
 4. If none of the above applies — no saved position, no activity history, no Country set — the camera opens on a fixed, deliberately zoomed-out world view.
 5. Panning or zooming rewrites the URL's saved position continuously, so the current view is always what a copied link restores.
+6. Out to zoom 3 the map is a globe, showing every place once however wide the screen; over the next zoom it turns flat, and from zoom 4 in it is the flat map. It never tilts. An export (FR-4.10) draws the same projection as the map it was framed on. The Android app's map is flat at every zoom (`apps/android/docs/SPEC.md` FR-2.1).
 
 **Notes**: A fresh session (signing out, then signing in or starting a demo session) never inherits a previous session's saved camera position — only an unmodified reload of the same session does. This resolution order never requests the browser's geolocation permission; FR-4.7's "Find my location" is a separate, always-available, user-clicked control, not part of it.
 
