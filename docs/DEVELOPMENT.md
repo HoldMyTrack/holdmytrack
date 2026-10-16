@@ -111,9 +111,9 @@ The app has JUnit tests over its pure logic (`./gradlew :app:testDebugUnitTest` 
 
 ### CI
 
-`.github/workflows/ci.yml` runs on every push to `main` and every pull request, in five parallel jobs: `scripts/check-doc-refs.sh`, which fails on a `§`, FR or ADR citation whose heading no longer exists; `go test -p 1 ./...` with a PostGIS service; the web `typecheck`, `test:coverage`, `verify:style` and `verify:api-types`; the Android JUnit tests; and `make verify verify-build` against the compose stack. That last job caches the basemap extract keyed on `apps/web/scripts/build-basemap.sh` and cuts it on a miss, which 404s once the pinned Protomaps build ages out (about a week): bump `BUILD` in the script.
+`.github/workflows/ci.yml` runs on every push to `main` and every pull request, in six parallel jobs: `scripts/check-doc-refs.sh`, which fails on a `§`, FR or ADR citation whose heading no longer exists; `scripts/check-file-size.sh`, which annotates a source file a change grows past 600 lines as a split candidate and never fails; `go test -p 1 ./...` with a PostGIS service; the web `typecheck`, `test:coverage`, `verify:style` and `verify:api-types`; the Android JUnit tests; and `make verify verify-build` against the compose stack. That last job caches the basemap extract keyed on `apps/web/scripts/build-basemap.sh` and cuts it on a miss, which 404s once the pinned Protomaps build ages out (about a week): bump `BUILD` in the script.
 
-The Go, web and Android jobs upload unit-test coverage to Codecov (flags `go`, `typescript`, `kotlin`), so the numbers are low by design; c8's `all` (`apps/web/.c8rc.json`) counts untested files. `codecov.yml` keeps the status checks informational. CI never deploys (`docs/DEPLOY.md` §6).
+The Go, web and Android jobs upload unit-test coverage to Codecov, informational only (`codecov.yml`) and low by design: c8's `all` counts untested files. CI never deploys (`docs/DEPLOY.md` §6).
 
 ## Writing a migration
 
@@ -144,6 +144,7 @@ Removing or renaming takes two releases: stop using it, then drop it. A migratio
 
 ```bash
 scripts/check-doc-refs.sh                                         # citation check
+scripts/check-file-size.sh                                        # soft size warnings
 cd apps/web && npm run gen:api-types                              # after a contract change
 cd apps/web && npm run build:style                                # after src/map/style.ts changes
 cd apps/android/holdmytrack && ./gradlew :app:testDebugUnitTest   # Android JUnit tests
@@ -155,8 +156,8 @@ On the host, `npm run build` must precede `verify:build`, and `npm run basemap` 
 
 - **The IDE needs a host `node_modules`**, about 300 MB, refreshed by hand when the lockfile changes.
 - **Adding a dependency takes three steps**: install in the container, rebuild the image, install on the host.
-- **`vite build` copies the 326 MB archive through VirtioFS**, seconds instead of an instant APFS clone.
+- **`vite build` copies the 326 MB archive through VirtioFS**, taking seconds.
 - **Playwright renders on SwiftShader**, a rasteriser no user has.
-- **HMR can go deaf over VirtioFS**, which the host never does.
+- **HMR can go deaf over VirtioFS.**
 
 Open follow-up: `scripts/build-basemap.sh` pins a Protomaps build that their seven-day retention ages out. Resolving the newest key from `https://build-metadata.protomaps.dev/builds.json` when `BUILD` is unset would make CI's cache miss self-healing ("CI" above).
