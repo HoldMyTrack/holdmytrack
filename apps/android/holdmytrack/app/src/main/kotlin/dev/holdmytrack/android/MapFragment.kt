@@ -13,7 +13,6 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -49,16 +48,12 @@ import dev.holdmytrack.android.map.MapPaths
 import dev.holdmytrack.android.map.MapSatellite
 import dev.holdmytrack.android.map.MapSpots
 import dev.holdmytrack.android.map.PendingDiff
-import dev.holdmytrack.android.map.PhotoMarkerOverlay
-import dev.holdmytrack.android.map.PhotoMarkers
-import dev.holdmytrack.android.map.PhotoPopup
 import dev.holdmytrack.android.map.ShowInArea
 import dev.holdmytrack.android.map.SpotPopup
 import dev.holdmytrack.android.map.ZoomLevelNotice
 import dev.holdmytrack.android.map.capturesSince
 import dev.holdmytrack.android.map.mergeCaptures
 import dev.holdmytrack.android.net.Activity
-import dev.holdmytrack.android.net.Photo
 import dev.holdmytrack.android.net.ApiException
 import dev.holdmytrack.android.net.TrackMetrics
 import dev.holdmytrack.android.net.TrackPoint
@@ -72,7 +67,7 @@ import dev.holdmytrack.android.panel.PanelTab
 import dev.holdmytrack.android.panel.PrivateLocationEditor
 import dev.holdmytrack.android.panel.PanelState
 import dev.holdmytrack.android.panel.SyncTab
-import dev.holdmytrack.android.photos.PhotoMarkerScope
+import dev.holdmytrack.android.photos.PhotosController
 import dev.holdmytrack.android.sync.Candidate
 import dev.holdmytrack.android.sync.SyncProgress
 import dev.holdmytrack.android.recording.RecordingController
@@ -130,8 +125,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private lateinit var modeButtons: Map<MapMode, MaterialButton>
     private lateinit var layersMenu: LayersMenu
     private lateinit var spotPopup: SpotPopup
-    private lateinit var photoMarkers: PhotoMarkers
-    private lateinit var photoPopup: PhotoPopup
     private lateinit var captureMode: CaptureMode
     /** Created with the map instance it reads the camera of. */
     private var showInArea: ShowInArea? = null
@@ -324,27 +317,18 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /** The bottom bar's Sync came before the panel was built: it opens on Sync once it is. */
     private var pendingSync = false
 
-    /** The Photos tab's Add photos: Android's photo picker, any number of images, with no
-     *  storage permission. What's picked goes to the tab to prepare and place. */
-    private val photoPickLauncher = registerForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
-        if (editWindow.isOpen) editWindow.photosTab.add(uris)
-    }
-
-    /**
-     * Whose photos the map shows (`apps/android/docs/SPEC.md` FR-2.10), in Normal mode only: the
-     * Edit window's single activity (none for a group), else the selected activity, else the open
-     * Story. As `"activity:<id>"` or `"story:<id>"`.
-     */
-    private var photoScope: String? = null
-
-    /** The scope's saved photos, in route order, and why they couldn't be read. */
-    private var photos: List<Photo> = emptyList()
-    private var photosError: String? = null
-    private var photosLoaded = false
-    private var photoGeneration = 0
-
-    /** The Photos tab's unsaved changes as they alter the markers, while it shows. */
-    private var photoOverlay: PhotoMarkerOverlay? = null
+    /** Photos on the map: the scope's markers, their popup and the Photos tab's picker. */
+    private val photos = PhotosController(
+        this,
+        panelState,
+        map = { map },
+        editWindow = { editWindow },
+        mode = { mode },
+        storyId = { storyId },
+        recording = ::isRecording,
+        frame = { box, maxZoom -> flyTo(box, maxZoom) },
+        onPopupOpening = { spotPopup.close() },
+    )
 
     /** The window this map is a tab of; null while the fragment is detached. */
     private val host get() = activity as? MainActivity
@@ -429,8 +413,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             onSatellite = ::setSatellite,
         )
         spotPopup = SpotPopup(findViewById(R.id.spot_popup), { topChrome.bottom }, ::onCaptureTap)
-        photoMarkers = PhotoMarkers(findViewById(R.id.photo_markers), ::openPhotoMarker)
-        photoPopup = PhotoPopup(findViewById(R.id.photo_popup), { topChrome.bottom }) { renderPhotoMarkers() }
+        photos.bind(view) { topChrome.bottom }
         captureMode = CaptureMode(
             requireActivity() as AppCompatActivity, findViewById(R.id.capture_banner), { map }, { style?.takeIf { overlaysAttached } },
             frame = ::flyTo,
@@ -492,7 +475,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             onStoriesChanged = {
                 reloadList()
                 // A Story's photos change with its members.
-                refreshPhotos(force = true)
+                photos.refresh(force = true)
             },
             onRemovedFromStory = ::onRemovedFromStory,
             onStoryCopyArrived = ::onStoryCopyArrived,
@@ -536,14 +519,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             findViewById(R.id.edit_bar),
             onStartTrack = ::startEditTrack,
             onDrawTrack = ::drawTrackEdit,
-            onPickPhotos = {
-                photoPickLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            },
-            onPhotoOverlay = { overlay ->
-                photoOverlay = overlay
-                renderPhotoMarkers()
-            },
-            onTabChanged = ::renderPhotoMarkers,
+            onPickPhotos = photos::pick,
+            onPhotoOverlay = photos::setOverlay,
+            onTabChanged = photos::render,
             onClose = ::onEditClosed,
         )
         chrome = ChromeInsets(findViewById(R.id.map_root), findViewById(R.id.top_bar), topChrome, notice, sheet, panel) { map }
@@ -613,11 +591,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             instance.addOnMapClickListener { point -> onMapTap(instance, point) }
             instance.addOnCameraMoveListener {
                 spotPopup.place()
-                photoMarkers.place()
-                photoPopup.place()
+                photos.onCameraMove()
             }
-            // What overlaps depends on the zoom: the photo groups again once the camera rests.
-            instance.addOnCameraIdleListener { photoMarkers.regroup() }
+            instance.addOnCameraIdleListener { photos.onCameraIdle() }
             showInArea = ShowInArea(findViewById(R.id.show_in_area), instance) { spots ->
                 MapSpots.setInArea(style?.takeIf { overlaysAttached }, spots)
             }.apply { setCategories(shownSpots(MapSpots.get(requireContext()))) }
@@ -919,7 +895,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  tile version moved, and the tiles follow. */
     private fun onRemovedFromStory(activityId: String) {
         if (panelState.focused == activityId) panel.clearFocus()
-        refreshPhotos(force = true)
+        photos.refresh(force = true)
         checkTileVersion()
         style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
         reloadList()
@@ -932,7 +908,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         panel.hold(true)
         editWindow.open(group, ActivityFacets.typeFacets(panelState.activities, null))
         // The photos follow the window: its one activity's, which its Photos tab manages.
-        refreshPhotos(force = false)
+        photos.refresh(force = false)
         closeEditOnBack.isEnabled = true
         chrome.placeEditors()
         renderDateFooter()
@@ -963,9 +939,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     private fun onEditClosed(saved: Boolean, trackApplied: Boolean, photosSaved: Boolean) {
-        photoOverlay = null
-        // Back to the selection's or the Story's photos — read again when any was written.
-        refreshPhotos(force = photosSaved)
+        photos.editClosed(photosSaved)
         editingTrackId?.let { id ->
             if (trackApplied) awaitingEditIds += id
             style?.let(TrackEditOverlay::clear)
@@ -1008,7 +982,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             reloadList()
             activityDays.reload()
             updateTrackMetrics(refetch = true)
-            refreshPhotos(force = true)
+            photos.refresh(force = true)
             panel.storiesTab.reloadOpen()
         }
     }
@@ -1053,7 +1027,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         activityDays.reload()
         coverageWatch.watch()
         panel.storiesTab.reloadOpen()
-        refreshPhotos(force = true)
+        photos.refresh(force = true)
     }
 
     /** The mode toggle shows once the session allows, hidden while recording or editing. Layers
@@ -1103,7 +1077,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun applyTrackFilter() {
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setTrackFilter(it, panelState.mapHidden, panelState.highlighted) }
         updateTrackMetrics(refetch = false)
-        refreshPhotos(force = false)
+        photos.refresh(force = false)
         if (::panel.isInitialized) renderDateFooter()
     }
 
@@ -1140,7 +1114,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             return
         }
         // A reprocess can move a photo along its track, or take its stretch away.
-        if (refetch) refreshPhotos(force = true)
+        if (refetch) photos.refresh(force = true)
         trackMetricsFor = focused
         if (!refetch) trackMetrics = null
         renderTrackMetrics()
@@ -1168,72 +1142,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             MapOverlays.clearTrackBands(loaded)
             panel.setBandsShown(false)
         }
-    }
-
-    /**
-     * The photos for [photoScope]: read when the scope moves, or with [force] when they may have
-     * changed (a Photos tab save, a reprocess, a Story's members). A new scope starts empty
-     * rather than showing the last one's while it loads.
-     */
-    private fun refreshPhotos(force: Boolean) {
-        val single = editWindow.single
-        val next = PhotoMarkerScope.scope(mode, editWindow.isOpen, single?.id, panelState.focused, storyId)
-        if (next == photoScope && !force) {
-            if (photosLoaded && single != null) editWindow.setPhotos(photos, photosError)
-            renderPhotoMarkers()
-            return
-        }
-        if (next != photoScope) {
-            photos = emptyList()
-            photosError = null
-            photosLoaded = false
-            photoPopup.close()
-        }
-        photoScope = next
-        val gen = ++photoGeneration
-        renderPhotoMarkers()
-        if (next == null) return
-        val (kind, id) = next.split(':', limit = 2)
-        HoldMyTrackApi.photos(activity = id.takeIf { kind == "activity" }, story = id.takeIf { kind == "story" }) { result ->
-            if (gen != photoGeneration) return@photos
-            photos = result.getOrDefault(emptyList())
-            photosLoaded = true
-            photosError = result.exceptionOrNull()?.let { it.message?.takeIf { m -> m.isNotBlank() } ?: getString(R.string.map_unreachable) }
-            if (photosError != null) Log.w(TAG, "could not load photos", result.exceptionOrNull())
-            if (single != null && editWindow.single?.id == single.id) editWindow.setPhotos(photos, photosError)
-            photoPopup.retain(photos)
-            renderPhotoMarkers()
-        }
-    }
-
-    /**
-     * The photo markers (`apps/android/docs/SPEC.md` FR-2.10): the scope's photos on their tracks,
-     * with the Photos tab's unsaved changes merged in. Not while the Track tab has the map, nor for
-     * a hidden route.
-     */
-    private fun renderPhotoMarkers() {
-        if (!::photoMarkers.isInitialized) return
-        val shown = PhotoMarkerScope.shown(photoScope, isRecording(), editWindow.showingTrack, panelState.mapHidden)
-        val overlay = photoOverlay
-        val items = if (shown) PhotoMarkerScope.markers(photos, panelState.mapHidden, overlay) else emptyList()
-        if (!shown) photoPopup.close()
-        photoMarkers.set(map, items, overlay?.activeId ?: photoPopup.showingId, overlay?.activeId)
-    }
-
-    /**
-     * A marker's tap (FR-2.10): a spread group zooms to fit ([PhotoMarkerScope.groupFit]), else
-     * the popup opens on its first photo. Only saved photos open.
-     */
-    private fun openPhotoMarker(ids: List<String>) {
-        val instance = map ?: return
-        val located = ids.mapNotNull { id -> photos.firstOrNull { it.id == id }?.takeIf { it.lat != null && it.lon != null } }
-        PhotoMarkerScope.groupFit(located.map { it.lat!! to it.lon!! })?.let { box ->
-            flyTo(box, maxZoom = PhotoMarkerScope.GROUP_MAX_ZOOM)
-            return
-        }
-        if (located.isEmpty()) return
-        spotPopup.close()
-        photoPopup.show(instance, located)
     }
 
     /** Frames every one of [activities] that has a track. */
@@ -1378,7 +1286,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         renderDateFooter()
         updateNoticeVisibility()
         // Like every history layer, the photos give the map to the live track.
-        renderPhotoMarkers()
+        photos.render()
 
         val loaded = style ?: return
         if (overlaysAttached) MapOverlays.setRecording(loaded, active, mode)
@@ -1489,7 +1397,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         renderCoverageNotice()
         renderModeChip()
         renderDateFooter()
-        refreshPhotos(force = false)
+        photos.refresh(force = false)
     }
 
     /** The Layers menu's Points of interest. Unticking the open popup's category closes it. */
@@ -1555,7 +1463,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         renderModeChip()
         if (shown) {
             spotPopup.close()
-            photoPopup.close()
+            photos.closePopup()
             layersMenu.dismiss()
         }
         map?.uiSettings?.apply {
