@@ -108,6 +108,8 @@ cd apps/android/holdmytrack    # not apps/android
 
 Check `curl -sI https://holdmytrack.com/download/holdmytrack.apk` — singular `/download/`; the server directory is plural `downloads/`, and `/downloads/…` is a misleading 404. This sideloaded APK is apart from the Play release, which is still built and uploaded separately.
 
+Then ask the user whether this release should turn older builds away (`MIN_ANDROID_BUILD`, DEPLOY.md §4 and §10) — say yes when `ROADMAP.md` has a route waiting on it. It's raised only once the Play release is live, which is usually after the deploy: until then, give the user the value (`git rev-list --count <deployed sha>`) and DEPLOY.md §10's command for later.
+
 ## 5. Report and record
 
 Tell the user the deployed SHA, whether migrations ran (and the backup's name, and whether the site went into maintenance mode), which one-time steps ran or were skipped and why, whether `versionName` was bumped, whether the APK was republished and at which `versionName`, and what was verified. If you keep notes on the deployment's state between sessions, record the deployed SHA there.
