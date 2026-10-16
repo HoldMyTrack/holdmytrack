@@ -26,7 +26,6 @@ import com.google.android.material.button.MaterialButton
 import dev.holdmytrack.android.export.ExportViewfinder
 import dev.holdmytrack.android.map.ActivityDays
 import dev.holdmytrack.android.map.BoxUnion
-import dev.holdmytrack.android.map.CaptureMode
 import dev.holdmytrack.android.map.ChromeInsets
 import dev.holdmytrack.android.map.CoverageWatch
 import dev.holdmytrack.android.map.EditPreview
@@ -48,17 +47,13 @@ import dev.holdmytrack.android.map.MapPaths
 import dev.holdmytrack.android.map.MapSatellite
 import dev.holdmytrack.android.map.MapSpots
 import dev.holdmytrack.android.map.PendingDiff
-import dev.holdmytrack.android.map.ShowInArea
-import dev.holdmytrack.android.map.SpotPopup
+import dev.holdmytrack.android.map.SpotsController
 import dev.holdmytrack.android.map.ZoomLevelNotice
-import dev.holdmytrack.android.map.capturesSince
-import dev.holdmytrack.android.map.mergeCaptures
 import dev.holdmytrack.android.net.Activity
 import dev.holdmytrack.android.net.ApiException
 import dev.holdmytrack.android.net.TrackMetrics
 import dev.holdmytrack.android.net.TrackPoint
 import dev.holdmytrack.android.net.HoldMyTrackApi
-import dev.holdmytrack.android.net.Spot
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.panel.ActivitiesPanel
 import dev.holdmytrack.android.panel.ActivityFacets
@@ -124,10 +119,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private lateinit var modeBar: View
     private lateinit var modeButtons: Map<MapMode, MaterialButton>
     private lateinit var layersMenu: LayersMenu
-    private lateinit var spotPopup: SpotPopup
-    private lateinit var captureMode: CaptureMode
-    /** Created with the map instance it reads the camera of. */
-    private var showInArea: ShowInArea? = null
     private lateinit var mapRail: View
     private lateinit var layersPanel: View
     private lateinit var modeChip: TextView
@@ -280,23 +271,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         showMap = { host?.showMap() },
     )
 
-    /** Asked for on a spot's Capture, when location isn't granted yet. Capture counts only
-     *  fixes accurate to 25 m, so it needs precise location; approximate alone isn't enough. */
-    private val capturePermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) {
-        val spot = pendingCapture
-        pendingCapture = null
-        if (hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
-            spot?.let(captureMode::start)
-        } else {
-            Toast.makeText(requireContext(), R.string.spots_capture_needs_location, Toast.LENGTH_LONG).show()
-        }
-    }
-
-    /** The spot whose Capture is waiting on the permission prompt. */
-    private var pendingCapture: Spot? = null
-
     /** Asked for on the first tap of Find my location. Approximate is enough to show the
      *  user roughly where they are, so either grant counts. */
     private val locatePermissionLauncher = registerForActivityResult(
@@ -327,8 +301,11 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         storyId = { storyId },
         recording = ::isRecording,
         frame = { box, maxZoom -> flyTo(box, maxZoom) },
-        onPopupOpening = { spotPopup.close() },
+        onPopupOpening = { spots.closePopup() },
     )
+
+    /** Points of interest: the shown places, their badges and popup, and capture mode. */
+    private val spots = SpotsController(this, map = { map }, style = { style?.takeIf { overlaysAttached } }, frame = { flyTo(it) })
 
     /** The window this map is a tab of; null while the fragment is detached. */
     private val host get() = activity as? MainActivity
@@ -412,13 +389,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             satellite = { if (satelliteAvailable) MapSatellite.isOn(requireContext()) else null },
             onSatellite = ::setSatellite,
         )
-        spotPopup = SpotPopup(findViewById(R.id.spot_popup), { topChrome.bottom }, ::onCaptureTap)
+        spots.bind(view) { topChrome.bottom }
         photos.bind(view) { topChrome.bottom }
-        captureMode = CaptureMode(
-            requireActivity() as AppCompatActivity, findViewById(R.id.capture_banner), { map }, { style?.takeIf { overlaysAttached } },
-            frame = ::flyTo,
-            onCaptured = spotPopup::renderCaptured,
-        )
         recording.bind(view)
 
         locateButton = findViewById(R.id.locate_button)
@@ -590,14 +562,12 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             mapView.post { chrome.enlargeAttributionTarget(mapView) }
             instance.addOnMapClickListener { point -> onMapTap(instance, point) }
             instance.addOnCameraMoveListener {
-                spotPopup.place()
+                spots.onCameraMove()
                 photos.onCameraMove()
             }
             instance.addOnCameraIdleListener { photos.onCameraIdle() }
-            showInArea = ShowInArea(findViewById(R.id.show_in_area), instance) { spots ->
-                MapSpots.setInArea(style?.takeIf { overlaysAttached }, spots)
-            }.apply { setCategories(shownSpots(MapSpots.get(requireContext()))) }
-            instance.addOnCameraIdleListener { showInArea?.onCameraIdle() }
+            spots.onMapReady(view, instance, shownSpots(MapSpots.get(requireContext())))
+            instance.addOnCameraIdleListener { spots.onCameraIdle() }
             instance.addOnCameraIdleListener { zoomLevelNotice.onCameraIdle(instance.cameraPosition.zoom) }
             loadStyle()
         }
@@ -708,11 +678,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             // The bike-path layers attach just added start hidden.
             MapPaths.apply(loaded, shownPaths(MapPaths.get(requireContext())))
             MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.highlighted)
-            // Last, so the places are over everything else, labels included.
-            MapSpots.attach(loaded, requireContext(), shownSpots(MapSpots.get(requireContext())))
+            spots.attach(loaded, shownSpots(MapSpots.get(requireContext())))
             overlaysAttached = true
-            loadSpotCaptures(onlyNew = false)
-            captureMode.onStyleAttached()
+            spots.onStyleAttached()
             renderTrackMetrics()
             // A new style has none of the circles; draw them again if the editor has the map.
             privateEditor.onStyleReady()
@@ -722,19 +690,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             if (isRecording()) MapOverlays.setRecording(loaded, true, mode)
             frameActivities()
             checkTileVersion()
-        }
-    }
-
-    /** The account's captured spots (`docs/SPEC.md` FR-15.6), for the badges and the popup: all
-     *  of them when the overlays attach, then on every return only what's newer ([capturesSince]).
-     *  Kept as they were on a failure. */
-    private fun loadSpotCaptures(onlyNew: Boolean) {
-        val since = if (onlyNew) capturesSince(MapSpots.captured) else null
-        HoldMyTrackApi.spotCaptures(since) { result ->
-            val fresh = result.getOrNull()?.associate { it.spotId to it.capturedAt } ?: return@spotCaptures
-            val captures = if (since != null) mergeCaptures(MapSpots.captured, fresh) else fresh
-            MapSpots.setCaptured(style?.takeIf { overlaysAttached }, captures)
-            spotPopup.renderCaptured()
         }
     }
 
@@ -924,10 +879,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         editingTrackId = activity.id
         style?.takeIf { overlaysAttached }?.let {
             MapOverlays.setEditingTrack(it, true, mode)
-            MapSpots.setEditing(it, true)
         }
-        spotPopup.close()
-        captureMode.stop()
+        spots.setEditing(true)
         // Once the Track tab has laid out, so the fit leaves room under the window as it now is.
         findViewById<View>(R.id.edit_window).post { flyToActivities(listOf(activity)) }
     }
@@ -943,10 +896,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         editingTrackId?.let { id ->
             if (trackApplied) awaitingEditIds += id
             style?.let(TrackEditOverlay::clear)
-            style?.takeIf { overlaysAttached }?.let {
-                MapOverlays.setEditingTrack(it, false, mode)
-                MapSpots.setEditing(it, false)
-            }
+            style?.takeIf { overlaysAttached }?.let { MapOverlays.setEditingTrack(it, false, mode) }
+            spots.setEditing(false)
         }
         editingTrackId = null
         closeEditOnBack.isEnabled = false
@@ -1156,14 +1107,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun onMapTap(instance: MapLibreMap, point: LatLng): Boolean {
         // A spot's badge first, in every mode, unless an editor has the map; a tap elsewhere
         // closes its popup.
-        if (!privateEditor.isShowing && !editWindow.isOpen) {
-            val spot = MapSpots.spotAt(instance, instance.projection.toScreenLocation(point), resources.displayMetrics.density)
-            if (spot != null) {
-                spotPopup.show(instance, spot)
-                return true
-            }
-            spotPopup.close()
-        }
+        if (!privateEditor.isShowing && !editWindow.isOpen && spots.tap(instance, point)) return true
         // The Sync tab's lines: one tapped is picked out on its list.
         if (::panel.isInitialized && panel.tab == PanelTab.SYNC && sheet.isVisible) {
             SyncCandidatesOverlay.keyAt(instance, instance.projection.toScreenLocation(point), resources.displayMetrics.density)
@@ -1223,19 +1167,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
     private fun hasPermission(permission: String) =
         ContextCompat.checkSelfPermission(requireContext(), permission) == PackageManager.PERMISSION_GRANTED
-
-    /** A spot's Capture: capture mode on it (FR-2.8), once precise location is granted. */
-    private fun onCaptureTap(spot: Spot) {
-        spotPopup.close()
-        if (hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
-            captureMode.start(spot)
-        } else {
-            pendingCapture = spot
-            capturePermissionLauncher.launch(
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-            )
-        }
-    }
 
     private fun hasLocationPermission() =
         hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) || hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
@@ -1401,11 +1332,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /** The Layers menu's Points of interest. Unticking the open popup's category closes it. */
-    private fun setSpots(categories: List<MapSpots.Category>) {
-        MapSpots.set(requireContext(), categories)
-        showSpots(shownSpots(categories))
-        captureMode.spot?.let { target -> if (categories.none { it.wire == target.category }) captureMode.stop() }
-    }
+    private fun setSpots(categories: List<MapSpots.Category>) = spots.setPicked(categories, shownSpots(categories))
 
     private fun setPaths(paths: MapPaths.Paths) {
         MapPaths.set(requireContext(), paths)
@@ -1417,7 +1344,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun setLayersShown(on: Boolean) {
         MapLayersSwitch.set(requireContext(), on)
         style?.let { MapPaths.apply(it, shownPaths(MapPaths.get(requireContext()))) }
-        showSpots(shownSpots(MapSpots.get(requireContext())))
+        spots.show(shownSpots(MapSpots.get(requireContext())))
     }
 
     /** The picks drawn: all while Show layers is on, none while off. */
@@ -1425,13 +1352,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
     private fun shownSpots(categories: List<MapSpots.Category>) =
         if (MapLayersSwitch.isOn(requireContext())) categories else emptyList()
-
-    /** Draws these places, and closes the popup of one that's no longer drawn. */
-    private fun showSpots(shown: List<MapSpots.Category>) {
-        style?.takeIf { overlaysAttached }?.let { MapSpots.setCategories(it, shown) }
-        spotPopup.spot?.let { open -> if (shown.none { it.wire == open.category }) spotPopup.close() }
-        showInArea?.setCategories(shown)
-    }
 
     private fun setSatellite(on: Boolean) {
         MapSatellite.set(requireContext(), on)
@@ -1462,7 +1382,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         findViewById<View>(R.id.photo_markers).visibility = visibility
         renderModeChip()
         if (shown) {
-            spotPopup.close()
+            spots.closePopup()
             photos.closePopup()
             layersMenu.dismiss()
         }
@@ -1579,12 +1499,12 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         daysStale = true
         syncSession()
         if (overlaysAttached) {
-            loadSpotCaptures(onlyNew = true)
+            spots.loadCaptures(onlyNew = true)
             // Back from elsewhere (the web, Sync): new tiles if the version moved, and the notice
             // if the account's coverage is still being worked on.
             checkTileVersion()
         }
-        captureMode.resume()
+        spots.resume()
         // An empty map is checked again on every return, so the notice goes and the camera frames
         // the history once something arrives.
         if (shownNotice == MapNotice.EMPTY) {
@@ -1604,7 +1524,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     override fun onPause() {
-        captureMode.pause()
+        spots.pause()
         mapView.onPause()
         super.onPause()
     }
@@ -1645,7 +1565,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         exportViewfinder.close()
         recording.dismissDialogs()
         layersMenu.dismiss()
-        captureMode.stop()
+        spots.stopCapture()
         mapView.onDestroy()
         dateSlider.release()
         coverageWatch.stop()
