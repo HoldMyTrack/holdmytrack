@@ -193,7 +193,7 @@ object MapOverlays {
     private const val FOG_FILL_COLOR = "#202b25"
     private const val FOG_FILL_OPACITY = 0.82f
     private const val FOG_FILL_COLOR_DARK = "#f7f4ec"
-    private const val FOG_FILL_OPACITY_DARK = 0.6f
+    private const val FOG_FILL_OPACITY_DARK = 0.82f
 
     /** Whether the style [attach] last drew on is the dark flavor — which veil and wash
      *  [addCoverage] uses, and keeps using across a [refreshCoverage]. */

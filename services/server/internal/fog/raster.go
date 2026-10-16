@@ -199,7 +199,7 @@ type Veil struct {
 // nothing shifts hue when a pan/zoom crosses the Region/City boundary.
 var (
 	LightVeil = Veil{R: 32, G: 43, B: 37, Opacity: 0.82}
-	DarkVeil  = Veil{R: 247, G: 244, B: 236, Opacity: 0.6}
+	DarkVeil  = Veil{R: 247, G: 244, B: 236, Opacity: 0.82}
 )
 
 // VeilForTheme maps a tile request's `theme` query value to its veil: `dark` gets DarkVeil,

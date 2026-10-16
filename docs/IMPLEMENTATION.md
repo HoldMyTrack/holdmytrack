@@ -324,7 +324,7 @@ Three Fog of World screenshots (`reference/fog-of-war-example*.{webp,jpg}`) were
 | Property | Measured | Decision |
 | :--- | :--- | :--- |
 | Fog colour | White. Fogged ≈ RGB (193, 192, 188); revealed ≈ (63, 66, 58) | Not white: a veil opposite to the basemap in lightness (§4.2) |
-| Fog opacity | ~0.66, consistent to ±0.02 across all three | `0.82` for the dark veil, `0.6` for the cream one |
+| Fog opacity | ~0.66, consistent to ±0.02 across all three | `0.82` for both, the dark veil and the cream one: at `0.6` the cream mist left satellite imagery so clear under it that fogged and revealed ground were hard to tell apart |
 | Desaturation | Saturation falls 0.15 → 0.03 under fog | **Not a separate effect.** A 66% white blend produces exactly this arithmetically |
 | Edge softness | 1–4 px transition at display resolution | Adopt — the anti-aliased stroke edge at 128 px, drawn larger by the client |
 | Reveal radius | Hugs the road centreline, ~2–3 lane widths | Deviate — ~48 m either side (§4.2) |
