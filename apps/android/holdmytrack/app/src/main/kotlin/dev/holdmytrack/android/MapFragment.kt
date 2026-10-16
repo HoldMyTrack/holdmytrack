@@ -105,29 +105,21 @@ import org.maplibre.android.maps.Style
 import java.time.LocalDate
 
 /**
- * The map, and everything that hangs off it: the served basemap, the session the user layers
- * need, and the Normal / Fog of War / Heatmap toggle between them. The toggle floats over the
- * map top-start, rather than living in a bar of its own, mirroring the web client's own on-map
- * mode control (`apps/web/src/map/MapView.tsx`).
+ * The map: the served basemap, the session the user layers need, and the Normal / Fog of War /
+ * Heatmap toggle floating top-start, as on the web (`apps/web/src/map/MapView.tsx`).
  *
- * Along the bottom in Normal mode, the web's phone layout: the Activities panel
- * (`panel/ActivitiesPanel`), a sheet listing the range's activities, on the date range the
- * tracks are drawn for — the web's phone footer (`map/DateRangeSlider`), defaulting to the five
- * most recent activity days as the web does (`docs/SPEC.md` FR-6.1). Tapping a track selects
- * it in the panel, and tapping empty map clears the selection. On the panel's Stories tab one
- * Story is open, and the tracks, the list and the date range are its activities only
- * ([enterStory]).
+ * In Normal mode the Activities sheet (`panel/ActivitiesPanel`) lists the date range's
+ * activities, the range defaulting to the five most recent activity days (`docs/SPEC.md`
+ * FR-6.1). Tapping a track selects it; tapping empty map clears the selection. On the Stories
+ * tab one Story is open, and the tracks and the list are its activities only ([enterStory]).
  *
- * Also the one place GPS recording is controlled from in the app: the record button raised in
- * the middle of `MainActivity`'s bottom bar (tap to start, tap to pause/resume, hold for two
- * seconds to stop —
- * `RecordingService` does the rest, and its notification offers the same controls, its Stop
- * confirmed here first). While a recording is in
- * progress the map shows only that recording's live track: the mode toggle and every history
- * layer are hidden (`MapOverlays.setRecording`), and the camera follows the latest fix.
+ * GPS recording is controlled from here: the record button in `MainActivity`'s bottom bar taps
+ * to start, pause and resume, and a two-second hold stops (`RecordingService` does the rest; its
+ * notification's Stop is confirmed here). While recording, the map shows only the live track
+ * (`MapOverlays.setRecording`) and the camera follows the latest fix.
  *
- * Hosted by `MainActivity`, which never adds it without a session ([MainActivity.onCreate]).
- * MapLibre's `MapView` lifecycle is forwarded from this fragment's own callbacks.
+ * `MainActivity` adds it only with a session. MapLibre's `MapView` lifecycle is forwarded from
+ * this fragment's callbacks.
  */
 class MapFragment : Fragment(R.layout.fragment_map) {
 
@@ -138,7 +130,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private lateinit var noticeDetail: TextView
     private lateinit var noticeAction: Button
 
-    /** Which notice is up, if any — see [Notice]. */
+    /** Which notice is up, if any ([Notice]). */
     private var shownNotice: Notice? = null
 
     /** Posted when a session check starts, so "Checking your session…" appears only if the
@@ -160,7 +152,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private lateinit var layersPanel: View
     private lateinit var modeChip: TextView
 
-    /** Whether the served style has satellite imagery — the Layers menu offers it only then. */
+    /** Whether the served style has satellite imagery; the Layers menu offers it only then. */
     private var satelliteAvailable = false
     private lateinit var recordingStatus: View
     private lateinit var recordingStatusDot: View
@@ -173,7 +165,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private var holdingToStop = false
     private lateinit var locateButton: MaterialButton
 
-    /** Find my location's panel — what hides while recording, so no empty panel is left. */
+    /** Find my location's panel, hidden whole while recording so no empty panel is left. */
     private lateinit var locatePanel: View
 
     /** The Activities sheet, the date range at its head. */
@@ -228,9 +220,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private var coverageRendering = false
     private lateinit var coverageNotice: View
 
-    /** The selected activity's `GET /v1/activities/track-metrics`, its pace bands
-     *  (`renderTrackMetrics`); null with nothing selected, and while a new selection's is on
-     *  its way. */
+    /** The selected activity's pace bands (`renderTrackMetrics`); null with nothing selected,
+     *  and while a new selection's are loading. */
     private var trackMetrics: TrackMetrics? = null
     private var trackMetricsFor: String? = null
 
@@ -238,29 +229,28 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  (`viewActivityOnMap`). */
     private var pendingFocusId: String? = null
 
-    /** A View on map from the Sync screen ([viewOnMap]) — the activity and its day —
-     *  waiting for the session to be confirmed. */
+    /** A View on map from the Sync screen ([viewOnMap]), the activity and its day, waiting for
+     *  the session to be confirmed. */
     private var viewOnMapRequest: Pair<String, String>? = null
 
     /** The activity whose track the Edit window's Track tab is editing, while it is. */
     private var editingTrackId: String? = null
 
     /**
-     * Activities whose track edit was saved from here and whose reprocess hasn't been seen
-     * finishing yet — the web's `awaitingEditIdsRef`. Seeing a row go Pending and back isn't
-     * enough on its own: the job is often done before the reload that follows the save even
-     * answers, so the row is never seen Pending at all.
+     * Activities whose track edit was saved here and whose reprocess hasn't been seen finishing,
+     * as the web's `awaitingEditIdsRef`. Trap: the job often finishes before the reload after
+     * the save answers, so the row is never seen Pending at all.
      */
     private val awaitingEditIds = HashSet<String>()
 
-    /** The ids the last list showed Pending — how a reprocess finishing is noticed. */
+    /** The ids the last list showed Pending, to notice a reprocess finishing. */
     private var pendingIds: Set<String> = emptySet()
 
-    /** Re-reads the list while any of it is Pending, the web's `EDIT_PENDING_POLL_MS`. */
+    /** Re-reads the list while any of it is Pending. */
     private val pendingPoll = Runnable { reloadList() }
 
-    /** Something the Sync tab sent reached the map, whichever tab shows: the list, its days and
-     *  the tiles catch up. Before that its job is only queued, with no row to show Pending. */
+    /** Something the Sync tab sent has landed, whichever tab shows: the list, its days and the
+     *  tiles catch up. Until then its job is only queued, with no row to show Pending. */
     private val syncProgressListener = SyncProgress.Listener(onChange = {}, onLanded = { onSyncedFromPhone() })
     private lateinit var dateFooter: View
     private lateinit var zoomLevelNotice: ZoomLevelNotice
@@ -271,60 +261,57 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  has set the default, when the tracks are the whole history. */
     private var selectedRange: DateRange? = null
 
-    /** The Story open on the Stories tab (`docs/SPEC.md` FR-14.6), or null: while one is, the
-     *  tracks and the list are all of its activities, whatever [selectedRange] is — which
-     *  opening a Story leaves alone, so closing it goes straight back. */
+    /** The Story open on the Stories tab (`docs/SPEC.md` FR-14.6). While one is, the tracks and
+     *  the list are all its activities; [selectedRange] is kept for when it closes. */
     private var storyId: String? = null
 
-    /** Whether the user has picked [selectedRange] themselves. Until then it is the default,
-     *  re-derived whenever the activity days reload — so a first sync on an empty account
-     *  moves it onto what arrived, as the web's does. */
+    /** Whether the user picked [selectedRange]. Until then it is the default, re-derived
+     *  whenever the activity days reload, so a first sync on an empty account moves it onto
+     *  what arrived. */
     private var userChangedRange = false
 
     /** Set on every resume, since Sync or a recording may have added days; `syncSession`
-     *  reloads them once the session allows. The default range follows until the user picks
-     *  one. */
+     *  reloads them once the session allows. */
     private var daysStale = false
 
     private var map: MapLibreMap? = null
     private var style: Style? = null
     private var mode = MapMode.NORMAL
 
-    /** The top inset (status bar height), applied to the floating chrome and to MapLibre's own
-     *  compass — see `insetSystemBars` and `applyCompassMargin`. Read before either the inset
-     *  or the map instance is necessarily available yet, so both paths call the latter once
-     *  they have what they need. */
+    /** The status bar's height, for the floating chrome and MapLibre's compass
+     *  (`insetSystemBars`, `applyCompassMargin`). The inset and the map instance arrive in either
+     *  order, so both paths call `applyCompassMargin`. */
     private var systemBarInsetTop = 0
 
-    /** The compass's own default top margin, captured once so repeated inset callbacks (e.g.
-     *  a rotation) add the status bar height on top of it rather than compounding it. */
+    /** The compass's default top margin, captured once so repeated inset callbacks don't
+     *  compound the status bar height. */
     private var compassBaseMarginTop = 0
     private var compassBaseMarginCaptured = false
 
-    /** The logo's and attribution's own bottom margins, captured once, like the compass's —
-     *  and carried through `onSaveInstanceState`, since MapLibre restores its UI settings with
-     *  the lift already applied, and capturing those again would lift them twice. */
+    /** The logo's and attribution's default bottom margins, captured once. Trap: MapLibre
+     *  restores its UI settings with the lift applied, so these are carried through
+     *  `onSaveInstanceState` rather than captured again, which would lift twice. */
     private var logoBaseMarginBottom = 0
     private var attributionBaseMarginBottom = 0
     private var attributionBaseCaptured = false
 
-    /** Whether the user layers are currently on the style — see `syncSession`. */
+    /** Whether the user layers are on the style (`syncSession`). */
     private var overlaysAttached = false
 
-    /** Whether this session's activity extent has already framed the camera. Once per session:
-     *  re-framing on every resume would fight the user for control of the camera. */
+    /** Whether the camera has been framed on the activities this session. Once only: framing on
+     *  every resume would fight the user for the camera. */
     private var framed = false
 
-    /** Whether the map view is coming back from a recreation — a rotation, a theme or language
-     *  change — with the camera MapLibre saved, which the opening world view mustn't replace. */
+    /** Whether the map view is coming back from a recreation (rotation, theme, language) with
+     *  the camera MapLibre saved, which the opening world view mustn't replace. */
     private var restoringCamera = false
 
-    /** Guards against a second `GET /v1/auth/me` while the first is still in flight — every
-     *  `onResume` calls `syncSession`, and returning from the Profile screen is one. */
+    /** Guards against a second session check while one is in flight; every `onResume` calls
+     *  `syncSession`. */
     private var verifying = false
 
-    /** Whether `syncSession` has got as far as showing the mode toggle — recording hides it,
-     *  and ending a recording must not show it before the session would have. */
+    /** Whether `syncSession` has shown the mode toggle. Ending a recording mustn't show it
+     *  before the session would have. */
     private var modeBarReady = false
 
     /** Bound from `onStart` to `onStop` to watch the recording; null between the two, or
@@ -364,10 +351,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
     }
 
-    /** Asked for on the first tap of the record button, not up front: location is what
-     *  recording needs, and asking at the moment of recording is when the reason is obvious.
-     *  Notifications ride along — without them the recording runs invisibly, with no Pause or
-     *  Stop in the shade — but only location is required to start. */
+    /** Asked for on the record button's first tap, when the reason is obvious. Notifications
+     *  are asked too (without them there's no Pause or Stop in the shade), but only location is
+     *  required to start. */
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) {
@@ -422,10 +408,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * Whose photos the map shows (`apps/android/docs/SPEC.md` FR-2.10), the web's `photoScope` — in Normal
-     * mode only: the one activity the Edit window is open on, whose Photos tab manages them (none
-     * for a group); else the selected activity's, the route a person is looking at; else the open
-     * Story's, the whole trip's pictures along its days. As `"activity:<id>"` or `"story:<id>"`.
+     * Whose photos the map shows (`apps/android/docs/SPEC.md` FR-2.10), in Normal mode only: the
+     * Edit window's single activity (none for a group), else the selected activity, else the open
+     * Story. As `"activity:<id>"` or `"story:<id>"`.
      */
     private var photoScope: String? = null
 
@@ -438,7 +423,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /** The Photos tab's unsaved changes as they alter the markers, while it shows. */
     private var photoOverlay: PhotoMarkerOverlay? = null
 
-    /** The window this map is a tab of — null while the fragment is detached. */
+    /** The window this map is a tab of; null while the fragment is detached. */
     private val host get() = activity as? MainActivity
 
     /** The bottom bar's Stories: the panel's Stories tab. */
@@ -457,9 +442,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * The Privacy screen's Add a location on the map ([PrivateLocationEditor.NEW]) or one of its
-     * rows: the editor on the map, in Normal mode, the circles drawn. Not while recording, which
-     * has the map.
+     * The Privacy screen's Add a location ([PrivateLocationEditor.NEW]) or one of its rows: the
+     * editor on the map, in Normal mode. Not while recording, which has the map.
      */
     fun editPrivateLocation(id: String) {
         if (!::privateEditor.isInitialized || isRecording()) return
@@ -473,8 +457,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         if (::panel.isInitialized) panel.showActivities()
     }
 
-    /** Which of the panel's tabs shows — the bottom bar marks Stories while it's that one. Null
-     *  before the panel is built. */
+    /** Which panel tab shows, for the bottom bar's Stories mark. Null before the panel is built. */
     val panelTab: PanelTab? get() = if (::panel.isInitialized) panel.tab else null
 
     /** The fragment's own views, found the way an Activity finds its own. */
@@ -739,10 +722,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
     }
 
-    /** Dragging a Private location's handle (`PrivateLocationEditor.onMapTouch`), or a track point in the
-     *  editor's Move point mode (`TrackEditor.onMapTouch`), takes the touch before the map can
-     *  pan with it. Only a press on the handle or a point is taken; every other touch, taps
-     *  included, still reaches the map, which performs its own clicks. */
+    /** A press on a Private location's handle (`PrivateLocationEditor.onMapTouch`) or on a track
+     *  point in Move point mode (`TrackEditor.onMapTouch`) takes the touch before the map pans.
+     *  Every other touch, taps included, reaches the map. */
     @SuppressLint("ClickableViewAccessibility")
     private fun takeHandleDrags() {
         mapView.setOnTouchListener { _, event ->
@@ -758,13 +740,10 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun minTouchTargetPx() = kotlin.math.ceil(MIN_TOUCH_TARGET_DP * resources.displayMetrics.density).toInt()
 
     /**
-     * MapLibre's attribution "i" is a 21dp view — under the 48dp touch target, and the one
-     * control on the map that isn't the app's own. It has no id, so it's found by the content
-     * description MapLibre gives it and padded out to 48dp on its right and top only: the view
-     * grows into the empty map beside and above the icon, and the icon stays exactly where
-     * MapLibre put it. The margins are left alone — `applyAttributionMargin` owns them for the
-     * date footer, and moving the view back through them to pad evenly put the icon over the
-     * MapLibre logo once the two met.
+     * Pads MapLibre's 21dp attribution "i" out to the 48dp touch target. It has no id, so it's
+     * found by its content description. Padding goes on its right and top only, so the icon stays
+     * put. Trap: the margins belong to `applyAttributionMargin`; padding evenly through them put
+     * the icon over the MapLibre logo.
      */
     private fun enlargeAttributionTarget() {
         val found = ArrayList<View>()
@@ -782,13 +761,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * Loads the served style, and on load puts the live track and (once the session allows)
-     * the user layers on it. Also what "Try again" re-runs after a failed load: a new style
-     * starts with none of the app's own layers, so they are attached afresh.
-     *
-     * Attribution is not decoration here — the Protomaps basemap is an ODbL Produced Work, and
-     * MapLibre's own attribution control renders the credit the style's source already
-     * carries, so it must stay enabled.
+     * Loads the served style and puts the live track and, once the session allows, the user
+     * layers on it. "Try again" re-runs it after a failed load. MapLibre's attribution control
+     * must stay enabled: it renders the ODbL credit the basemap requires.
      */
     private fun loadStyle() {
         val instance = map ?: return
@@ -816,7 +791,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /** The Sync screen's View on map ([viewOnMap]): kept until the session is confirmed
-     *  (`syncSession`), and the opening camera skipped, since this activity is the view. */
+     *  (`syncSession`); the opening camera is skipped, since this activity is the view. */
     private fun takeViewOnMap(intent: Intent) {
         // A relaunch from recents replays the intent; it has been handled.
         if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
@@ -826,21 +801,18 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         framed = true
     }
 
-    /** The notification's Stop comes through here rather than straight to `RecordingService`
-     *  (`RecordingService.buildNotification`): the Save screen that follows a stop needs an app
-     *  window in the foreground to open over, and the stop is confirmed first ([confirmStop]).
-     *  Ignored when relaunched from recents, which replays the last intent — that would stop a
-     *  recording started since. */
+    /** The notification's Stop comes through the app: the Save screen after a stop needs a
+     *  foreground window, and the stop is confirmed first ([confirmStop]). Ignored when relaunched
+     *  from recents, whose replayed intent would stop a recording started since. */
     private fun handleStopIntent(intent: Intent) {
         if (intent.action != RecordingService.ACTION_STOP) return
         if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
         confirmStop()
     }
 
-    /** The notification's Stop asks before it stops: one tap in the shade is easy to make by
-     *  mistake, where the map's own Stop takes a two-second hold ([RecordButton]) that is its
-     *  own confirmation. Before the bind answers there's nothing to show yet — no state, no
-     *  stats — so it's asked from `onServiceConnected` instead. */
+    /** The notification's Stop asks first: a tap in the shade is easy to make by mistake, where
+     *  the map's two-second hold ([RecordButton]) is its own confirmation. Before the bind
+     *  answers there are no stats to show, so `onServiceConnected` asks instead. */
     private fun confirmStop() {
         val service = recorder
         if (service == null) {
@@ -865,20 +837,13 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * Keeps the floating chrome clear of the status bar, and of the gesture navigation pill —
-     * which `MainActivity`'s bottom bar takes as its own, so the bottom inset given here is 0.
+     * Keeps the floating chrome clear of the status bar. `MainActivity`'s bottom bar takes the
+     * gesture inset, so the bottom inset here is 0.
      *
-     * Not optional at this target SDK: from API 35 the system draws every app edge to edge and
-     * ignores the old opt-out. The top row (modes, Find my location) sits in a `layout_margin`ed
-     * `LinearLayout`, which has no `fitsSystemWindows` of its own, so without this it renders
-     * underneath the status bar's own icons — found exactly that way, the compass included,
-     * both behind the clock and battery indicator on a real device. The map itself is left
-     * alone on purpose: it should fill the whole screen, and MapLibre keeps its own attribution
-     * and logo out of the corners anyway.
-     *
-     * The insets are added to the padding/margin each view was laid out with rather than
-     * replacing it, and the listener returns them unconsumed so nothing else that wants them
-     * misses out.
+     * Required from API 35, which draws every app edge to edge: the top row's `LinearLayout` has
+     * no `fitsSystemWindows`, so without this it sits under the status bar's icons. The map
+     * itself fills the screen. Insets are added to each view's laid-out margin, and returned
+     * unconsumed for anything else that wants them.
      */
     private fun insetSystemBars() {
         val topBar: View = findViewById(R.id.top_bar)
@@ -913,12 +878,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * MapLibre's own compass control defaults to top-end with a small fixed margin, unaware of
-     * the status bar — found sitting directly behind the clock/battery indicator on a real
-     * device — and of the top row, whose rail of Layers and Find my location shares that
-     * corner. Called from both `insetSystemBars` and `getMapAsync` because whichever of the
-     * inset callback and the map-ready callback fires second is the one that actually has
-     * everything it needs.
+     * Moves MapLibre's compass below the status bar and the top row, whose rail shares its
+     * top-end corner. Called from both `insetSystemBars` and `getMapAsync`: whichever fires
+     * second has everything it needs.
      */
     private fun applyCompassMargin() {
         val instance = map ?: return
@@ -927,9 +889,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             compassBaseMarginTop = settings.compassMarginTop
             compassBaseMarginCaptured = true
         }
-        // Below the top row (the modes and the rail), which already sits below the status bar,
-        // and the notice while one is up; before the row is laid out, below the status bar at
-        // least.
+        // Below the top row and any notice; before the row is laid out, below the status bar.
         val belowTopBar = maxOf(
             findViewById<View>(R.id.top_bar).bottom,
             if (notice.isVisible) notice.bottom else 0,
@@ -943,12 +903,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * MapLibre's logo and attribution sit bottom-start, where the panel and the date-range
-     * footer are — and the attribution is the basemap's ODbL credit, which must stay visible
-     * (`FR-2.4`). So while those are up both move above them, above the *collapsed* panel
-     * whatever the panel's state, as the web keeps them (an expanded panel covers them, as it
-     * covers the map); the rest of the time they keep their own margins, which already clear
-     * the gesture bar.
+     * Lifts MapLibre's logo and attribution above the collapsed sheet or an open editor: the
+     * attribution is the basemap's ODbL credit and must stay visible (`FR-2.4`). An expanded
+     * sheet covers them as it covers the map.
      */
     private fun applyAttributionMargin() {
         val instance = map ?: return
@@ -981,16 +938,12 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * Brings the map in line with the credential the app holds — called both when the style
-     * finishes loading and on every resume. A session that has gone away by then (the stored
-     * token was revoked) sends the user back to `SignInActivity` rather than leaving a map with
-     * nothing of theirs on it.
+     * Brings the map in line with the stored credential, on style load and on every resume. No
+     * session goes to `SignInActivity`.
      *
-     * A token restored from disk is not trusted until the server confirms it. An expired or
-     * revoked one would otherwise surface as a wall of 401s on tile requests, which show up
-     * only in logcat: on screen it would look like an ordinary blank map. The same check says
-     * whether the account's email is confirmed; one that isn't goes to `VerifyEmailActivity`,
-     * since every tile and sync request would be a `403` it has no way to explain.
+     * A token restored from disk isn't trusted until the server confirms it: a revoked one would
+     * otherwise show as a blank map, its 401s visible only in logcat. An unconfirmed email goes
+     * to `VerifyEmailActivity`, since every tile and sync request would be a `403`.
      */
     private fun syncSession() {
         if (!Session.isSignedIn) {
@@ -1005,9 +958,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             openVerifyEmail()
             return
         }
-        // The first run, as on the web: a real account that has never saved Settings (no
-        // Country) goes there before the map — its Country decides the units the map's own
-        // screens show, and nothing else would ever ask for it.
+        // The first run, as on the web: an account with no Country goes to Settings first. The
+        // Country decides the units, and nothing else asks for it.
         if (!Session.isDemo && Session.country.isEmpty()) {
             WebPageActivity.openOnboarding(requireContext())
             requireActivity().finish()
@@ -1019,8 +971,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         if (daysStale) {
             daysStale = false
             activityDays.reload()
-            // Sync or a recording may have changed the range's activities too, not just which
-            // days have any — and an open Story's numbers.
+            // Sync or a recording may have changed the range's activities and an open Story too.
             reloadList()
             panel.storiesTab.reloadOpen()
         }
@@ -1053,10 +1004,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
     }
 
-    /** The account's captured spots (`docs/SPEC.md` FR-15.6), for the badges and the popup —
-     *  all of them when the overlays attach, and on every return to the app only what's new
-     *  since the newest the map has ([capturesSince]), usually nothing. Kept as they were on a
-     *  failure. */
+    /** The account's captured spots (`docs/SPEC.md` FR-15.6), for the badges and the popup: all
+     *  of them when the overlays attach, then on every return only what's newer ([capturesSince]).
+     *  Kept as they were on a failure. */
     private fun loadSpotCaptures(onlyNew: Boolean) {
         val since = if (onlyNew) capturesSince(MapSpots.captured) else null
         HoldMyTrackApi.spotCaptures(since) { result ->
@@ -1068,16 +1018,14 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * The overlays were just attached at the tile version kept from last time
-     * ([Session.tileVersion]), so what MapLibre already has draws straight away. This reads the
-     * current one and, only if it moved while the app was away (an upload on the web, a sync),
-     * fetches every tile again at it.
+     * The overlays attach at the stored tile version ([Session.tileVersion]), so cached tiles draw
+     * at once. This reads the current version and refetches every tile only if it moved while the
+     * app was away.
      */
     private fun checkTileVersion() {
         HoldMyTrackApi.coverageStatus { result ->
             val status = result.getOrNull() ?: return@coverageStatus
-            // Still being worked on (an import on the web, a sync): watched until it's done, which
-            // shows the notice and refetches at the end.
+            // Still rendering: watched until done, with the notice meanwhile and a refetch at the end.
             if (status.rendering) coverageWatch.watch()
             if (status.tileVersion.isEmpty() || status.tileVersion == Session.tileVersion) return@coverageStatus
             Session.tileVersion = status.tileVersion
@@ -1092,9 +1040,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * The date-range slider's window has moved or reloaded. A reload — the first page, or a
-     * fresh one on returning to the map — re-derives the default range until the user has
-     * picked one: the five most recent activity days, through today (`docs/SPEC.md` FR-6.1).
+     * The slider's window moved or reloaded. A reload re-derives the default range until the
+     * user picks one: the five most recent activity days, through today (`docs/SPEC.md` FR-6.1).
      */
     private fun onActivityDaysChanged(reloaded: Boolean) {
         dateSlider.setDays(activityDays.visibleDays, activityDays.canPanEarlier, activityDays.canPanLater)
@@ -1110,11 +1057,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * Draws the tracks for [range] and lists its activities in the panel. Only a range the
-     * user picked moves the camera — onto that range's activities, as the web does
-     * (`docs/SPEC.md` FR-6.6) — never the default re-deriving itself after a sync; and only a
-     * picked range clears the panel's selection, group, hidden set and filters, which were
-     * built against the old one.
+     * Draws the tracks for [range] and lists its activities. Only a picked range ([fly]) moves
+     * the camera and clears the selection, group, hidden set and filters (`docs/SPEC.md` FR-6.6);
+     * a re-derived default does neither.
      */
     private fun applyRange(range: DateRange, fly: Boolean) {
         selectedRange = range
@@ -1127,11 +1072,11 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         loadActivities(range, fly)
     }
 
-    /** The panel's list read again for what it shows now — the open Story, else the range. */
+    /** Reads the list again for the open Story, else the range. */
     private fun reloadList() = loadActivities(selectedRange, fly = false)
 
-    /** `GET /v1/activities` for [range] — or, while a Story is open, for all of that Story,
-     *  whatever the range — into the panel, and, with [fly], the camera onto every drawn one. */
+    /** Lists [range]'s activities, or the open Story's, in the panel; with [fly], frames every
+     *  drawn one. */
     private fun loadActivities(range: DateRange?, fly: Boolean) {
         val story = storyId
         if (story == null && range == null) return
@@ -1151,8 +1096,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             }.onFailure { failure ->
                 Log.w(TAG, "could not load the activity list", failure)
                 panel.setError(getString(R.string.map_unreachable))
-                // A Pending row still has to be seen finishing: a dropped read doesn't end
-                // the polling, it only waits for the next one.
+                // A failed read doesn't end the polling: a Pending row still has to be seen finishing.
                 mapView.removeCallbacks(pendingPoll)
                 if (pendingIds.isNotEmpty()) mapView.postDelayed(pendingPoll, PENDING_POLL_MS)
             }
@@ -1160,11 +1104,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * Pending rows (a reprocess still running — a track edit, a Private location change, from
-     * here or from another client): while any is, the list is read again every 2 seconds, and
-     * a row that starts or stops being Pending has the track tiles fetched again, and Fog and
-     * Heatmap watched until their re-render is done — the web's Pending effects in
-     * `MapView.tsx`. A finished one also changes the days that have activity.
+     * Pending rows (a reprocess running, from here or another client): while any is, the list is
+     * read again every [PENDING_POLL_MS]. A row starting or stopping Pending refetches the track
+     * tiles and watches Fog and Heatmap until re-rendered; a finished one also reloads the days.
      */
     private fun trackPending(activities: List<Activity>) {
         val now = activities.filter { it.pending }.mapTo(HashSet()) { it.id }
@@ -1193,11 +1135,10 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * A Sync history row's View on map — the web's `viewActivityOnMap`: Normal mode and the
-     * collapsed Activities tab, then the activity selected and flown to, as a row tap does. When
-     * its [day] (its local date where it was recorded, the day the server files it under) is
-     * outside the range, the range becomes that one day, as if picked, and the selection waits
-     * for that range's list.
+     * A Sync history row's View on map: Normal mode, the collapsed Activities tab, and the
+     * activity selected and flown to. When its [day] (its local date where it was recorded) is
+     * outside the range, the range becomes that day, as if picked, and the selection waits for
+     * that list.
      */
     private fun viewActivityOnMap(activityId: String, day: String) {
         setMode(MapMode.NORMAL)
@@ -1217,10 +1158,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * Opens Story [id] on the map — the web's `enterStory`: the panel's state starts afresh, as
-     * for a new range, since the rows are a different set; the tracks and the list become all
-     * of the Story's activities, whatever the range, and the camera fits them. Also how Add to
-     * story's new Story lands on the tab.
+     * Opens Story [id]: the panel's state resets as for a new range, the tracks and the list
+     * become the Story's activities, and the camera fits them.
      */
     private fun enterStory(id: String) {
         storyId = id
@@ -1232,10 +1171,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         loadActivities(null, fly = true)
     }
 
-    /**
-     * Closes the open Story — the web's `exitStory`: back to the range, which opening it never
-     * changed, with the panel's state afresh. The camera stays.
-     */
+    /** Closes the open Story: back to the range, the panel's state reset. The camera stays. */
     private fun exitStory() {
         storyId = null
         panel.storiesTab.setOpen(null)
@@ -1245,8 +1181,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         if (selectedRange != null) reloadList() else panel.setActivities(emptyList())
     }
 
-    /** An activity taken out of the open Story: its track leaves the map and its row the list;
-     *  a selection on it goes. The tile version moved with the change, and the tiles follow. */
+    /** An activity taken out of the open Story: its track and row go, and its selection. The
+     *  tile version moved, and the tiles follow. */
     private fun onRemovedFromStory(activityId: String) {
         if (panelState.focused == activityId) panel.clearFocus()
         refreshPhotos(force = true)
@@ -1255,8 +1191,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         reloadList()
     }
 
-    /** The toolbar's Edit: the window over its target, the panel held down and made inert
-     *  under it, and the mode toggle away — the window edits Normal mode's rows. */
+    /** The toolbar's Edit: the window over its target, the panel held and inert under it, and
+     *  the mode toggle away. */
     private fun openEditWindow(group: List<Activity>) {
         panel.dismissPopups()
         panel.hold(true)
@@ -1273,8 +1209,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         renderTrackMetrics()
     }
 
-    /** The Track tab opened: the other tracks and the bands away, and the camera on this one,
-     *  the way a row tap flies — the web's `startEditTrack`. */
+    /** The Track tab opened: the other tracks and the bands away, and the camera on this one. */
     private fun startEditTrack(activity: Activity) {
         editingTrackId = activity.id
         style?.takeIf { overlaysAttached }?.let {
@@ -1317,9 +1252,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         if (saved) reloadList()
     }
 
-    /** The Edit window and the Private location editor sit along the bottom of the map, which
-     *  reaches the screen's edge while either is open — the bottom bar is gone — so their margin
-     *  clears the gesture bar. */
+    /** The Edit window and the Private location editor sit at the screen's bottom edge (the
+     *  bottom bar hides meanwhile), so their margin clears the gesture bar. */
     private fun placeEditWindow() {
         val insets = ViewCompat.getRootWindowInsets(requireView())
         val gesture = insets?.getInsets(WindowInsetsCompat.Type.navigationBars())?.bottom ?: 0
@@ -1337,19 +1271,17 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /** Whether the Private location editor is open over the map. */
     private fun privacyEditing() = ::privateEditor.isInitialized && privateEditor.isEditing
 
-    /** The Private location editor has the map in Normal mode only: another mode, or a
-     *  recording started, gives it back — circles and any unsaved draft gone. */
+    /** The Private location editor has the map in Normal mode only: another mode or a recording
+     *  closes it, unsaved draft and all. */
     private fun renderPrivacy() {
         if (!::privateEditor.isInitialized || !privateEditor.isShowing) return
         if (modeBarReady && !normalMode()) privateEditor.stop()
     }
 
     /**
-     * A Private location saved or deleted — the web's `handlePrivateLocationsChanged`: the
-     * activities it touches go Pending and are reprocessed, so the list is read again at once,
-     * and once the server has drained its work, everything is: the tracks, the list, the days,
-     * the selected activity's metrics — a batch that finished before the first read never
-     * showed a row Pending at all.
+     * A Private location saved or deleted: the activities it touches are reprocessed. The list is
+     * read at once, and everything again once the server drains, since a batch that finishes
+     * before the first read never shows a row Pending.
      */
     private fun onPrivateLocationsChanged() {
         reloadList()
@@ -1363,12 +1295,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
     }
 
-    /** The toolbar's Delete finished: the tracks, the list and the days read again, and Fog
-     *  and Heatmap watched until their re-render lands — the web's `handleActivitiesDeleted`.
-     *  Deleted ids drop out of the selection with the reload. */
-    /** A copy of a Story someone sent has arrived (`docs/SPEC.md` FR-14.8): new activities on
-     *  the map and in the list, and the Fog and Heatmap the copy queued, as after an upload. The
-     *  map has history now, so its "nothing on your map yet" notice goes. */
+    /** A Story copy arrived (`docs/SPEC.md` FR-14.8): new activities, refreshed as after an
+     *  upload. The map has history now, so the empty notice goes. */
     private fun onStoryCopyArrived() {
         hideNotice(Notice.EMPTY)
         style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
@@ -1377,7 +1305,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         coverageWatch.watch()
     }
 
-    /** The Sync tab's lines, drawn over the map — or none, as it leaves. */
+    /** The Sync tab's lines over the map, or none as it leaves. */
     private fun drawSyncCandidates(candidates: List<Candidate>, highlight: String?) {
         syncCandidates = candidates
         syncHighlight = highlight
@@ -1385,13 +1313,11 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         if (candidates.isEmpty()) SyncCandidatesOverlay.clear(loaded) else SyncCandidatesOverlay.set(loaded, candidates, highlight)
     }
 
-    /** The Sync tab sent activities: the range's list, its days and the tiles catch up, as on a
-     *  return to the map. */
+    /** The Sync tab sent activities: the list, its days and the tiles catch up. */
     private fun onSyncedFromPhone() {
         activityDays.reload()
         reloadList()
-        // The tracks tile is read from the activities as they are, so it's fetched again at once;
-        // the tile version only moves once the coverage render after the ingest is done.
+        // Tracks refetch at once; the tile version moves only after the coverage render.
         style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
         checkTileVersion()
         if (shownNotice == Notice.EMPTY) {
@@ -1400,6 +1326,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
     }
 
+    /** The toolbar's Delete finished: tracks, list and days read again, and Fog and Heatmap
+     *  watched until re-rendered. Deleted ids leave the selection with the reload. */
     private fun onActivitiesDeleted(ids: List<String>) {
         if (ids.isEmpty()) return
         style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
@@ -1410,9 +1338,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         refreshPhotos(force = true)
     }
 
-    /** The mode toggle: shown once the session allows, away while recording or editing. Layers
-     *  shows once the session allows too, and stays while recording: the base map and the
-     *  paths are about where the recording is going, not about the modes. */
+    /** The mode toggle shows once the session allows, hidden while recording or editing. Layers
+     *  stays while recording: the base map and paths are about where the recording goes. */
     private fun renderModeBar() {
         if (!modeBarReady) return
         modeBar.visibility = if (isRecording() || editWindow.isOpen || selectionShown()) View.GONE else View.VISIBLE
@@ -1422,8 +1349,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         renderModeChip()
     }
 
-    /** What Fog or Heatmap shows, since neither takes the date range: once the session allows,
-     *  and not while recording, which draws neither. */
+    /** Names what Fog or Heatmap shows, since neither takes the date range. Not while recording,
+     *  which draws neither. */
     private fun renderModeChip() {
         val text = when (mode) {
             MapMode.NORMAL -> null
@@ -1434,31 +1361,28 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         if (text != null) modeChip.setText(text)
     }
 
-    /** Names Fog's and Heatmap's level in view — once the session allows, and not while
-     *  recording, which draws neither. */
+    /** Names Fog's and Heatmap's level in view; not while recording. */
     private fun renderZoomLevelNotice() {
         zoomLevelNotice.render(mode, active = modeBarReady && !isRecording())
     }
 
-    /** "Your map is still being updated…" (`docs/SPEC.md` FR-4.2): in Fog and Heatmap,
-     *  while the coverage watch's last read found the account's coverage still being worked on. */
+    /** "Your map is still being updated…" (`docs/SPEC.md` FR-4.2), in Fog and Heatmap while the
+     *  coverage watch finds coverage rendering. */
     private fun renderCoverageNotice() {
         if (!::coverageNotice.isInitialized) return
         val shown = coverageRendering && mode != MapMode.NORMAL && modeBarReady && !isRecording()
         coverageNotice.visibility = if (shown) View.VISIBLE else View.GONE
     }
 
-    /** Layers and Find my location, on the rail at the top row's end: away while the Edit window
-     *  or the Private location editor is open, since both open over the top of the map. */
+    /** The rail (Layers, Find my location), hidden while an editor is open over the map. */
     private fun renderRail() {
         val editing = editWindow.isOpen || privacyEditing()
         mapRail.visibility = if (editing || selectionShown()) View.GONE else View.VISIBLE
         if (editing) layersMenu.dismiss()
     }
 
-    /** The panel's hidden set, filters, Pending rows and selection, onto the track layers —
-     *  and the selected activity's bands with them; and the sheet's head and the selection bar,
-     *  which follow the selection and the checking. */
+    /** Applies the panel's hidden set, filters, Pending rows and selection to the track layers,
+     *  the bands, the sheet's head and the selection bar. */
     private fun applyTrackFilter() {
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setTrackFilter(it, panelState.mapHidden, panelState.highlighted) }
         updateTrackMetrics(refetch = false)
@@ -1466,13 +1390,12 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         if (::panel.isInitialized) renderDateFooter()
     }
 
-    /** Whether the sheet's rows are being checked where the selection bar can show: Normal mode,
-     *  the Activities tab, no Edit window over the map. */
+    /** Whether rows are being checked where the selection bar can show: Normal mode, the
+     *  Activities tab, no Edit window. */
     private fun selectionShown(): Boolean =
         ::panel.isInitialized && sheet.isVisible && panel.selecting && panel.tab == PanelTab.ACTIVITIES && !editWindow.isOpen
 
-    /** The selection bar in the top row's place while [selectionShown], the mode toggle and the
-     *  rail stepping aside for it. */
+    /** The selection bar replaces the top row while [selectionShown]. */
     private fun renderSelectionBar() {
         val shown = selectionShown()
         endSelectingOnBack.isEnabled = shown
@@ -1484,9 +1407,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * The selected activity's metrics — fetched when the selection moves to another activity,
-     * or again with [refetch] once its reprocess has landed (the web's `trackMetricsVersion`),
-     * and dropped the moment it clears.
+     * The selected activity's metrics: fetched when the selection moves, again with [refetch]
+     * after its reprocess lands, and dropped when it clears.
      */
     private fun updateTrackMetrics(refetch: Boolean) {
         val focused = panelState.focused
@@ -1513,10 +1435,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * The selected activity's pace bands on the map while it's also drawn there — not hidden,
-     * filtered out or Pending, whose metrics describe the points from before its reprocess
-     * (the web's `focusedPending`). Not on the Sync tab, whose picked candidate has bands of its
-     * own (`map/SyncCandidatesOverlay`).
+     * The selected activity's pace bands, while its track is drawn: not hidden, filtered out or
+     * Pending (its metrics would show the old points). Not on the Sync tab, whose picked candidate
+     * has its own (`map/SyncCandidatesOverlay`).
      */
     private fun renderTrackMetrics() {
         val metrics = trackMetrics
@@ -1533,10 +1454,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * The photos for whatever the map now shows ([photoScope]) — read when the scope moves to
-     * another activity or Story, or with [force] when they may have changed under it (a save
-     * from the Photos tab, a reprocess, a Story's members). A new scope starts empty rather than
-     * showing the last one's photos while it loads.
+     * The photos for [photoScope]: read when the scope moves, or with [force] when they may have
+     * changed (a Photos tab save, a reprocess, a Story's members). A new scope starts empty
+     * rather than showing the last one's while it loads.
      */
     private fun refreshPhotos(force: Boolean) {
         val single = editWindow.single
@@ -1576,9 +1496,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * The photo markers (`apps/android/docs/SPEC.md` FR-2.10): the scope's photos on their tracks, with the
-     * Photos tab's unsaved changes merged in while it shows — not while the Track tab has the
-     * map, nor for a route hidden on the map.
+     * The photo markers (`apps/android/docs/SPEC.md` FR-2.10): the scope's photos on their tracks,
+     * with the Photos tab's unsaved changes merged in. Not while the Track tab has the map, nor for
+     * a hidden route.
      */
     private fun renderPhotoMarkers() {
         if (!::photoMarkers.isInitialized) return
@@ -1603,11 +1523,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * A marker's tap (FR-2.10): one photo opens its popup. A group the map can separate — its
-     * photos more than [PHOTO_GROUP_SPREAD_M] apart — zooms in to fit them, at most to z19, where
-     * that spread is wider than a marker; one it can't (several taken at one spot) opens the
-     * popup on its first photo, to step through the rest. Only saved photos open: one the Photos
-     * tab hasn't uploaded has nothing to show yet.
+     * A marker's tap (FR-2.10): one photo opens its popup. A group spread over more than
+     * [PHOTO_GROUP_SPREAD_M] zooms to fit; a tighter group opens the popup on its first photo.
+     * Only saved photos open.
      */
     private fun openPhotoMarker(ids: List<String>) {
         val instance = map ?: return
@@ -1625,20 +1543,18 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         photoPopup.show(instance, located)
     }
 
-    /** Frames every one of [activities] that has a track — nothing, for none. */
+    /** Frames every one of [activities] that has a track. */
     private fun flyToActivities(activities: List<Activity>) {
         flyTo(BoxUnion.of(activities.mapNotNull { it.bbox }) ?: return)
     }
 
     /**
-     * A tap on the map in Normal mode: a track under it — within 14dp, the web's touch
-     * tolerance (`docs/SPEC.md` §19), since a 2.5dp line is too thin to hit exactly — is
-     * selected in the panel and flown to; empty map clears the selection. The panel's own
-     * collapsed or expanded state is left as it was.
+     * A tap on the map in Normal mode: a track within [TAP_TOLERANCE_DP] (a 2.5dp line is too thin
+     * to hit) is selected and flown to; empty map clears the selection. The sheet stays as it was.
      */
     private fun onMapTap(instance: MapLibreMap, point: LatLng): Boolean {
-        // A spot's badge first, in every mode: it opens the spot's popup, and a tap anywhere
-        // else closes it. Not while the Private location editor or the Edit window has the map.
+        // A spot's badge first, in every mode, unless an editor has the map; a tap elsewhere
+        // closes its popup.
         if (!privateEditor.isShowing && !editWindow.isOpen) {
             val spot = MapSpots.spotAt(instance, instance.projection.toScreenLocation(point), resources.displayMetrics.density)
             if (spot != null) {
@@ -1659,8 +1575,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             privateEditor.onMapTap(point)
             return true
         }
-        // The Edit window's group mustn't change underneath it; the one thing a tap does then
-        // is Delete point's.
+        // The Edit window's group mustn't change under it; a tap only serves Delete point.
         if (editWindow.isOpen) {
             if (editWindow.trackEditor.deleteMode) {
                 TrackEditOverlay.pointAt(instance, point, resources.displayMetrics.density)?.let(editWindow.trackEditor::dropPoint)
@@ -1683,19 +1598,16 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         collapseSheetOnBack.isEnabled = sheet.isVisible && panel.expanded && !editWindow.isOpen
     }
 
-    /** The sheet is Normal mode's alone, as on the web (Fog and Heatmap ignore the range and
-     *  select nothing — `docs/SPEC.md` FR-4.2), and steps aside while recording. It waits for
-     *  the session; the range at its head also for the first page of days, and an account with
-     *  no activity at all has nothing to pick from — the empty notice speaks for it instead. The
-     *  range is the Activities tab's alone: Stories takes none (`docs/SPEC.md` FR-6), and has
-     *  its title at the head instead. */
+    /** The sheet is Normal mode's only (`docs/SPEC.md` FR-4.2), hidden while recording, and waits
+     *  for the session. The range at its head is the Activities tab's, waits for the first page of
+     *  days, and is absent for an account with no activity, where the empty notice speaks. */
     private fun renderDateFooter() {
         val normal = normalMode()
         // The selected activity's card takes the range's place at the head.
         val footer = normal && panel.tab == PanelTab.ACTIVITIES && !panel.showsCard && activityDays.ready && activityDays.earliest != null
         dateFooter.visibility = if (footer) View.VISIBLE else View.GONE
-        // An editor over the map has the screen, the sheet stepping aside for it. The Sync tab
-        // stays while recording: what's on the phone can be sent with a new walk under way.
+        // An editor over the map hides the sheet. The Sync tab stays while recording: what's on
+        // the phone can be sent mid-walk.
         val editing = editWindow.isOpen || privacyEditing()
         val syncing = modeBarReady && mode == MapMode.NORMAL && panel.tab == PanelTab.SYNC
         sheet.visibility = if ((normal || syncing) && !editing) View.VISIBLE else View.GONE
@@ -1708,19 +1620,15 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
     private fun isRecording() = (recorder?.state ?: RecordingState.IDLE) != RecordingState.IDLE
 
-    /** Normal mode with the session ready and no recording: when the sheet, its tabs and their
-     *  editors are the map's. */
+    /** Normal mode, session ready, not recording: when the sheet and its editors have the map. */
     private fun normalMode() = modeBarReady && mode == MapMode.NORMAL && !isRecording()
 
     private fun hasPermission(permission: String) =
         ContextCompat.checkSelfPermission(requireContext(), permission) == PackageManager.PERMISSION_GRANTED
 
-    /** Idle: start (asking for permissions first if they're missing). Recording or paused:
-     *  toggle between the two. Nothing here ever asks for a name or a type — see
-     *  `RecordingService`'s class doc for where those come from. Pausing says how to stop
-     *  instead: a tap is the obvious guess at "stop", and it only pauses. Every tap is felt —
-     *  pause and resume as a toggle's off and on, start as [startRecording]'s confirm — so a
-     *  tap that registered is never in doubt. */
+    /** Idle: start, asking for missing permissions first. Recording or paused: toggle. Pausing
+     *  says how to stop, since a tap is the obvious guess at "stop". Every tap has a haptic, so
+     *  one that registered is never in doubt. */
     private fun onRecordTap() {
         // A start from Sync or You goes to the map, where the recording is drawn.
         if (!isRecording()) host?.showMap()
@@ -1739,15 +1647,14 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         if (missing.isEmpty()) startRecording() else permissionLauncher.launch(missing.toTypedArray())
     }
 
-    /** A two-second hold stops (`RecordButton`) — deliberately not a plain tap, so a stray
-     *  touch can pause a recording but never end it. `RecordingService` then opens the Save
-     *  screen over the map. */
+    /** A two-second hold stops (`RecordButton`), so a stray touch can pause but never end a
+     *  recording. `RecordingService` then opens the Save screen. */
     private fun stopRecording() {
         requireContext().startService(RecordingService.intent(requireContext(), RecordingService.ACTION_STOP))
     }
 
-    /** Felt and seen: a confirm haptic and a short pop of the button, ahead of the red ring,
-     *  pulse and status pill that [renderRecording] brings once the service reports in. */
+    /** A confirm haptic and a pop of the button, ahead of what [renderRecording] shows once the
+     *  service reports in. */
     private fun startRecording() {
         recordButton.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
         recordButton.animate().cancel()
@@ -1757,10 +1664,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         ContextCompat.startForegroundService(requireContext(), RecordingService.intent(requireContext(), RecordingService.ACTION_START))
     }
 
-    /** A recording the process died in the middle of (`RecordingService.findLeftover`): not
-     *  cancellable, since dismissing it would only bring it back on the next bind. Resume comes
-     *  back paused; Save goes to the Save screen as a Stop would; Discard confirms first, as the
-     *  Save screen's does, since the journal is the only copy. */
+    /** A recording the process died during (`RecordingService.findLeftover`). Not cancellable:
+     *  it would come back on the next bind. Resume returns paused; Save goes to the Save screen;
+     *  Discard confirms first, since the journal is the only copy. */
     private fun offerLeftover(leftover: LiveRecordingJournal.Leftover) {
         if (leftoverDialog?.isShowing == true || requireActivity().isFinishing) return
         leftoverDialog = MaterialAlertDialogBuilder(requireContext())
@@ -1790,8 +1696,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             .setCancelable(false)
             .setPositiveButton(R.string.recording_discard) { _, _ -> recorder?.discardLeftover(leftover) }
             .setNegativeButton(android.R.string.cancel) { _, _ ->
-                // Still showing while its own button's callback runs, so the guard would
-                // otherwise keep the prompt from coming back.
+                // Still showing during its own button's callback; cleared so the guard lets it back.
                 leftoverDialog = null
                 offerLeftover(leftover)
             }
@@ -1825,10 +1730,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * Turns on MapLibre's own position dot and puts the camera in tracking mode, which flies to
-     * the first fix (or the last known one) and then follows it until the user pans — the same
-     * behavior as the web map's geolocate control. Activated lazily, on the first tap, so a
-     * user who never asks is never located.
+     * Turns on MapLibre's position dot and tracking camera, which flies to the first fix and
+     * follows until the user pans, like the web's geolocate control. Activated on the first tap,
+     * so a user who never asks is never located.
      */
     @SuppressLint("MissingPermission") // Only reached once hasLocationPermission() holds.
     private fun showMyLocation() {
@@ -1849,9 +1753,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         )
     }
 
-    /** Brings the button, the mode toggle, the map's layers, the live track and the camera in
-     *  line with the recording's state — called on bind, on every state change and fix the
-     *  service reports, and once the style has loaded. */
+    /** Brings the button, the mode toggle, the layers, the live track and the camera in line with
+     *  the recording: on bind, on every change and fix, and once the style has loaded. */
     private fun renderRecording() {
         val state = recorder?.state ?: RecordingState.IDLE
         val active = state != RecordingState.IDLE
@@ -1861,8 +1764,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             RecordingState.PAUSED -> Triple(R.drawable.ic_play, R.drawable.bg_record_button_paused, R.string.record_button_resume)
         }
         recordButton.setImageResource(icon)
-        // Pause and play are white Lucide strokes, tinted for the button's surface disc; the
-        // idle red dot keeps its own colour.
+        // Pause and play are tinted for the button's surface; the idle red dot keeps its colour.
         recordButton.imageTintList = when (state) {
             RecordingState.IDLE -> null
             RecordingState.RECORDING -> ColorStateList.valueOf(requireContext().getColor(R.color.hmt_record))
@@ -1911,9 +1813,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
     }
 
-    /** 56dp idle, 60dp while a recording is in progress — a bigger target for the hold that
-     *  stops it, with less of it under the finger. Centred over the bottom bar's middle slot
-     *  either way (`activity_main.xml`). */
+    /** 56dp idle, 60dp while recording: a bigger target for the hold that stops it. */
     private fun sizeRecordButton(active: Boolean) {
         val density = resources.displayMetrics.density
         val size = ((if (active) RECORD_BUTTON_ACTIVE_DP else RECORD_BUTTON_IDLE_DP) * density).toInt()
@@ -1924,10 +1824,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         recordButton.layoutParams = params
     }
 
-    /** The pill beside the record button, while a recording is in progress: a red dot (amber
-     *  paused), the moving time — ticking on its own while recording, frozen while paused — and
-     *  the distance, or "Waiting for GPS…" until the first fix arrives. A hold on the button
-     *  takes the detail line over ([renderHoldProgress]). */
+    /** The status pill while recording: a dot (amber when paused), the moving time, and the
+     *  distance or "Waiting for GPS…". A hold on the button takes the detail line
+     *  ([renderHoldProgress]). */
     private fun renderRecordingStatus(state: RecordingState, hasFix: Boolean) {
         val service = recorder
         if (state == RecordingState.IDLE || service == null) {
@@ -1942,7 +1841,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         if (recording) {
             recordingStatusTime.start()
         } else {
-            // Stopped, nothing ticks after setBase's own redraw in the Chronometer's format.
+            // Trap: setBase redraws in the Chronometer's own format, so the text is set after it.
             recordingStatusTime.stop()
             recordingStatusTime.text = RecordingFormat.duration(stats.elapsedMs)
         }
@@ -1994,10 +1893,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
                 AppLanguage.followAccount(requireContext().applicationContext, profile.locale)
                 hideNotice(Notice.UNREACHABLE)
             }.onFailure { failure ->
-                // Only a 401 means the token itself is dead. Anything else — no network, a
-                // stopped dev stack — says nothing about the credential, so it survives and
-                // gets re-checked on the next resume rather than silently signing the user out;
-                // meanwhile the map says why none of their layers is on it.
+                // Only a 401 means the token is dead. Any other failure keeps it for the next
+                // resume, and the notice says why the map is empty.
                 if (failure is ApiException && failure.code == 401) {
                     Session.clear()
                 } else {
@@ -2014,16 +1911,12 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
     }
 
-    /**
-     * What the map can have to say, most important first: when two apply, the earlier one
-     * stays up. They share the one panel under the chrome row rather than stacking.
-     */
+    /** The map's notices, most important first: when two apply, the earlier stays up. */
     private enum class Notice { MAP_FAILED, UNREACHABLE, CHECKING, EMPTY }
 
     /**
-     * The map's notice panel, after the web's on-map banner: [text], an optional smaller
-     * [detail], and at most one action. A less important notice never replaces a more
-     * important one that is up (see [Notice]).
+     * Shows [text], an optional [detail] and at most one action. A less important notice never
+     * replaces a more important one ([Notice]).
      */
     private fun showNotice(
         kind: Notice,
@@ -2053,9 +1946,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         updateNoticeVisibility()
     }
 
-    /** "Nothing on your map yet" has nothing to say while a recording has the map, or on the
-     *  Sync tab it points to, so it steps aside then and comes back after; the failures stay up
-     *  regardless. */
+    /** The empty notice steps aside while recording and on the Sync tab it points to; failures
+     *  stay up. */
     private fun updateNoticeVisibility() {
         val kind = shownNotice
         val onSync = ::panel.isInitialized && panel.tab == PanelTab.SYNC
@@ -2067,9 +1959,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * At a large font size the three labels don't fit beside the rail, so only the active mode
-     * keeps its label and the other two are their icons (`ui/LargeText`); each is still named
-     * for TalkBack. The label is the button's own text from the layout, kept in its tag.
+     * At a large font size only the active mode keeps its label; the others show icons
+     * (`ui/LargeText`), still named for TalkBack. The layout's label is kept in the button's tag.
      */
     private fun renderModeLabel(button: MaterialButton, active: Boolean) {
         val label = (button.tag as? CharSequence) ?: button.text.also { button.tag = it }
@@ -2107,15 +1998,15 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         style?.let { MapPaths.apply(it, shownPaths(paths)) }
     }
 
-    /** The Layers menu's Show layers: shows or hides every pick at once, keeping them. A capture in progress
-     *  carries on, since hiding the places is about the view, not about going to one. */
+    /** The Layers menu's Show layers: shows or hides every pick, keeping them. A capture in
+     *  progress carries on. */
     private fun setLayersShown(on: Boolean) {
         MapLayersSwitch.set(requireContext(), on)
         style?.let { MapPaths.apply(it, shownPaths(MapPaths.get(requireContext()))) }
         showSpots(shownSpots(MapSpots.get(requireContext())))
     }
 
-    /** What the map draws of the picks: all of them while Show layers is on, none while off. */
+    /** The picks drawn: all while Show layers is on, none while off. */
     private fun shownPaths(paths: MapPaths.Paths) = if (MapLayersSwitch.isOn(requireContext())) paths else MapPaths.NONE
 
     private fun shownSpots(categories: List<MapSpots.Category>) =
@@ -2135,13 +2026,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         if (overlaysAttached) MapOverlays.setDarkVeil(loaded, darkBase(loaded))
     }
 
-    /** Whether the basemap reads dark — the dark flavor, or satellite imagery over either —
-     *  which picks Fog's veil and Heatmap's wash (`MapOverlays.setDarkVeil`), the web's `isDarkBase`. */
     /**
-     * The export's hidden map (`export/MapImageRenderer`) made to look like this one: the same
-     * calls [loadStyle] and [syncSession] make on the live style — paths, satellite, the user
-     * layers in the current mode, range and Story, the panel's hidden set and selection. No
-     * Spots, photos or recording: the web's export leaves them out too.
+     * Makes the export's hidden map (`export/MapImageRenderer`) look like this one, with the calls
+     * [loadStyle] and [syncSession] make. No Spots, photos or recording, as on the web.
      */
     private fun prepareExportStyle(loaded: Style) {
         val context = requireContext()
@@ -2152,9 +2039,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.highlighted)
     }
 
-    /** While the viewfinder shows, the map's own chrome steps aside — the top row and its
-     *  notices, the mode's chip, the sheet, the popups and photo markers, MapLibre's logo,
-     *  attribution and compass — since what sits inside the window would cover the picture. */
+    /** While the viewfinder shows, the map's chrome steps aside, since it would cover the picture. */
     private fun renderExportShown(shown: Boolean) {
         closeExportOnBack.isEnabled = shown
         val visibility = if (shown) View.INVISIBLE else View.VISIBLE
@@ -2174,18 +2059,17 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
     }
 
+    /** Whether the basemap reads dark (dark flavor or satellite), which picks Fog's veil and
+     *  Heatmap's wash (`MapOverlays.setDarkVeil`). */
     private fun darkBase(style: Style): Boolean =
         isNight() || (MapSatellite.isOn(requireContext()) && MapSatellite.isAvailable(style))
 
     /**
-     * Moves the camera onto the account's most recent activity, once per session — the web's
-     * opening view (`docs/SPEC.md` FR-4.5), not the whole history, which for an account with
-     * scattered recent history is a near-world view that reads as broken.
+     * Frames the account's most recent activity, once per session (`docs/SPEC.md` FR-4.5). The
+     * whole history could zoom out to the world.
      *
-     * An account with no geometry yet is left at the world view, which is the truthful thing to
-     * show for a history that is empty — with a notice saying so and pointing at Sync,
-     * re-checked on every resume until something arrives (`onResume`). Not for a demo account,
-     * which always has history and can't sync.
+     * An account with no geometry stays at the world view, with a notice pointing at Sync,
+     * re-checked on every resume (`onResume`). Not for a demo, which has history and can't sync.
      */
     private fun frameActivities() {
         if (framed) return
@@ -2209,11 +2093,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * Flies the camera to fit [box] (`[west, south, east, north]`, east past 180 for one across
-     * the antimeridian, which `LatLngBounds.from` takes as it is). The zoom is capped
-     * because a single short activity — or one clipped to almost nothing by a Private location —
-     * has a near-zero extent, and fitting the camera to that box lands well past the basemap's
-     * z14 data, on a grey rectangle.
+     * Flies to fit [box] (`[west, south, east, north]`, east past 180 across the antimeridian).
+     * The zoom is capped: a tiny extent would land past the basemap's z14 data, on grey.
      */
     private fun flyTo(box: DoubleArray, maxZoom: Double = MAX_FRAME_ZOOM) {
         val instance = map ?: return
@@ -2226,9 +2107,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             findViewById<View>(R.id.top_bar).bottom,
             if (banner.isVisible) topChrome.top + banner.bottom + FRAME_PADDING_PX / 2 else 0,
         )
-        // Above the height the sheet rests at or is heading to, not mid-drag: a View on map
-        // collapses it and flies in the same moment, and fitting to where it was pushed the
-        // activity to the top of the screen.
+        // Above where the sheet rests or is heading, not mid-drag: View on map collapses it and
+        // flies at once.
         val root = findViewById<View>(R.id.map_root)
         val editor = listOf(card, findViewById<View>(R.id.private_editor)).firstOrNull { it.isVisible }
         val bottom = FRAME_PADDING_PX + when {
@@ -2236,8 +2116,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             sheet.isVisible -> root.height - panel.restingTop(root.height)
             else -> 0
         }
-        // A landscape phone's top row (the rail's two buttons stacked) and sheet can leave
-        // nothing between them; the fit then gets at least a strip, taken from the top first.
+        // In landscape the top row and sheet can leave no gap; the fit keeps a strip, taken from
+        // the top first.
         val minSpan = (MIN_FRAME_SPAN_DP * resources.displayMetrics.density).toInt()
         val fitTop = top.coerceAtMost(maxOf(FRAME_PADDING_PX, root.height - bottom - minSpan))
         val fitBottom = bottom.coerceAtMost(maxOf(FRAME_PADDING_PX, root.height - fitTop - minSpan))
@@ -2250,11 +2130,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * Flavor follows the app's night mode, the same one its own colors follow: the system's
-     * day/night setting, or the You tab's Theme toggle when that overrides it (`AppTheme`). The
-     * API serves five (`light`, `dark`, `white`, `black`, `grayscale`); this picks between the
-     * two general-purpose ones. Its labels are in the app's language (`?lang=`, root
-     * `docs/SPEC.md` FR-13.1); the server answers English for one it has no catalog for.
+     * The style URL: `light` or `dark` following the app's night mode (`AppTheme`), labels in
+     * the app's language (`?lang=`, root `docs/SPEC.md` FR-13.1).
      */
     private fun styleUrl(): String {
         val flavor = if (isNight()) "dark" else "light"
@@ -2265,8 +2142,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun isNight(): Boolean =
         resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
 
-    /** The style (or its sources) couldn't be fetched: a plain sentence, with the origin and
-     *  MapLibre's own error in small print for whoever has to fix it, and a way to try again. */
+    /** The style or its sources failed: a plain sentence, the origin and MapLibre's error in
+     *  small print, and Try again. */
     private fun reportFailure(error: String) {
         Log.e(TAG, "map failed to load: $error")
         showNotice(
@@ -2278,9 +2155,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         ) { loadStyle() }
     }
 
-    // MapLibre's MapView holds a native renderer and a GL surface, so every lifecycle
-    // callback has to be forwarded by hand — a missed one leaks the surface or crashes on
-    // rotation. This is the whole set the SDK expects.
+    // MapLibre's MapView holds a native renderer and a GL surface: every lifecycle callback below
+    // is forwarded, since a missed one leaks the surface or crashes on rotation.
     override fun onStart() {
         super.onStart()
         mapView.onStart()
@@ -2300,8 +2176,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             checkTileVersion()
         }
         captureMode.resume()
-        // An empty map is asked again on every return — typically from Sync — so the notice
-        // goes, and the camera frames the new history, as soon as something has arrived.
+        // An empty map is checked again on every return, so the notice goes and the camera frames
+        // the history once something arrives.
         if (shownNotice == Notice.EMPTY) {
             framed = false
             frameActivities()
@@ -2388,30 +2264,26 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         /** The least height of map a fit keeps between the top row and the sheet. */
         private const val MIN_FRAME_SPAN_DP = 96
 
-        /** A photo group whose photos lie further apart than this zooms in to split them; one
-         *  closer opens its popup, since no zoom would — the web's `GROUP_SPREAD_M`. */
+        /** A photo group spread wider than this zooms in to split; a tighter one opens its popup. */
         private const val PHOTO_GROUP_SPREAD_M = 15.0
 
-        /** How far a photo group's tap zooms in, where its 15 m is wider than a marker. */
+        /** How far a photo group's tap zooms in: where 15 m is wider than a marker. */
         private const val PHOTO_GROUP_MAX_ZOOM = 19.0
 
-        /** How far from a tap a track still counts as tapped — the web's `TAP_TOLERANCE_PX`. */
+        /** How far from a tap a track still counts as tapped, as on the web. */
         private const val TAP_TOLERANCE_DP = 14
 
         /** How often a list with Pending rows is read again. */
         private const val PENDING_POLL_MS = 2_000L
 
-        /** Where the camera flies to on a recording's first fix — street level, so the line
-         *  visibly grows from the first few metres rather than being a dot on a city. */
+        /** The zoom on a recording's first fix: street level, so the line visibly grows. */
         private const val RECORDING_ZOOM = 16.0
 
-        /** Find my location's minimum zoom — neighbourhood level, so the dot lands in streets
-         *  the user recognises; a closer zoom the user already chose is kept. */
+        /** Find my location's minimum zoom: neighbourhood level. A closer zoom is kept. */
         private const val LOCATE_ZOOM = 14.0
         private const val FRAME_DURATION_MS = 900
 
-        /** How long a session check may take before the map says it's checking — a fast one
-         *  shouldn't flash a notice. */
+        /** How long a session check runs before the notice shows, so a fast one doesn't flash it. */
         private const val CHECKING_DELAY_MS = 600L
 
         /** Material's and the platform's minimum touch target. */
