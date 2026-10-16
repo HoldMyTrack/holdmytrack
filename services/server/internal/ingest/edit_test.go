@@ -2,7 +2,6 @@ package ingest
 
 import (
 	"encoding/json"
-	"math"
 	"testing"
 	"time"
 
@@ -87,7 +86,7 @@ func TestTrackEditSurvivesDifferentTrim(t *testing.T) {
 // A stray fix outside a Private location keeps ClipEnds from trimming the points after it that
 // are back inside; deleting that fix must let the location hide them.
 func TestTrackEditApplyClippedReclipsNewEnds(t *testing.T) {
-	points := line(41.4, -81.7, 21, 50) // 1 km north, 50 m apart
+	points := line(41.4, -81.7, 201, 5) // 1 km north, 5 m apart
 	zone := Zone{Lat: 41.4, Lon: -81.7, RadiusM: 175}
 	stray := points[0]
 	stray.Lon += 0.01 // ~830 m east, well outside
@@ -98,8 +97,8 @@ func TestTrackEditApplyClippedReclipsNewEnds(t *testing.T) {
 		t.Fatal("fixture: the stray fix should stop ClipEnds from trimming the start")
 	}
 	got := TrackEdit{Drop: []int64{stray.Time.UnixMilli()}}.ApplyClipped(clipped, []Zone{zone})
-	if d := distToZone(zone, got[0]); math.Abs(d-175) > 0.01 {
-		t.Errorf("first point %.3f m from center, want 175 on the boundary", d)
+	if want := expectedStart(points[1:], zone, 's'); got[0] != want {
+		t.Errorf("first point %+v, want %+v as a fresh clip would cut it", got[0], want)
 	}
 	for _, p := range got {
 		if zone.contains(p) {
@@ -108,9 +107,9 @@ func TestTrackEditApplyClippedReclipsNewEnds(t *testing.T) {
 	}
 
 	// An edit that doesn't touch an already-clipped end leaves it where it was.
-	again := TrackEdit{Drop: []int64{points[10].Time.UnixMilli()}}.ApplyClipped(got, []Zone{zone})
+	again := TrackEdit{Drop: []int64{points[150].Time.UnixMilli()}}.ApplyClipped(got, []Zone{zone})
 	if again[0] != got[0] || len(again) != len(got)-1 {
-		t.Errorf("re-clipping moved an end already on the boundary")
+		t.Errorf("re-clipping moved an end already clipped")
 	}
 }
 

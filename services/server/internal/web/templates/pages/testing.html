@@ -282,11 +282,11 @@
       <li>You tab → Privacy → Add a location on the map.</li>
       <li>Drag the circle's center to that spot, name it "Home", leave the radius at 200 m, and save.</li>
     </ol>
-    <p class="testing__expect"><strong>Expected:</strong> the activities touched show Pending for a moment. Then the Lakefront walk starts and ends at the circle's edge instead of at the door, and the West Side ride starts there. The circle itself isn't drawn on the map once you leave the editor.</p>
+    <p class="testing__expect"><strong>Expected:</strong> the activities touched show Pending for a moment. Then the Lakefront walk starts and ends outside the circle instead of at the door, each end a different distance past its edge (up to another 200 m), and the West Side ride starts outside it too. The circle itself isn't drawn on the map once you leave the editor.</p>
 
     <h3 id="PL-2">PL-2 · An activity entirely inside</h3>
     <p>Add a second location at <strong>41.3909, -81.7485</strong> (Radlick Park) with a radius of 300 m.</p>
-    <p class="testing__expect"><strong>Expected:</strong> the Radlick Park walk (19 September) disappears from the map. Its row shows Private and no distance, and its Track and Photos tabs can't be opened. The Big Creek walk, which starts nearby, is clipped at the circle's edge.</p>
+    <p class="testing__expect"><strong>Expected:</strong> the Radlick Park walk (19 September) disappears from the map. Its row shows Private and no distance, and its Track and Photos tabs can't be opened. The Big Creek walk, which starts nearby, now starts a little way outside the circle.</p>
 
     <h3 id="PL-3">PL-3 · Changing and deleting</h3>
     <ol class="page-list">

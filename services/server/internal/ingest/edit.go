@@ -104,7 +104,7 @@ func (e TrackEdit) Apply(points []parse.Point) []parse.Point {
 // result's ends again. ClipEnds trims only the run of points inside a zone at each end, so an
 // edit that removes the first or last point outside one — a stray GPS fix before leaving home,
 // a Chop of the track's end — leaves the new end inside it, and those points would otherwise
-// be shown. Clipping an unedited end again changes nothing: it already sits on a zone's edge.
+// be shown. Clipping an unedited end again changes nothing: it already lies outside every zone.
 func (e TrackEdit) ApplyClipped(points []parse.Point, zones []Zone) []parse.Point {
 	return ClipEnds(e.Apply(points), zones)
 }

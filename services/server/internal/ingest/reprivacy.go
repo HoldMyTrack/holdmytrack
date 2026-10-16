@@ -21,14 +21,14 @@ type ReprivacyJob struct {
 	ActivityIDs []string `json:"activity_ids"`
 }
 
-// zoneMarginM widens the affected-set search past a location's own radius. The stored
-// trajectory is simplified (a few metres of tolerance), and a track clipped by a location
-// ends exactly on its edge — both must still count as touching it.
+// zoneMarginM widens the affected-set search past where a clipped end can lie: the stored
+// trajectory is simplified (a few metres of tolerance).
 const zoneMarginM = 25
 
-// AffectedActivities returns the activities of userID whose display trajectory comes within a
-// circle's radius (plus zoneMarginM) of its center: every activity a location placed, or
-// previously placed, there could clip. Run inside the caller's transaction, alongside the
+// AffectedActivities returns the activities of userID whose display trajectory comes within
+// twice a circle's radius (plus zoneMarginM) of its center: every activity a location placed,
+// or previously placed, there could clip. Twice, because ClipEnds cuts an end up to a radius
+// further on past the edge (clipStart). Run inside the caller's transaction, alongside the
 // privacy_zones change itself.
 func AffectedActivities(ctx context.Context, tx pgx.Tx, userID string, lat, lon float64, radiusM int) ([]string, error) {
 	rows, err := tx.Query(ctx, `
@@ -36,7 +36,7 @@ func AffectedActivities(ctx context.Context, tx pgx.Tx, userID string, lat, lon 
 		WHERE user_id = $1 AND raw_payload_key IS NOT NULL
 		  AND trajectory IS NOT NULL
 		  AND ST_DWithin(trajectory::geography, ST_SetSRID(ST_MakePoint($3, $2), 4326)::geography, $4)
-	`, userID, lat, lon, radiusM+zoneMarginM)
+	`, userID, lat, lon, 2*radiusM+zoneMarginM)
 	if err != nil {
 		return nil, err
 	}

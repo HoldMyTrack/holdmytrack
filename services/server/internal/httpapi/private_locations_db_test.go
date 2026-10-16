@@ -141,8 +141,9 @@ func TestPrivateLocationReprocessesActivities(t *testing.T) {
 	}
 	clippedBy := func(label, id string, lon, lat float64) {
 		t.Helper()
-		if got := distance(id); math.Abs(fullDistance-radiusM-got) > 50 {
-			t.Errorf("%s: distance %.0f m, want about %d m less than %.0f", label, got, radiusM, fullDistance)
+		// The end is cut up to another radius past the edge (ingest.ClipEnds).
+		if lost := fullDistance - distance(id); lost < radiusM-50 || lost > 2*radiusM+50 {
+			t.Errorf("%s: %.0f m shorter than the whole %.0f, want %d–%d m", label, lost, fullDistance, radiusM, 2*radiusM)
 		}
 		if near := d.nearestM(id, lon, lat); near < radiusM-1 {
 			t.Errorf("%s: track comes within %.0f m of the location, want at least %d", label, near, radiusM)
@@ -154,7 +155,7 @@ func TestPrivateLocationReprocessesActivities(t *testing.T) {
 	}
 
 	// Add one at walk's start: only walk is queued and marked Pending, and once the job runs its
-	// start is gone up to the location's edge.
+	// start is gone up to past the location's edge.
 	var home privateLocation
 	d.decode(d.do(me, "POST", "/v1/private-locations", map[string]any{"name": "Home", "lon": 10.0, "lat": 50.0, "radius_m": radiusM}), http.StatusCreated, &home)
 	if jobs := d.reprivacyJobs(me); len(jobs) != 1 || !slices.Equal(jobs[0].ActivityIDs, []string{walk}) {
