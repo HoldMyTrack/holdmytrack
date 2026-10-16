@@ -385,7 +385,7 @@ object HoldMyTrackApi {
      * inheriting OkHttp's default here would throttle the map relative to the SDK's own
      * behaviour for no reason.
      */
-    /** This build: the release number and the commit, "0.13 (62da50b)" — what the You tab shows
+    /** This build: the release number and the commit, "0.14 (62da50b)" — what the You tab shows
      *  and the User-Agent carries. */
     val appVersion: String = "${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_SHA})"
 
@@ -423,7 +423,7 @@ object HoldMyTrackApi {
     }
 
     /**
-     * Names the app and its build — `HoldMyTrack-Android/0.13 (62da50b; 812)` — on HoldMyTrack's
+     * Names the app and its build — `HoldMyTrack-Android/0.14 (62da50b; 812)` — on HoldMyTrack's
      * own requests, so the server's logs say which build made a call and the server can turn
      * away one older than its minimum. Other origins keep what the request already had:
      * MapLibre's own agent on the basemap's assets.
