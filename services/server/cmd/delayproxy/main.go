@@ -2,7 +2,7 @@
 // each direction, so a request through it pays about that much per round trip. The dev stack's
 // object store answers in about a millisecond, which hides exactly the cost production pays on
 // every R2 call; pointing a dev worker at the store through this proxy brings it back
-// (docs/PERFORMANCE.md "Local measurements"). From services/server:
+// (docs/PERFORMANCE.md "Running a session"). From services/server:
 //
 //	go run ./cmd/delayproxy 127.0.0.1:9555 127.0.0.1:9000 80ms
 //

@@ -7,7 +7,7 @@
 #
 #   17 3 * * * root /srv/holdmytrack/scripts/backup.sh --nightly >> /var/log/holdmytrack-backup.log 2>&1
 #
-# and by hand, without it, before a deploy or a migration (DEPLOY.md §6), as a rollback point.
+# and by hand, without it, before a deploy or a migration (DEPLOY.md §7), as a rollback point.
 # Only a nightly run counts for the "Backup overdue" alert and fills the bucket's history: a
 # deploy-day's manual runs would otherwise crowd it with near-identical dumps, and could hide a
 # nightly job that stopped running.

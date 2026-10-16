@@ -27,13 +27,21 @@ x-logging: &logging
 
 services:
   db:
-    # Before moving to an image on Debian 13 or later, see docs/DEPLOY.md §9 (time zones).
+    # The server passes each account's stored zone to Postgres (AT TIME ZONE users.timezone,
+    # every per-day query), and this image reads zones from the OS's files (built
+    # --with-system-tzdata). On Debian 11 those still carry the old IANA names (Asia/Calcutta,
+    # Europe/Kiev); Debian 13 moves them to tzdata-legacy, not installed by default, so a query
+    # for an account still storing one would fail. New accounts store current names
+    # (IMPLEMENTATION.md §4.9), but accounts from before 2026-09-25 keep their browser's old
+    # spelling until they next save Settings. Before moving to an image on Debian 13 or later,
+    # rewrite them: docs/DEPLOY.md §9.
     image: postgis/postgis:16-3.4
     restart: unless-stopped
     logging: *logging
     # About 25% and 65% of a 4 GB droplet's RAM, rather than the image's 128MB of cache, which
     # renders reading activity masks would push the map's queries out of (docs/DEPLOY.md §6).
-    # A change restarts db, so it needs maintenance mode.
+    # On a droplet of another size, scale both. A change restarts db, so it needs maintenance
+    # mode.
     command: ["postgres", "-c", "shared_buffers=1GB", "-c", "effective_cache_size=2560MB"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -249,8 +257,8 @@ services:
       # Where it keeps its place in each log and its queue of samples not yet sent, so a
       # restart neither resends nor loses them.
       - alloy_data:/var/lib/alloy/data
-    # A cap well above what it uses (docs/DEPLOY.md §13), so a fault in the collector can't
-    # take memory the database needs.
+    # A cap well above the ~70 MB it uses, so a fault in the collector can't take memory the
+    # database needs.
     mem_limit: 400m
 
   # Backups (docs/DEPLOY.md §11) — never started by `up` (the `ops` profile keeps it out);
