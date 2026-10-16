@@ -6,6 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** The export viewfinder and its sizes (`apps/android/docs/SPEC.md` FR-2.11). */
 class ViewfinderTest {
 
     private val margins = ViewfinderMargins(top = 64f, bottom = 44f, side = 16f, minWindow = 64f)

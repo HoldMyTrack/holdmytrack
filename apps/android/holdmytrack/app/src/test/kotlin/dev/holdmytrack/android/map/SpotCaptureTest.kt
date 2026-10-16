@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** The capture rule: 30 seconds inside, fixes accurate to 25 m (`apps/android/docs/SPEC.md` FR-2.8). */
 class SpotCaptureTest {
 
     private val area: SpotArea = listOf(listOf(listOf(GeoPoint(0.0, 0.0), GeoPoint(0.0, 0.001), GeoPoint(0.001, 0.001), GeoPoint(0.001, 0.0), GeoPoint(0.0, 0.0))))

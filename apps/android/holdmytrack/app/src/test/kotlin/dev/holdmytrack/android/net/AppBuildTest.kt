@@ -5,6 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** The Update screen's trigger and target (`apps/android/docs/SPEC.md` FR-1.8). */
 class AppBuildTest {
 
     private val api = "https://holdmytrack.com"

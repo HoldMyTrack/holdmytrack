@@ -3,7 +3,7 @@ package dev.holdmytrack.android.map
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The same cases as the web's `tests/rangeShift.test.mjs`. */
+/** The date range's ‹ › (`apps/android/docs/SPEC.md` FR-2.6): the same cases as the web's `tests/rangeShift.test.mjs`. */
 class RangeShiftTest {
 
     private val days = listOf("2026-09-01", "2026-09-03", "2026-09-06", "2026-09-07", "2026-09-08", "2026-09-09")

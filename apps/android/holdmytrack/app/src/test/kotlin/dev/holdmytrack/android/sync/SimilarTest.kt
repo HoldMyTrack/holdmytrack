@@ -5,6 +5,7 @@ import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
+/** The overlap hint (`apps/android/docs/SPEC.md` FR-3.2, `docs/SPEC.md` FR-3.7). */
 class SimilarTest {
 
     private val t0 = Instant.parse("2026-09-01T08:00:00Z")

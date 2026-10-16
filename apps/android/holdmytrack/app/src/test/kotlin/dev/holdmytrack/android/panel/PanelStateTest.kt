@@ -7,6 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** The Activities panel's rules (`apps/android/docs/SPEC.md` FR-2.7). */
 class PanelStateTest {
 
     private fun activity(id: String, type: String = "walking", meters: Double? = 1000.0, pending: Boolean = false) =

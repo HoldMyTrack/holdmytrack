@@ -4,6 +4,7 @@ import dev.holdmytrack.android.net.TrackMetricPoint
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
+/** What the last Load found, kept on the phone (`apps/android/docs/SPEC.md` FR-3.2). */
 class WaitingStoreTest {
 
     @Test

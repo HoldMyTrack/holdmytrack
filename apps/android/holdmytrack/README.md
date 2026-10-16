@@ -11,7 +11,7 @@ Nothing here is containerised, deliberately: the SDK, the emulator and the physi
 - **JDK 17 or 21.** The Android Gradle Plugin supports no other versions.
 - **Android SDK** with platform 37 and build-tools 37. On this machine it is Homebrew's `android-commandlinetools` at `/opt/homebrew/share/android-commandlinetools`, with `adb` in its `platform-tools/`.
 - **`ANDROID_HOME` pointing at that SDK**, or an `sdk.dir` line in a `local.properties` next to this file. Neither is committed and Gradle fails without one of them.
-- **An emulator, if no phone is attached.** This machine has an AVD, `holdmytrack`, a Pixel 7 image on Android 16 (API 36), under the SDK's `emulator/`. Health Connect's own verification still needs a physical device (`apps/android/docs/SPEC.md`).
+- **An emulator, if no phone is attached.** This machine has an AVD, `holdmytrack`, a Pixel 7 image on Android 16 (API 36), under the SDK's `emulator/`. Health Connect's own verification still needs a physical device.
 
 ```sh
 export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
