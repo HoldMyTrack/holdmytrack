@@ -1091,7 +1091,7 @@ These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HT
 **Preconditions**: None.
 
 **Behavior**:
-1. `GET /contacts` returns the page, listing the email address `hello@holdmytrack.com` and the GitHub repository `https://github.com/HoldMyTrack/holdmytrack` for code and issues.
+1. `GET /contacts` returns the page, listing the email address `hello@holdmytrack.com` and the GitHub repository `https://github.com/HoldMyTrack/platform` for code and issues.
 
 ### FR-10.4 Page header and footer
 
