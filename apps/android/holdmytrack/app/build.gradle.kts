@@ -38,7 +38,7 @@ android {
         // versionName is the release number, bumped by hand when a release means something;
         // GIT_SHA is the exact commit, the same short SHA the server's /healthz reports.
         versionCode = gitOutput("rev-list", "--count", "HEAD")?.toIntOrNull() ?: 1
-        versionName = "0.13"
+        versionName = "0.14"
         buildConfigField("String", "GIT_SHA", "\"${gitOutput("rev-parse", "--short", "HEAD") ?: "dev"}\"")
     }
 

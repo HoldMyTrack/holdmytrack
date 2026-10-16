@@ -9,7 +9,7 @@ object AppBuild {
 
     private const val PLAY_INSTALLER = "com.android.vending"
 
-    /** What the User-Agent names this build — `HoldMyTrack-Android/0.13 (62da50b; 812)`: the
+    /** What the User-Agent names this build — `HoldMyTrack-Android/0.14 (62da50b; 812)`: the
      *  release number, the commit and the versionCode, which the server compares against its
      *  minimum. */
     fun userAgent(versionName: String, gitSha: String, versionCode: Int): String =
