@@ -38,6 +38,9 @@
     <string name="profile_card_longest_streak">Longest streak</string>
 
     <string name="verify_email_title">Verify your email</string>
+    <string name="update_app_title">Update HoldMyTrack</string>
+    <string name="update_app_body">This version of the app is too old to use. Update it to keep using HoldMyTrack. Anything waiting to sync stays on your phone until then.</string>
+    <string name="update_app_open">Update</string>
     <string name="verify_email_hint">We sent a confirmation link to %1$s. Open it to unlock your account — your map and sync start working as soon as you do.</string>
     <string name="verify_email_continue">Continue</string>
     <string name="verify_email_resend">Resend verification email</string>

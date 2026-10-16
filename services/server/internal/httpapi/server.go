@@ -89,6 +89,7 @@ type Server struct {
 	syncActivityLimiter   *fixedWindowLimiter
 	signupLimiter         *fixedWindowLimiter
 	budget                *budget.Gate
+	minAndroidBuild       int
 }
 
 // defaultUploadsPerHour is how many files one account may send to `POST /v1/activities/upload`
@@ -388,6 +389,9 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.crossSiteAPIWrite(r) {
 		writeAPIError(w, "cross-origin request refused", http.StatusForbidden)
+		return
+	}
+	if s.refuseOutdatedApp(w, r) {
 		return
 	}
 	if strings.HasPrefix(r.URL.Path, apiPrefix+"/") && !setsOwnBodyLimit(r) {

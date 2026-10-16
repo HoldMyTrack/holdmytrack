@@ -129,6 +129,7 @@ func main() {
 		srv.SetUploadsPerHour(cfg.UploadsPerHour)
 		srv.SetTilesPerMinute(cfg.TilesPerMinute)
 		srv.SetSignupsPerHour(cfg.SignupsPerHour)
+		srv.SetMinAndroidBuild(cfg.MinAndroidBuild)
 		// No ReadTimeout or WriteTimeout: a 16 MiB upload, a data export's download or a photo
 		// over a slow uplink is a legitimate request that takes minutes. ReadHeaderTimeout and IdleTimeout still free a connection
 		// that sends nothing useful.

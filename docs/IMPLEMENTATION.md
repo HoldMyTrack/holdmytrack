@@ -972,7 +972,7 @@ Outdoor places from OpenStreetMap, on the web and in the Android app over the sa
 - An error's code comes from its message key (`api_errors.go`, ADR-0045): `error.photo_no_track` is `photo_no_track`. Renaming a key a client branches on renames that code; the contract pins those codes with an enum, so a test that reaches the error fails.
 - `format: uuid` is the handlers' own pattern, any hex UUID, not kin-openapi's RFC 4122 one, which would refuse ids with other version bits.
 - A `$ref` is relative to the file it's written in: from a path file a shared shape is `../components/schemas.yaml#/Name`, inside `components/schemas.yaml` it's `#/Name`. The loader only follows one into another file when told to (`newContractLoader`).
-- The cross-origin guard's 403 (§4.19) answers before any operation and isn't in the contract, so a test of it can't go through the check.
+- The cross-origin guard's 403 (§4.19) and an outdated app's 426 (§4.33) answer before any operation and aren't in the contract, so a test of either can't go through the check.
 - `openapi.yaml`'s `servers` entry is for readers; the router can't match a relative one, so the check cuts the `/v1` prefix itself. A path outside `/v1` (tiles, pages) is never checked.
 
 ### 4.32 Service statistics
@@ -992,6 +992,15 @@ Outdoor places from OpenStreetMap, on the web and in the Android app over the sa
 **Object sizes are recorded as each object is written, not asked of the bucket.** Asking R2 per object would cost a request each, and summing a listing daily would be a thousand objects per request across every account. So the size goes in the row that names the object: whoever enqueues an ingest job knows the original's size as it writes it, and the job carries it to `activities.raw_bytes`, which a split piece copies; a render stores each tile's PNG size beside its key in `fog_tiles`. Activity masks need no column: their PNGs are in `activity_tile_mask_data`, and `pg_column_size` reads each one's stored size from its header without fetching it. A row from before the columns existed is NULL until `backfill-object-bytes` lists the bucket once (`docs/DEPLOY.md`).
 
 **What the storage values count.** Each original once, however many split pieces share it. `storage_bytes_per_account` sums everything one account stores, over accounts storing anything, which is what a per-account quota would bound; there a photo shared into a Story copy counts for every account holding it, since each could keep it alone. `storage_bytes_unmeasured_rows` counts rows naming an object whose size isn't recorded: after the backfill it should stay 0, and a row whose object is missing from the bucket stays in it, which is worth knowing too.
+
+### 4.33 Turning away old Android builds
+
+**A minimum build, so a route kept for old installs can go.** An app on a phone isn't updated when the server is, so a route an old build still calls stays until the Play Console shows no such build left (`ROADMAP.md`), and a few may never update. `MIN_ANDROID_BUILD` turns that wait into a choice: raise it past the builds that need the route, and they're told to update instead of failing on a route that's gone. `serve` refuses them before any handler runs (`internal/httpapi/app_outdated.go`), with `426` `app_outdated` (`SPEC.md` §1.5).
+- **Decided by the server, read from the User-Agent.** The app sends its `versionCode` in its User-Agent (`apps/android/docs/IMPLEMENTATION.md` §8), the commit count, so builds compare as numbers. Play's in-app updates were the alternative, but they reach only Play installs, not the sideloaded APK (`DEPLOY.md` §10), and leave the decision on the phone, so the server could never count on it.
+- **A build with no number in its agent counts as 0**, older than any minimum: those are the builds from before the gate, which are exactly the ones a minimum is raised to turn away.
+- **The message is written for builds that don't know the code.** Builds from before the gate show a refusal's `message` as it is, so it says what to do. Anything waiting to sync stays on the phone in every build, since a refused request decides nothing (`apps/android/docs/SPEC.md` FR-3.4 behavior 6).
+- **`/v1` only.** The tiles go on answering, so the map an old build already shows doesn't blank out under it, and the pages the app shows (ADR-0042) work at any version.
+- A browser, or anything else that isn't the Android app, is never refused: anyone could claim to be an old build, and the gate is for the app's sake, not a lock.
 
 ## 5. Engineering Risks & Mitigations
 

@@ -145,6 +145,19 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 3. **Your data**: **Download your data** (`docs/SPEC.md` FR-1.12), "A copy of everything, emailed when it's ready", for a real account only, opens a screen of its own: what the copy holds, then **Request a download** (`POST /v1/account/export`). While it's prepared the section says so, naming the address the email goes to, and checks again every 10 seconds while the screen shows. Once ready it says the total size and the last day, with a **Download n of m (size)** button per archive, which saves it to the phone's Downloads folder with Android's own download notification, and **Request a new one**. If it failed it says so, with the request button. Then **Privacy policy**, which opens the web's `/privacy` in a browser tab.
 4. The demo account sees its Private locations without chevrons — a row doesn't open — and no Add, no note, and no Download your data.
 
+### FR-1.8 Update screen
+
+**Description**: What the app shows once the server refuses this build as older than the deployment's minimum (root `docs/SPEC.md` §1.5).
+
+**Preconditions**: A `/v1` request answered `426` `app_outdated`, signed in or not.
+
+**Behavior**:
+1. The Update screen opens over whatever was showing: "Update HoldMyTrack", "This version of the app is too old to use. Update it to keep using HoldMyTrack. Anything waiting to sync stays on your phone until then.", **Update**, and the build under it, "Version 0.13 (62da50b)". Several refused requests at once open it once.
+2. **Update** opens the app's Google Play listing for a Play install, and the deployment's APK download (root `docs/DEPLOY.md` §10) for any other.
+3. Back closes the app. Opening it again shows the Update screen again for as long as the server refuses the build; once it doesn't, the app opens as usual.
+4. Nothing on the phone is changed: recordings and Health Connect sessions waiting on the Sync tab stay there to be sent from the updated app, and a recording under way goes on.
+5. A refused request's own screen says nothing about it; the Update screen speaks for it.
+
 ## 4. FR-2 — Map Visualization
 
 ### FR-2.1 Base map

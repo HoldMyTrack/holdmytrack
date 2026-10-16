@@ -8,7 +8,8 @@ info:
     package's tests check every request and response they make against it, so a handler that
     stops matching it fails CI. Every error is components/schemas.yaml's Error (ADR-0045). A
     browser's write from another site is refused with a 403 forbidden before any operation
-    runs; the operations don't repeat it.
+    runs, and so is an Android build older than the deployment's minimum, with a 426
+    app_outdated; the operations don't repeat either.
 servers:
   - url: /v1
 security:
