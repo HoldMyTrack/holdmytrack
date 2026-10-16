@@ -59,7 +59,7 @@ function fieldWrites(
 }
 
 /**
- * The Edit window (§4.7.4, §4.7.7) — reached from the header toolbar's Edit button
+ * The Edit window (docs/SPEC.md FR-5.10, IMPLEMENTATION.md §4.7.7) — reached from the header toolbar's Edit button
  * (ActivitiesPanel.tsx) over whatever's currently checked, floating over the map. Two tabs
  * behind one shared Save and Cancel:
  *
@@ -90,8 +90,8 @@ function fieldWrites(
  * must not change underneath it.
  *
  * Type is ActivityTypePicker.tsx — the same searchable picker as Settings' Country and
- * Timezone, listing this account's existing types, but open-ended: §4.7.2 already resolved
- * activity_type as free-form, not a controlled vocabulary. Picking an existing type is a
+ * Timezone, listing this account's existing types, but open-ended: activity_type is free
+ * text, not a controlled vocabulary (§4.7). Picking an existing type is a
  * convenience, never a constraint: typing something nobody has used before offers an "Add" row
  * that saves it exactly as typed, to every checked activity. Name is optional — an activity
  * with none falls back to its start datetime as the row's primary line; it's never parsed from

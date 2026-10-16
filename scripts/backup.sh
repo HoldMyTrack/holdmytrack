@@ -40,6 +40,15 @@
 # from the database and raw/ (DEPLOY.md §11's restore steps), so the dump doesn't grow with them.
 #
 set -euo pipefail
+# pg_dump runs inside the live db container, so the client always matches the server's version.
+# The object sync keeps what it removes or overwrites in objects-deleted/ (--backup-dir): without
+# it, a deletion or overwrite in the app bucket would reach the backup the next night.
+#
+# Not covered: losing the Cloudflare account, which holds both buckets, and up to a day of
+# writes (no continuous WAL archiving). Droplet snapshots aren't a backup: a snapshot of a
+# running Postgres is only crash-consistent, leaves out R2, and can't be restored beside the
+# live database to drill.
+#
 # A dump is the whole database, so it's root's alone like .env.prod: nothing written here is
 # readable by anyone else (docs/DEPLOY.md §12).
 umask 077

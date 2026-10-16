@@ -4,7 +4,7 @@ import { nextDistanceFilter, type DistanceRange } from './activityFacets';
 import { t } from '../i18n';
 
 /**
- * The Activities panel's DISTANCE dual slider — standalone and always visible now (§4.7.6),
+ * The Activities panel's DISTANCE dual slider — standalone and always visible (docs/SPEC.md FR-5.3),
  * not folded into the Type dropdown or hidden behind the old "Filter" toggle button. TYPE
  * moved into its own dropdown (checkboxes inline in ActivitiesPanel.tsx's toolbar); this
  * component now does one job, distance only, and no longer takes any TYPE-related props.

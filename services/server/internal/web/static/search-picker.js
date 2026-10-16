@@ -2,6 +2,7 @@
 // map app's SearchPicker (apps/web/src/ui/SearchPicker.tsx) — a trigger button over a popover
 // with a search field and a list — drawn by the same search-picker.css. The same ranking, keys
 // and markup, less what these fields don't need: no "Add" row (a closed list), no leading slot.
+// A change to the ranking or keys is made in both files.
 // Settings' Country and Timezone use it.
 //
 // The <select> stays in the form, hidden, and holds the value: picking sets it and fires its

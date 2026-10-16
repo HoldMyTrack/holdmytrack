@@ -21,14 +21,14 @@ coroutines = "1.10.2"
 # direct compile dependency here, not an implementation detail of the map SDK. 4.12.0 is the
 # version MapLibre 13.6.1's own POM already resolves to, so this pins rather than upgrades.
 okhttp = "4.12.0"
-# Sign in with Google (docs/IMPLEMENTATION.md §4.15): Credential Manager's account picker,
+# Sign in with Google (docs/IMPLEMENTATION.md §4.9): Credential Manager's account picker,
 # its Play services backend, and the Google ID-token credential type it returns.
 credentials = "1.6.0"
 # Not 1.2.1: that release is compiled with Kotlin 2.4 metadata, which this project's Kotlin
 # compiler (2.2, AGP's built-in) can't read.
 googleId = "1.2.0"
 # Custom Tabs, for Sign in with Facebook through the server's own web flow in a browser tab —
-# instead of Meta's SDK (docs/IMPLEMENTATION.md §4.22).
+# instead of Meta's SDK (docs/IMPLEMENTATION.md §4.9).
 browser = "1.10.0"
 # The map's Activities panel list (panel/ActivitiesPanel.kt) — declared rather than borrowed
 # from Material's own dependency on it, at the version Material 1.13.0 already resolves to,

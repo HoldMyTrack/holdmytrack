@@ -295,7 +295,7 @@ func claimAndRunOne(ctx context.Context, pool *pgxpool.Pool, store *storage.Stor
 //     claimed (busy) waits, which keeps its own jobs of the lane in order (an ingest, then an
 //     edit) and stops one account's import from taking every worker. Its job on another lane
 //     can run beside it: a render beside an ingest or an edit, which dirty_gen and
-//     edit_pending make safe (IMPLEMENTATION.md §3.8).
+//     edit_pending make safe (IMPLEMENTATION.md §4.1).
 //   - Of each other account, only its next job (runnable, by run_after then id) is a
 //     candidate, and the candidates go in order of when their account was last served (its
 //     latest claim on this lane, idx_jobs_user_locked), never-served first. A new user's single

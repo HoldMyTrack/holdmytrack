@@ -32,8 +32,9 @@ var embedded embed.FS
 func Embedded() fs.FS { return embedded }
 
 // OpenCollectiveSlug names the collective that funds the project — a fact about the project,
-// not about a deployment, so a constant rather than config (IMPLEMENTATION.md §4.16). Empty
-// until the collective exists; the header's Donate then links to About's funding section.
+// not about a deployment, so a constant rather than config. Empty until the collective exists;
+// the header's Donate then links to About's funding section instead of a 404. Launching means
+// setting it and editing About's "donations are not open yet" line by hand.
 // apps/web/src/funding.ts holds the same value for the map page's React header until that
 // header is this one too (ADR-0012's phase 5); keep the two in step.
 const OpenCollectiveSlug = ""

@@ -7,7 +7,7 @@ import (
 	"github.com/HoldMyTrack/platform/services/server/internal/i18n"
 )
 
-// activeImport is one row of the header's Upload menu (IMPLEMENTATION.md §4.0.1): an import
+// activeImport is one row of the header's Upload menu (IMPLEMENTATION.md §4.0): an import
 // still being processed — a single uploaded file, or every job one request enqueued together
 // (a phone sync's activities, ingest.Job.Batch), with how many of them have finished. A row leaves the list once all of its jobs have; what they came
 // to is the /sync page's.

@@ -26,7 +26,7 @@ import dev.holdmytrack.android.recording.RecordingService
  * (`MapFragment.onRecordTap`).
  *
  * Never shows the map without a session: a signed-out visitor is handed straight to
- * `SignInActivity`, mirroring web's `AuthGate` (`docs/IMPLEMENTATION.md` §4.13), before any layout
+ * `SignInActivity`, as the web's page shell redirects one to `/signin` (`docs/IMPLEMENTATION.md` §4.19), before any layout
  * or `MapView` exists. A bare basemap with none of the three user layers — all behind
  * `requireAuth` server-side — would be a weak first impression next to the Demo account that
  * screen offers one tap away.

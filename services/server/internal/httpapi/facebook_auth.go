@@ -26,6 +26,9 @@ import (
 // Unlike Google, Facebook never says whether the email it returns is verified, so a Facebook
 // identity is matched by its Facebook id only — never linked to an existing account by email —
 // and a new account it creates verifies its email by mail like any sign-up (FR-1.8).
+//
+// Meta's data-deletion requirement is met with a deletion-instructions URL, Help's
+// #delete-account section.
 
 const (
 	// facebookGraphVersion pins the Graph API version the dialog and both endpoints use —
@@ -75,7 +78,7 @@ func (f facebookOAuth) enabled() bool { return f.AppID != "" }
 // it, and the code is only redeemable with the app secret, which never leaves this server;
 // state still ties the callback to this browser. The Android app opens this same URL in a
 // browser tab with `&app_challenge=` added (oauth.go), which is how it signs in with Facebook
-// without Meta's SDK (docs/IMPLEMENTATION.md §4.22).
+// without Meta's SDK (docs/IMPLEMENTATION.md §4.9).
 func (s *Server) handleFacebookStart(w http.ResponseWriter, r *http.Request) {
 	if !s.facebook.enabled() {
 		writeAPIError(w, "not found", http.StatusNotFound)

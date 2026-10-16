@@ -182,7 +182,8 @@ type querier interface {
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 }
 
-// RegisterStats adds the holdmytrack_stat gauges to Registry.
+// RegisterStats adds the holdmytrack_stat gauges to Registry: the newest day's daily_stats, one
+// gauge per key. Only `serve` registers them, so the series isn't sent twice.
 func RegisterStats(pool *pgxpool.Pool, log *slog.Logger) {
 	Registry.MustRegister(newStatsCollector(pool, log))
 }

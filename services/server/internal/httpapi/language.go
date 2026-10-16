@@ -21,6 +21,14 @@ const languageCookieAge = 365 * 24 * time.Hour
 // the choice; a demo account can't save settings, so it gets the cookie alone. An empty lang
 // is "Automatic": the cookie is cleared and the setting set back to NULL, so the browser's
 // own language decides again. Then back to the page the menu was on.
+//
+// A cookie because the server picks the language before it sends the page. It needs no consent
+// banner: the ePrivacy Directive's Art. 5(3) exempts storage strictly necessary for a service
+// the user asked for, and the Article 29 Working Party's Opinion 04/2012 names a cookie
+// remembering a chosen language as an example. Sign-up doesn't copy it into the account, which
+// would turn a browser preference into a setting the person never chose. The menu never shows
+// Automatic as checked: a signed-out page is cached per language, not per cookie (RenderPublic),
+// so the header can't know whether its language was chosen.
 func (s *Server) handleLanguageForm(w http.ResponseWriter, r *http.Request) {
 	lang := r.PostFormValue("lang")
 	if lang != "" && !i18n.IsSupported(lang) {

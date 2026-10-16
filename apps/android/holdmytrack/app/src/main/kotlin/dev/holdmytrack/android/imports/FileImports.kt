@@ -36,7 +36,7 @@ object FileImports {
      *  refused — or why a picked file wasn't sent. */
     data class Note(val text: String, val error: Boolean)
 
-    /** The web's cap on files picked at once (root `docs/IMPLEMENTATION.md` §4.0.1). */
+    /** The web's cap on files picked at once (`docs/SPEC.md` FR-3.1). */
     const val MAX_FILES = 20
 
     /** The server's limits (`services/server/internal/httpapi/server.go`): checked here too, so

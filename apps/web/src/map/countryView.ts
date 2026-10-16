@@ -4,8 +4,8 @@ import type { ViewState } from './viewState';
  * Per-country opening view for MapView's zero-history fallback (docs/SPEC.md FR-4.5) — a
  * point + zoom that keeps roughly the whole country in frame, not a real-time lookup.
  *
- * Generated once, offline, from Natural Earth's Admin-0 country polygons (IMPLEMENTATION.md
- * §4.13): `ST_PointOnSurface(geom)` per ISO code (not `ST_Centroid`, which can land outside a concave
+ * Generated once, offline, from Natural Earth's Admin-0 country polygons:
+ * `ST_PointOnSurface(geom)` per ISO code (not `ST_Centroid`, which can land outside a concave
  * or archipelago shape), zoom derived from the polygon's own bounding-box extent so a small
  * country lands close and a large one lands wide. Scoped to exactly the codes
  * the Settings page's Country list (`services/server/internal/web/places_data.go`) can write into `users.country` — a handful of

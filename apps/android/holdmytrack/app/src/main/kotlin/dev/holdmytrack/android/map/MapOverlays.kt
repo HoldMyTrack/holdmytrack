@@ -24,7 +24,7 @@ import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 
 /**
- * The three mutually exclusive views `docs/IMPLEMENTATION.md` §4.2.2 names — one toggle, not
+ * The three mutually exclusive views `docs/SPEC.md` FR-4.4 names — one toggle, not
  * three checkboxes. Both Fog and Heatmap hide the track lines: the veil or the heat already
  * shows where the user has been, and lines drawn on top of it read as noise rather than as extra
  * information.
@@ -78,7 +78,7 @@ object MapOverlays {
     private const val REGION_FOG_LAYER_ID = "region-fog-fill"
 
     /** Heatmap below city zoom: the server's heat points drawn as heatmap circles, the web's
-     *  `heat-points` (`docs/IMPLEMENTATION.md` §4.2.4). */
+     *  `heat-points` (`docs/IMPLEMENTATION.md` §4.2.2). */
     private const val HEAT_POINTS_SOURCE_ID = "heat-points"
     private const val HEAT_POINTS_LAYER_ID = "heat-points-circles"
     /** Must match `ST_AsMVT(t, 'heat', ...)` in the backend's heat-points query. */
@@ -124,7 +124,7 @@ object MapOverlays {
     const val TRACKS_MIN_ZOOM = 4f
 
     /**
-     * The basemap archive's own maximum zoom (`docs/IMPLEMENTATION.md` §5.4), and the same
+     * The basemap archive's own maximum zoom (`docs/SPEC.md` FR-4.15), and the same
      * ceiling the server renders fog and heatmap tiles to. MapLibre overzooms past a declared
      * maximum rather than stopping, so the layers stay drawn as the user keeps zooming in.
      */

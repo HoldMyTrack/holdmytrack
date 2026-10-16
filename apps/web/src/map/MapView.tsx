@@ -129,8 +129,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
 
   // Read once per mount. A previous session's camera position can't leak into a new one: every
   // sign-in, sign-up, demo start and sign-out is a server-rendered page that ends in a
-  // redirect to a bare `/`, with no hash to inherit (IMPLEMENTATION.md §4.13). (While those
-  // were React screens swapped in place, App.tsx had to clear the hash itself.)
+  // redirect to a bare `/`, with no hash to inherit (IMPLEMENTATION.md §4.19).
   const [initial] = useState<{ hash: HashState; view: ViewState; flavor: Flavor }>(() => {
     const hash = parseHash(window.location.hash);
     return {
@@ -158,8 +157,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   const container = useRef<HTMLDivElement>(null);
   const [exportFlow, setExportFlow] = useState<ExportFlow>({ stage: 'idle' });
   const [exportError, setExportError] = useState<string | null>(null);
-  // Normal is what already rendered before fog existed — it needed no new work to count
-  // as a "mode" (IMPLEMENTATION.md §4.2.2).
+  // Exactly one of Normal, Fog and Heatmap shows at a time (docs/SPEC.md FR-4.4).
   const [mapMode, setMapModeState] = useState<MapMode>('normal');
   // The Satellite button (BasemapToggle.tsx) and the Layers menu (OverlaysMenu.tsx): Bike
   // paths, Shared paths, Mountain bike trails and each Spots category, over any mode, drawn while the Layers checkbox is
@@ -376,6 +374,8 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // Set here and consumed by the range fly further down: only a range the user picked moves
   // the camera, never the default re-deriving itself after an upload or sync.
   const flyToNextRangeRef = useRef(false);
+  // A new range clears the selection, focus, hidden set and filters (docs/SPEC.md FR-6.6): they
+  // could name activities the new range doesn't list, and a stale distance band could exclude all.
   const changeSelectedRange = useCallback((next: DateRange) => {
     userChangedRangeRef.current = true;
     flyToNextRangeRef.current = true;
@@ -622,8 +622,10 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // handle: the target activity may not be in the currently selected date range (an old upload,
   // a Health Connect backfill), in which case focusActivity would silently find nothing
   // in `activities` and no-op. When that happens, this narrows the range to just that activity's
-  // own day — in the account's timezone, as the link carries it (changeSelectedRange, the same
-  // mechanism the slider commits through) — and defers the actual focus to the effect below,
+  // own day — its local day in the zone it was recorded in, as the link carries it and as the
+  // server reads a bare from/to (IMPLEMENTATION.md §4.30); a UTC day would put an evening activity
+  // west of Greenwich a day late and come back empty (changeSelectedRange, the same mechanism the
+  // slider commits through) — and defers the actual focus to the effect below,
   // which fires once that range's own refetch has actually landed and the id is really there.
   // Also restores Normal mode first: Fog/Heatmap have no per-track focus concept, and their own
   // mode-switch effect already clears focus whenever entering either.
@@ -963,7 +965,8 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   }, [handleUploaded]);
 
   // Files dropped on the map go to the header's Upload menu, which uploads them and shows their
-  // progress. A demo account has no Upload menu, and the map takes no drop.
+  // progress. A demo account has no Upload menu, and the map takes no drop. The cover counts
+  // enters and leaves, since each child element the drag crosses fires its own pair.
   const [fileDragOver, setFileDragOver] = useState(false);
   const dragDepthRef = useRef(0);
   const carriesFiles = (event: React.DragEvent) => !isDemo && Array.from(event.dataTransfer.types).includes('Files');
@@ -991,7 +994,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     window.dispatchEvent(new CustomEvent('hmt:upload-files', { detail: event.dataTransfer.files }));
   };
 
-  // §4.7.5/§4.7.6: one or more deleted activities need the exact same refresh a finished
+  // §4.7.5: one or more deleted activities need the exact same refresh a finished
   // upload does (unlike editing type/description, deleting changes the slider's days too) — plus dropping every deleted id from any local selection
   // state that could otherwise still reference it. focusedActivityId is the one that actually
   // matters for correctness: left pointing at a now-deleted id, the pace-colored segments

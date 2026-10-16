@@ -36,7 +36,8 @@ loki.process "scrub" {
 	forward_to = [loki.write.grafanacloud.receiver]
 
 	// api, worker and the one-off commands log JSON (slog). The level becomes a label, so
-	// alerts and searches can pick out errors without parsing every line.
+	// alerts and searches can pick out errors without parsing every line. It is the only label
+	// the app's lines get: `version`, the build's commit, stays a JSON field.
 	stage.match {
 		selector = "{service=~\"api|worker|migrate\"}"
 
@@ -164,5 +165,7 @@ prometheus.remote_write "grafanacloud" {
 		}
 	}
 
+	// Not `instance`: every scraped series already has one, so an external label of that name
+	// would never apply.
 	external_labels = {deployment = sys.env("DOMAIN")}
 }

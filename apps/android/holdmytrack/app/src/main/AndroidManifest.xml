@@ -113,7 +113,7 @@
 
         <!-- Exported, unlike SignInActivity, because the browser launches it: a Facebook
              sign-in in a Custom Tab ends at holdmytrack://oauth, which this forwards to
-             SignInActivity (docs/IMPLEMENTATION.md §4.22). -->
+             SignInActivity (docs/IMPLEMENTATION.md §4.9). -->
         <activity
             android:name=".OAuthRedirectActivity"
             android:exported="true"

@@ -1,5 +1,5 @@
 // cmd/make-testing-files writes the sample files the Android test suite page offers testers
-// (`/testing`, docs/SPEC.md FR-10.7, IMPLEMENTATION.md §4.14) into
+// (`/testing`, docs/SPEC.md FR-10.7, IMPLEMENTATION.md §4.19) into
 // internal/web/static/testing/, from the Demo Customer's own tracks and photos
 // (internal/httpapi/demo_data). Run it from services/server after changing them, or this file:
 //

@@ -55,7 +55,7 @@ The production VPS (2 vCPU, 4 GB) with one sequential worker. 21 test accounts; 
 A laptop (Apple silicon) running the dev stack.
 
 - **Render in parallel** (`IMPLEMENTATION.md` §4.2 "Invalidation"): with 80 ms added to every object-store round trip by `delayproxy`, the Vietnam track took 93 s to ingest and 780 s to render (1,622 tiles) one tile at a time, and 7.7 s and 52 s sixteen at a time. Every Fog tile was byte-identical between the two runs.
-- **Fair, concurrent worker** (`IMPLEMENTATION.md` §3.8): a claim took about 11 ms against a 5,000-job backlog of one account, 20,000 finished jobs and 20 other accounts. With 300 of one account's import jobs queued, another account's single upload was processed in 5 s.
+- **Fair, concurrent worker** (`IMPLEMENTATION.md` §4.1): a claim took about 11 ms against a 5,000-job backlog of one account, 20,000 finished jobs and 20 other accounts. With 300 of one account's import jobs queued, another account's single upload was processed in 5 s.
 - **Palette tiles** (`IMPLEMENTATION.md` §4.2 "Serving"): serving a Fog tile went from about 6.4 ms of CPU (0.27 ms decode, 1.1 ms colouring, 5 ms encode) to 0.66 µs. A 50-user browse took the API from about 200% CPU to about 27% and Fog's p95 from 28 ms to 3 ms.
 - **Two-pass blur and dilate** (`IMPLEMENTATION.md` §4.2 "Rendering a tile"): compositing a three-activity tile went from 20.6 ms to 1.1 ms for Fog and from 62 ms to 3.3 ms for Heatmap, a pyramid tile from 7.5 ms to 1.2 ms. Output byte-identical.
 
@@ -180,7 +180,7 @@ The same VPS with 64 px tiles (`IMPLEMENTATION.md` §4.2), the parallel purge an
 - Views rose in step with people all the way to 200; nothing saturated. A view cost 2.3–3.0 requests, the rest coming from the tile cache. Postgres averaged 51% CPU at 100 people and 117% at 200 (peaks of 195%), serving the live Tracks, Region and Country tiles; the API stayed under 35% and Caddy under 35%. At least 2.6 GB of memory stayed available.
 - The seed's 945 uploads were accepted in 30 s (p95 2.36 s) and the queue drained in 19 minutes, with the worker peaking at 193% CPU.
 - The import's 5,000 files, sent one at a time by five accounts at once, were accepted in about 2.5 minutes without a failure, and the queue drained in 38 minutes. Ingests ran at about 75 a minute for the first three minutes, the worker at about 45% CPU and the host two-thirds idle while autovacuum analysed `activities` and `activity_streams`, then at 260–375 a minute.
-- A single upload from another account was processed in 5 s with 4,254 jobs queued ahead of it, but took 7 minutes 35 s when sent at 23:04: by then the renders of the four accounts that had finished ingesting held all four worker loops (`IMPLEMENTATION.md` §3.8), and the upload waited until the first of them ended at 23:12. Those four renders ended between 23:12 and 23:15 with the worker averaging 81% CPU of its 200%, waiting more than computing.
+- A single upload from another account was processed in 5 s with 4,254 jobs queued ahead of it, but took 7 minutes 35 s when sent at 23:04: by then the renders of the four accounts that had finished ingesting held all four worker loops (`IMPLEMENTATION.md` §4.1), and the upload waited until the first of them ended at 23:12. Those four renders ended between 23:12 and 23:15 with the worker averaging 81% CPU of its 200%, waiting more than computing.
 - 12 people browsing during the import: every 30 s window's Fog p95 under 155 ms (median 59 ms), Tracks under 245 ms (63 ms), Region under 940 ms (118 ms), with no errors.
 - The purge removed the 21 accounts and their 5,947 activities in about 10 minutes, leaving no row with their `user_id` in any table and no job pending. The database grew from 2,452 to 2,582 MB during the test and stood at 2,564 MB after the purge.
 
@@ -219,7 +219,7 @@ The decision behind the 128 px tile size (`IMPLEMENTATION.md` §4.2). One dev ac
 
 ### 2026-10-10 — dev stack, the render lane and masks in Postgres
 
-The laptop's dev stack, first with a worker and API built from `main`, then from the branch that gives renders their own lane (`IMPLEMENTATION.md` §3.8), moves masks into Postgres (`IMPLEMENTATION.md` §3.11), draws 128 px tiles (`IMPLEMENTATION.md` §4.2) and keeps the Country and Region outlines per tile (`IMPLEMENTATION.md` §4.2.4). Both workers reached the object store through `delayproxy` at 80 ms a round trip and ran `WORKER_CONCURRENCY=2`, so two accounts' renders could fill the main lane as four did in production; the branch's also ran `WORKER_RENDER_CONCURRENCY=2`. Two accounts each imported a 1,000-track set (`gen 2 1000`, `import 2`); a third probed. On the branch, `rerender-coverage --masks` first redrew both accounts' masks into Postgres.
+The laptop's dev stack, first with a worker and API built from `main`, then from the branch that gives renders their own lane (`IMPLEMENTATION.md` §4.1), moves masks into Postgres (`IMPLEMENTATION.md` §3.11), draws 128 px tiles (`IMPLEMENTATION.md` §4.2) and keeps the Country and Region outlines per tile (`IMPLEMENTATION.md` §4.2.4). Both workers reached the object store through `delayproxy` at 80 ms a round trip and ran `WORKER_CONCURRENCY=2`, so two accounts' renders could fill the main lane as four did in production; the branch's also ran `WORKER_RENDER_CONCURRENCY=2`. Two accounts each imported a 1,000-track set (`gen 2 1000`, `import 2`); a third probed. On the branch, `rerender-coverage --masks` first redrew both accounts' masks into Postgres.
 
 | | `main` | Branch |
 | :-- | :-- | :-- |
@@ -244,7 +244,7 @@ The laptop's dev stack, first with a worker and API built from `main`, then from
 
 ### 2026-10-10 — production, `535cec9`, the render lane
 
-The same VPS after the deploy of renders in a lane of their own (`IMPLEMENTATION.md` §3.8, two render loops beside four main ones), activity masks in Postgres (`IMPLEMENTATION.md` §3.11), 128 px tiles (`IMPLEMENTATION.md` §4.2), Country and Region outlines kept per tile (`IMPLEMENTATION.md` §4.2.4) and Postgres's cache at 1 GB (`DEPLOY.md` §6). The deploy's `rerender-coverage --masks` redrew the 5,777 masks of 780 activities into Postgres, 502 bytes each on average, and their renders took at most 110 s. 21 test accounts; the bypass was on for about 14 s, and `api` ran with `UPLOADS_PER_HOUR=100000` until the cleanup.
+The same VPS after the deploy of renders in a lane of their own (`IMPLEMENTATION.md` §4.1, two render loops beside four main ones), activity masks in Postgres (`IMPLEMENTATION.md` §3.11), 128 px tiles (`IMPLEMENTATION.md` §4.2), Country and Region outlines kept per tile (`IMPLEMENTATION.md` §4.2.4) and Postgres's cache at 1 GB (`DEPLOY.md` §6). The deploy's `rerender-coverage --masks` redrew the 5,777 masks of 780 activities into Postgres, 502 bytes each on average, and their renders took at most 110 s. 21 test accounts; the bypass was on for about 14 s, and `api` ran with `UPLOADS_PER_HOUR=100000` until the cleanup.
 
 | Users | Map views/s | Requests/s | Fog p95 | Heatmap p95 | Tracks p95 | Region p95 | Country p95 | Errors |
 | :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- |

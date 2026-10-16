@@ -143,7 +143,7 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGoogleToken serves `POST /v1/auth/google/token` `{id_token, tz}` — Sign in with Google
-// for a native client (docs/IMPLEMENTATION.md §4.15). The Android app gets the id_token from
+// for a native client (docs/IMPLEMENTATION.md §4.9). The Android app gets the id_token from
 // Credential Manager's account picker and posts it here; its signature is verified
 // (verifyGoogleIDToken), the account resolved exactly as the web callback does, and the answer
 // is the same session JSON as a password sign-in. Every failure is a 401 with the web's own

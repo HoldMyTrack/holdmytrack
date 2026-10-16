@@ -17,7 +17,7 @@ const defaultUploadsLimit = 5
 // comment on why LIMIT/OFFSET is fine here despite §4.7's list endpoint dropping pagination.
 const maxUploadsLimit = 50
 
-// uploadRow is one entry in the persistent upload history (IMPLEMENTATION.md §4.0.1),
+// uploadRow is one entry in the persistent upload history (IMPLEMENTATION.md §4.0),
 // distinct from live in-flight status
 // (handleActivityStatus): this answers "what happened to every upload ever, including ones
 // whose tab is long closed," which nothing before this endpoint could answer at all.
@@ -61,10 +61,8 @@ type uploadsResponse struct {
 // uploadsCountQuery and uploadsListQuery read the `jobs` table directly rather than a
 // dedicated uploads table — every upload already is an `ingest` job (handleUpload), and `jobs` already carries everything a history row needs (filename via
 // `payload->>'source_detail'`, external_id, state, last_error, created_at). LIMIT/OFFSET,
-// not the keyset pagination §4.7's histogram uses, because this is the one place in the
-// upload flow §4.0.1 says pagination is actually justified — unlike the activity list, an
-// upload log grows monotonically forever and a caller legitimately wants "page 3", not
-// "everything since some cursor."
+// not the keyset pagination §4.7's histogram uses: unlike the activity list, an upload log
+// only grows, and a caller wants "page 3", not "everything since some cursor."
 // The `$2::text[] IS NULL OR ...` treatment is §4.3's own optional-filter pattern
 // (activities.go's listActivitiesQuery) — an absent/nil sources filter means "every source",
 // not "no rows". `source` is what ROADMAP.md's Files/Sync tab split filters this by client-side.
@@ -107,7 +105,7 @@ func jobErrorMessage(l *i18n.Localizer, errorCode, lastError *string) string {
 	return ""
 }
 
-// handleListUploads serves §4.0.1's `GET /v1/uploads?limit=&offset=`.
+// handleListUploads serves §4.0's `GET /v1/uploads?limit=&offset=`.
 func (s *Server) handleListUploads(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	limit := defaultUploadsLimit

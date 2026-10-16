@@ -657,7 +657,7 @@ object HoldMyTrackApi {
     /**
      * `POST /v1/auth/google/token` — trades the ID token Credential Manager returned for a
      * session. The server checks the token's signature against Google's keys before trusting
-     * anything in it (`docs/IMPLEMENTATION.md` §4.15).
+     * anything in it (`docs/IMPLEMENTATION.md` §4.9).
      */
     fun signInWithGoogle(idToken: String, timezone: String, onResult: (Result<Account>) -> Unit) {
         authenticate("/auth/google/token", jsonBody(GoogleTokenJson(idToken, timezone)), onResult)
@@ -903,7 +903,7 @@ object HoldMyTrackApi {
 
     /**
      * `PATCH /v1/activities/{id}` — a full replace of the three fields a person can set
-     * (`docs/IMPLEMENTATION.md` §4.7.4): an empty [name] or [description] clears it. Answers
+     * (`docs/SPEC.md` FR-5.10): an empty [name] or [description] clears it. Answers
      * with the row as it now is. A refusal (too long, a demo account) is the server's own
      * wording, in the app's language.
      */
@@ -1317,7 +1317,7 @@ object HoldMyTrackApi {
 
     /**
      * `GET /v1/activities/histogram?from=&to=` — every day with activity in a calendar window,
-     * both ends inclusive (§4.7's calendar-window mode). Profile asks for everything up to the
+     * both ends inclusive (`docs/IMPLEMENTATION.md` §4.8). Profile asks for everything up to the
      * end of this year in one call, the same single query the web's page runs for its grids.
      */
     fun activityDays(from: String, to: String, onResult: (Result<ActivityDayPage>) -> Unit) {

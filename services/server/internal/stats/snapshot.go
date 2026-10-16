@@ -1,6 +1,16 @@
 // Package stats keeps the service's daily statistics (IMPLEMENTATION.md §4.32): once per UTC
 // day the worker runs the catalogue against the database and writes one daily_stats row per
 // value. Every value is an aggregate across accounts; nothing here reads or writes one account.
+//
+// A state value is read as it stands when the snapshot runs, normally in the first hour after
+// midnight, which stands for the end of the day closely enough. A flow value counts rows
+// timestamped in the day, exact while the row still exists the next day. active_Nd counts
+// last_seen_at from the start of the day N−1 days before, so a first visit between midnight and
+// the snapshot also counts for the day before, a small overcount accepted.
+//
+// Deletions aren't stored, since a deleted account's row is gone within minutes: read back,
+// deletions(D) = accounts(D−1) + signups(D) − accounts(D), exact whenever both days have a
+// snapshot. An account created and deleted within D is missing from both.
 package stats
 
 import (

@@ -12,13 +12,16 @@
 // fires `hmt:imports-changed` on window, which the map listens to (MapView.tsx) to redraw its
 // list and tracks.
 //
+// Both page shells load this one plain script (layout.html, app/app.html), so the menu works the
+// same on the map and on every server-rendered page.
+//
 // The menu's words are the server's catalog, rendered into <script class="upload-menu__strings">.
 (function () {
   'use strict';
 
   var POLL_MS = 2000;
   var IDLE_MS = 20000;
-  // How many files one pick or drop may bring (IMPLEMENTATION.md §4.0.1).
+  // How many files one pick or drop may bring (docs/SPEC.md FR-3.1).
   var MAX_FILES = 20;
   var ACCEPT = /\.(gpx|fit|tcx)$/i;
   var ZIP = /\.zip$/i;
@@ -173,6 +176,7 @@
     return text || fill(strings.request_failed, { status: xhr.status });
   }
 
+  // One XMLHttpRequest per file, for the upload-progress event fetch doesn't reliably have.
   function send(file, transfer) {
     return new Promise(function (resolve) {
       var xhr = new XMLHttpRequest();

@@ -24,7 +24,7 @@ import (
 // the smallest thing that removes the old placeholder-user stand-in, with no vendor to depend
 // on, the same bias Path 3 uploads already made. Sign in with Google (google_auth.go) is an
 // optional second way into the same accounts and the same sessions, off unless configured —
-// email+password never depends on it. Password reset (IMPLEMENTATION.md §4.11) and email verification (docs/SPEC.md FR-1.8)
+// email+password never depends on it. Password reset (IMPLEMENTATION.md §4.9) and email verification (docs/SPEC.md FR-1.8)
 // share the same token-table shape. Rate limiting is partially built: see demoLimiter/forgotPasswordLimiter
 // below, added specifically because their endpoints are reachable with no credentials at all,
 // and storySendLimiter and Server.uploadLimiter, per account.

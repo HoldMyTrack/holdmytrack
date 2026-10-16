@@ -24,8 +24,8 @@ const (
 	Zoom = 14
 
 	// strokeRadiusPx: how far either side of a track Fog clears (and Heatmap's line reaches) —
-	// 2.5 px at z14's ~19 m/px, ~48 m, a band of about 100 m. §4.2.1's
-	// references hug the road centreline (~20-40 m), and that left daily-walked blocks
+	// 2.5 px at z14's ~19 m/px, ~48 m, a band of about 100 m. Fog of World and its like
+	// hug the road centreline (~20-40 m), and that left daily-walked blocks
 	// (often 100-150 m deep) still fogged between the streets walked; ~100 m opens a walked
 	// neighbourhood while streets a block apart stay separate. Changing it means redrawing
 	// every stored mask: rerender-coverage --masks.
@@ -33,8 +33,8 @@ const (
 
 	// TileMarginPx is how far (in tile-local pixels, at TileSize) a point's own drawn mark
 	// reaches past its bare coordinate: half the stroke width. Nothing blurs it further — at
-	// 128 px the stroke's anti-aliased edge, drawn ~4 times larger by the client, is the feather
-	// §4.2.1's "1-4px transition at display resolution" asks for. internal/ingest's
+	// 128 px the stroke's anti-aliased edge, drawn ~4 times larger by the client, is the
+	// 1-4 px edge transition at display resolution measured on Fog of World's screenshots. internal/ingest's
 	// computeTouchedTiles buffers its tile-membership check by this margin so a point close
 	// enough to a tile boundary to actually paint into the neighboring tile gets that
 	// neighbor rendered too, not just the tile its coordinate floors into.
@@ -111,10 +111,8 @@ func thinPoints(pts []pixelPoint) []pixelPoint {
 
 // compositeFogMask combines several activities' crisp masks into §4.2's coverage mask: a
 // true per-pixel max — a once-ridden road and a daily commute converge on full reveal rather
-// than accumulating past it, exactly the property §4.2.1 depends on, and a stricter one than
-// the old single-canvas sequential-draw approach gave at anti-aliased stroke edges (where
-// sequential source-over compositing of several strokes' partial edge coverage could end up
-// very slightly brighter than a true max).
+// than accumulating past it. Sequential source-over drawing of several strokes would come out
+// slightly brighter than a true max at their anti-aliased edges.
 func compositeFogMask(masks []*image.Gray) *image.Gray {
 	out := image.NewGray(image.Rect(0, 0, TileSize, TileSize))
 	for _, m := range masks {
@@ -165,9 +163,8 @@ const (
 	// 0001_users_and_auth.sql) and is also the floor RecomputeHeatmapCap falls back to before an
 	// account has enough coverage to derive its own value (see minTouchedTilesForAdaptiveCap
 	// in cap.go) — "about 8 separate activities through the same spot reads as maximally hot,"
-	// the same adopted-not-derived reasoning §4.2.1 recorded fog's reveal radius with, kept as
-	// the starting point a sparse account's cap actually is before real usage data exists for
-	// it specifically.
+	// a chosen starting point, as strokeRadiusPx is, kept until the account has usage data of
+	// its own.
 	defaultHeatmapCap = 8.0
 
 	// minHeatmapCap floors RecomputeHeatmapCap's output — a sparse or unusually uniform

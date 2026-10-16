@@ -6,10 +6,10 @@ import { BAND_LAYER_ID } from './trackBands';
 import { TRACKS_CASING_LAYER_ID, TRACKS_LAYER_ID } from './tracks';
 
 /**
- * The three mutually-exclusive views IMPLEMENTATION.md §4.2.2 names — not
+ * The three mutually exclusive views (docs/SPEC.md FR-4.4) — not
  * independent checkboxes, a single toggle. Lives here rather than in fog.ts or heatmap.ts
  * because it has to coordinate all three overlay layers (fog, heatmap, tracks) at once:
- * both Fog and Heatmap hide the track layer (§4.2.2 — the raster already encodes where, and
+ * both Fog and Heatmap hide the track layer (the coverage already shows where, and
  * the drawn lines on top of either one read as visual noise rather than adding information,
  * reported live as ruining the effect), which neither fog.ts nor heatmap.ts alone could
  * express without reaching into a layer they don't own.

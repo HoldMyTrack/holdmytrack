@@ -214,7 +214,8 @@ services:
   # Monitoring (docs/DEPLOY.md §13) — ships the containers' logs and the host's, Postgres's
   # and the app's metrics to Grafana Cloud, as ops/alloy/config.alloy says. Off unless
   # .env.prod has COMPOSE_PROFILES=monitoring and the GRAFANA_CLOUD_* values. It reads the
-  # Docker socket to find and tail the containers, which makes it as trusted as root here.
+  # Docker socket to find and tail the containers, which makes it as trusted as root here, so
+  # its image is pinned.
   alloy:
     image: grafana/alloy:v1.20.1
     profiles: ["monitoring"]

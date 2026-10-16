@@ -34,7 +34,7 @@ Process-level setup, in a fixed order that matters: `Session.init` before anythi
 
 ### 1.3 Theme (`res/values/themes.xml`)
 
-**The palette, scales, fonts and icons are the web's** (root `docs/IMPLEMENTATION.md` §4.17, §4.18): `res/values/colors.xml` and `res/values-night/colors.xml` are the web's light and dark tokens value for value, under the same names, and `res/values/dimens.xml` its spacing, radius and type scales with CSS px read as dp — a phone browser draws one CSS px as one dp, so the mobile web and the app come out the same size. **A change to the web's tokens needs the matching change here.** The base theme maps the palette onto Material's color roles once, so the mapping holds for both palettes. Dynamic color is not applied, so the user's wallpaper never replaces the palette.
+**The palette, scales, fonts and icons are the web's** (root `docs/IMPLEMENTATION.md` §4.19): `res/values/colors.xml` and `res/values-night/colors.xml` are the web's light and dark tokens value for value, under the same names, and `res/values/dimens.xml` its spacing, radius and type scales with CSS px read as dp — a phone browser draws one CSS px as one dp, so the mobile web and the app come out the same size. **A change to the web's tokens needs the matching change here.** The base theme maps the palette onto Material's color roles once, so the mapping holds for both palettes. Dynamic color is not applied, so the user's wallpaper never replaces the palette.
 
 - **Which palette applies is AppCompat's night mode**: the You tab's Theme choice is applied in `HoldMyTrackApplication.onCreate` and again on a change, which recreates the open screens, and the map's flavor reads the same configuration (§1.2).
 - **Shape is the web's radius scale, not Material's** pill buttons and 28dp dialogs.
@@ -85,9 +85,9 @@ The app's whole HTTP surface in one object: one shared `OkHttpClient`, its inter
 
 **Client-side validation is only "both fields are non-empty"**, so the server remains the single source of truth for what an acceptable email or password looks like, and the user sees its error text.
 
-**Google and Facebook** (the server side is root `docs/IMPLEMENTATION.md` §4.15 and §4.22) show only once the server reports each configured; if that request fails they stay hidden, since a button that can only fail is worse than none.
+**Google and Facebook** (the server side is root `docs/IMPLEMENTATION.md` §4.9) show only once the server reports each configured; if that request fails they stay hidden, since a button that can only fail is worse than none.
 - **Google** asks Credential Manager for an ID token for the server's *web* client id, so the token's audience is the one the server checks. Any failure other than closing the picker is logged: in development it's almost always a missing Android OAuth client for the debug key's SHA-1, which the picker reports only as a generic error. `googleid` is pinned at 1.2.0: 1.2.1 is compiled with Kotlin 2.4 metadata, which this project's compiler can't read.
-- **Facebook** doesn't use Meta's SDK (root `docs/IMPLEMENTATION.md` §4.22). The verifier is saved to `SharedPreferences` before the Custom Tab opens, since the process can die while the tab is in front. **`OAuthRedirectActivity`** receives the `holdmytrack://oauth` redirect: an exported, no-display activity whose only job is forwarding the URI to `SignInActivity` with `CLEAR_TOP | SINGLE_TOP`, which closes the tab above it and keeps `SignInActivity` itself unexported. The buttons re-enable on resume when the tab was closed.
+- **Facebook** doesn't use Meta's SDK (root `docs/IMPLEMENTATION.md` §4.9). The verifier is saved to `SharedPreferences` before the Custom Tab opens, since the process can die while the tab is in front. **`OAuthRedirectActivity`** receives the `holdmytrack://oauth` redirect: an exported, no-display activity whose only job is forwarding the URI to `SignInActivity` with `CLEAR_TOP | SINGLE_TOP`, which closes the tab above it and keeps `SignInActivity` itself unexported. The buttons re-enable on resume when the tab was closed.
 
 ### 2.4 `VerifyEmailActivity`
 
@@ -263,7 +263,7 @@ The rows swiped aside, as candidate keys per account, so two people on one phone
 
 ### 5.4 `UploadActivity` and `imports/FileImports` — uploading files
 
-The Upload screen (`apps/android/docs/SPEC.md` FR-3.6) is the web's Upload menu (`upload.js`) ported, against the same endpoint (root `docs/IMPLEMENTATION.md` §4.0.1).
+The Upload screen (`apps/android/docs/SPEC.md` FR-3.6) is the web's Upload menu (`upload.js`) ported, against the same endpoint (root `docs/IMPLEMENTATION.md` §4.0).
 
 - **A process-wide object, not the screen's**, with its own scope, so an upload outlives a rotation or a trip to another app — unlike a Health Connect read or send, which leaving the screen cancels (§5.1).
 - **The picker asks for `*/*`.** Providers label these files inconsistently — the emulator's Downloads called a `.gpx` `application/octet-stream` — so filtering by MIME type would hide the files asked for, and the queue decides by name instead. For the same reason the app doesn't claim `application/octet-stream` for opened or shared files, or it would offer itself for every binary file.

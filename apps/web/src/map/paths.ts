@@ -10,7 +10,8 @@ import { PATH_LAYER_IDS } from './style';
  *
  * Only a layer still below the fog raster moves: reattachOverlays calls this on every
  * `styledata`, and moving a layer that's already in place would fire another (docs/DEVELOPMENT.md).
- * A style swap puts the layers back among the roads, and the next call lifts them again.
+ * A style swap puts the layers back among the roads, and the next call lifts them again. The cost
+ * is that a path paints over a road bridge crossing it.
  */
 export function raisePathLayers(map: MapLibreMap, beforeId: string | undefined): void {
   const order = map.getStyle().layers.map((layer) => layer.id);
