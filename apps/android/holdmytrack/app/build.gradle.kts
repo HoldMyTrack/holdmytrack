@@ -96,11 +96,14 @@ android {
     sourceSets["test"].java.srcDirs("src/test/kotlin")
 }
 
-// WireContractTest reads the API contract, outside this project, so a change to it reruns the
-// unit tests rather than leaving them up to date.
+// WireContractTest reads the API contract and MapRulesTest the shared map rule cases, both outside
+// this project, so a change to either reruns the unit tests rather than leaving them up to date.
 tasks.withType<Test>().configureEach {
     inputs.files(rootProject.fileTree("../../../services/server/api"))
         .withPropertyName("apiContract")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(rootProject.fileTree("../../../testdata/map-session"))
+        .withPropertyName("mapRuleCases")
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 

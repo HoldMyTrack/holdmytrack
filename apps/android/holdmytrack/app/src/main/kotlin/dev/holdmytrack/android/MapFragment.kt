@@ -42,14 +42,17 @@ import dev.holdmytrack.android.export.ExportViewfinder
 import dev.holdmytrack.android.map.ActivityDays
 import dev.holdmytrack.android.map.BoxUnion
 import dev.holdmytrack.android.map.CaptureMode
-import dev.holdmytrack.android.map.Geo
 import dev.holdmytrack.android.map.CoverageWatch
 import dev.holdmytrack.android.map.EditPreview
 import dev.holdmytrack.android.map.SyncCandidatesOverlay
 import dev.holdmytrack.android.map.TrackEditOverlay
 import dev.holdmytrack.android.map.DateRange
 import dev.holdmytrack.android.map.DateRangeSlider
+import dev.holdmytrack.android.map.DefaultRange
+import dev.holdmytrack.android.map.FrameRules
+import dev.holdmytrack.android.map.MapChromeRules
 import dev.holdmytrack.android.map.MapMode
+import dev.holdmytrack.android.map.MapNotice
 import dev.holdmytrack.android.map.MapModeButton
 import dev.holdmytrack.android.map.MapOverlays
 import dev.holdmytrack.android.map.LayersMenu
@@ -58,6 +61,7 @@ import dev.holdmytrack.android.map.MapBikePaths
 import dev.holdmytrack.android.map.MapPaths
 import dev.holdmytrack.android.map.MapSatellite
 import dev.holdmytrack.android.map.MapSpots
+import dev.holdmytrack.android.map.PendingDiff
 import dev.holdmytrack.android.map.PhotoMarkerItem
 import dev.holdmytrack.android.map.PhotoMarkerOverlay
 import dev.holdmytrack.android.map.PhotoMarkers
@@ -83,9 +87,12 @@ import dev.holdmytrack.android.panel.PanelTab
 import dev.holdmytrack.android.panel.PrivateLocationEditor
 import dev.holdmytrack.android.panel.PanelState
 import dev.holdmytrack.android.panel.SyncTab
+import dev.holdmytrack.android.photos.PhotoMarkerScope
 import dev.holdmytrack.android.sync.Candidate
 import dev.holdmytrack.android.sync.SyncProgress
 import dev.holdmytrack.android.recording.RecordButton
+import dev.holdmytrack.android.recording.RecordTap
+import dev.holdmytrack.android.recording.RecordTapRules
 import dev.holdmytrack.android.recording.RecordingFormat
 import dev.holdmytrack.android.recording.RecordingService
 import dev.holdmytrack.android.ui.LargeText
@@ -130,13 +137,13 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private lateinit var noticeDetail: TextView
     private lateinit var noticeAction: Button
 
-    /** Which notice is up, if any ([Notice]). */
-    private var shownNotice: Notice? = null
+    /** Which notice is up, if any ([MapNotice]). */
+    private var shownNotice: MapNotice? = null
 
     /** Posted when a session check starts, so "Checking your session…" appears only if the
      *  check is slow enough to notice; removed when it answers. */
     private val showChecking = Runnable {
-        showNotice(Notice.CHECKING, getString(R.string.checking_session))
+        showNotice(MapNotice.CHECKING, getString(R.string.checking_session))
     }
     private lateinit var modeBar: View
     private lateinit var modeButtons: Map<MapMode, MaterialButton>
@@ -771,7 +778,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         overlaysAttached = false
         instance.setStyle(Style.Builder().fromUri(styleUrl())) { loaded ->
             style = loaded
-            hideNotice(Notice.MAP_FAILED)
+            hideNotice(MapNotice.MAP_FAILED)
             // The served style ships the path layers hidden; a fresh style needs the saved choice.
             MapPaths.apply(loaded, shownPaths(MapPaths.get(requireContext())))
             // Only a deployment with imagery serves it; without, the Layers menu has no Satellite.
@@ -805,9 +812,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  foreground window, and the stop is confirmed first ([confirmStop]). Ignored when relaunched
      *  from recents, whose replayed intent would stop a recording started since. */
     private fun handleStopIntent(intent: Intent) {
-        if (intent.action != RecordingService.ACTION_STOP) return
-        if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
-        confirmStop()
+        val fromHistory = intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
+        if (RecordTapRules.stopIntentApplies(intent.action == RecordingService.ACTION_STOP, fromHistory)) confirmStop()
     }
 
     /** The notification's Stop asks first: a tap in the shade is easy to make by mistake, where
@@ -1046,11 +1052,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun onActivityDaysChanged(reloaded: Boolean) {
         dateSlider.setDays(activityDays.visibleDays, activityDays.canPanEarlier, activityDays.canPanLater)
         if (reloaded && !userChangedRange) {
-            val today = LocalDate.now().toString()
-            val from = activityDays.visibleDays.takeLast(DEFAULT_RANGE_DAYS).firstOrNull()?.date
-                ?: activityDays.earliest
-                ?: today
-            val range = DateRange(from, today)
+            val range = DefaultRange.of(activityDays.visibleDays.map { it.date }, activityDays.earliest, LocalDate.now().toString())
             if (range != selectedRange) applyRange(range, fly = false)
         }
         renderDateFooter()
@@ -1109,29 +1111,22 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      * tiles and watches Fog and Heatmap until re-rendered; a finished one also reloads the days.
      */
     private fun trackPending(activities: List<Activity>) {
-        val now = activities.filter { it.pending }.mapTo(HashSet()) { it.id }
-        val started = now.any { it !in pendingIds }
-        var finished = pendingIds.any { it !in now }
-        // An edit saved from here counts as finished the first time a list shows it not
-        // Pending, whether or not one ever showed it Pending.
-        awaitingEditIds.filter { it !in now }.forEach { id ->
-            awaitingEditIds -= id
-            finished = true
-            if (id == panelState.focused) updateTrackMetrics(refetch = true)
-        }
+        val change = PendingDiff.of(pendingIds, activities.filter { it.pending }.mapTo(HashSet()) { it.id }, awaitingEditIds)
+        awaitingEditIds.retainAll(change.awaiting)
         // The selected activity's reprocess landed: its metrics describe the old points.
-        if (panelState.focused?.let { it in pendingIds && it !in now } == true) updateTrackMetrics(refetch = true)
-        pendingIds = now
-        if (started || finished) {
+        if (panelState.focused in change.landed) updateTrackMetrics(refetch = true)
+        if (panelState.focused in change.left) updateTrackMetrics(refetch = true)
+        pendingIds = change.now
+        if (change.started || change.finished) {
             style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
             coverageWatch.watch()
         }
-        if (finished) {
+        if (change.finished) {
             activityDays.reload()
             panel.storiesTab.reloadOpen()
         }
         mapView.removeCallbacks(pendingPoll)
-        if (now.isNotEmpty()) mapView.postDelayed(pendingPoll, PENDING_POLL_MS)
+        if (change.now.isNotEmpty()) mapView.postDelayed(pendingPoll, PENDING_POLL_MS)
     }
 
     /**
@@ -1298,7 +1293,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /** A Story copy arrived (`docs/SPEC.md` FR-14.8): new activities, refreshed as after an
      *  upload. The map has history now, so the empty notice goes. */
     private fun onStoryCopyArrived() {
-        hideNotice(Notice.EMPTY)
+        hideNotice(MapNotice.EMPTY)
         style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
         reloadList()
         activityDays.reload()
@@ -1320,7 +1315,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         // Tracks refetch at once; the tile version moves only after the coverage render.
         style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
         checkTileVersion()
-        if (shownNotice == Notice.EMPTY) {
+        if (shownNotice == MapNotice.EMPTY) {
             framed = false
             frameActivities()
         }
@@ -1342,7 +1337,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  stays while recording: the base map and paths are about where the recording goes. */
     private fun renderModeBar() {
         if (!modeBarReady) return
-        modeBar.visibility = if (isRecording() || editWindow.isOpen || selectionShown()) View.GONE else View.VISIBLE
+        modeBar.isVisible = MapChromeRules.modeBarShown(isRecording(), editWindow.isOpen, selectionShown())
         layersPanel.visibility = View.VISIBLE
         renderZoomLevelNotice()
         renderCoverageNotice()
@@ -1357,7 +1352,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             MapMode.FOG -> R.string.mode_chip_fog
             MapMode.HEATMAP -> R.string.mode_chip_heatmap
         }
-        modeChip.isVisible = text != null && modeBarReady && !isRecording() && !(::exportViewfinder.isInitialized && exportViewfinder.isOpen)
+        modeChip.isVisible = MapChromeRules.modeChipShown(mode, modeBarReady, isRecording(), ::exportViewfinder.isInitialized && exportViewfinder.isOpen)
         if (text != null) modeChip.setText(text)
     }
 
@@ -1370,14 +1365,13 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  coverage watch finds coverage rendering. */
     private fun renderCoverageNotice() {
         if (!::coverageNotice.isInitialized) return
-        val shown = coverageRendering && mode != MapMode.NORMAL && modeBarReady && !isRecording()
-        coverageNotice.visibility = if (shown) View.VISIBLE else View.GONE
+        coverageNotice.isVisible = MapChromeRules.coverageNoticeShown(coverageRendering, mode, modeBarReady, isRecording())
     }
 
     /** The rail (Layers, Find my location), hidden while an editor is open over the map. */
     private fun renderRail() {
         val editing = editWindow.isOpen || privacyEditing()
-        mapRail.visibility = if (editing || selectionShown()) View.GONE else View.VISIBLE
+        mapRail.isVisible = MapChromeRules.railShown(editing, selectionShown())
         if (editing) layersMenu.dismiss()
     }
 
@@ -1393,7 +1387,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /** Whether rows are being checked where the selection bar can show: Normal mode, the
      *  Activities tab, no Edit window. */
     private fun selectionShown(): Boolean =
-        ::panel.isInitialized && sheet.isVisible && panel.selecting && panel.tab == PanelTab.ACTIVITIES && !editWindow.isOpen
+        ::panel.isInitialized && MapChromeRules.selectionShown(sheet.isVisible, panel.selecting, panel.tab, editWindow.isOpen)
 
     /** The selection bar replaces the top row while [selectionShown]. */
     private fun renderSelectionBar() {
@@ -1460,13 +1454,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      */
     private fun refreshPhotos(force: Boolean) {
         val single = editWindow.single
-        val next = when {
-            mode != MapMode.NORMAL -> null
-            editWindow.isOpen -> single?.let { "activity:${it.id}" }
-            panelState.focused != null -> "activity:${panelState.focused}"
-            storyId != null -> "story:$storyId"
-            else -> null
-        }
+        val next = PhotoMarkerScope.scope(mode, editWindow.isOpen, single?.id, panelState.focused, storyId)
         if (next == photoScope && !force) {
             if (photosLoaded && single != null) editWindow.setPhotos(photos, photosError)
             renderPhotoMarkers()
@@ -1502,40 +1490,22 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      */
     private fun renderPhotoMarkers() {
         if (!::photoMarkers.isInitialized) return
-        val scope = photoScope
-        val activityScope = scope?.removePrefix("activity:")?.takeIf { scope.startsWith("activity:") }
-        val shown = scope != null && !isRecording() && !editWindow.showingTrack && activityScope !in panelState.mapHidden
-        var items = if (!shown) emptyList() else photos.mapNotNull { p ->
-            val lat = p.lat ?: return@mapNotNull null
-            val lon = p.lon ?: return@mapNotNull null
-            if (p.activityId in panelState.mapHidden) return@mapNotNull null
-            PhotoMarkerItem(p.id, lon, lat, p.caption, thumbPath = p.thumbUrl)
-        }
+        val shown = PhotoMarkerScope.shown(photoScope, isRecording(), editWindow.showingTrack, panelState.mapHidden)
         val overlay = photoOverlay
-        if (shown && overlay != null) {
-            val upserts = overlay.upserts.associateBy { it.id }
-            val kept = items.filter { it.id !in overlay.hidden }.map { upserts[it.id] ?: it }
-            val keptIds = kept.mapTo(HashSet()) { it.id }
-            items = kept + overlay.upserts.filter { it.id !in keptIds }
-        }
+        val items = if (shown) PhotoMarkerScope.markers(photos, panelState.mapHidden, overlay) else emptyList()
         if (!shown) photoPopup.close()
         photoMarkers.set(map, items, overlay?.activeId ?: photoPopup.showingId, overlay?.activeId)
     }
 
     /**
-     * A marker's tap (FR-2.10): one photo opens its popup. A group spread over more than
-     * [PHOTO_GROUP_SPREAD_M] zooms to fit; a tighter group opens the popup on its first photo.
-     * Only saved photos open.
+     * A marker's tap (FR-2.10): a spread group zooms to fit ([PhotoMarkerScope.groupFit]), else
+     * the popup opens on its first photo. Only saved photos open.
      */
     private fun openPhotoMarker(ids: List<String>) {
         val instance = map ?: return
         val located = ids.mapNotNull { id -> photos.firstOrNull { it.id == id }?.takeIf { it.lat != null && it.lon != null } }
-        val spread = located.maxOfOrNull { a -> located.maxOf { b -> Geo.haversineM(a.lat!!, a.lon!!, b.lat!!, b.lon!!) } } ?: 0.0
-        if (located.size > 1 && spread > PHOTO_GROUP_SPREAD_M) {
-            flyTo(
-                doubleArrayOf(located.minOf { it.lon!! }, located.minOf { it.lat!! }, located.maxOf { it.lon!! }, located.maxOf { it.lat!! }),
-                maxZoom = PHOTO_GROUP_MAX_ZOOM,
-            )
+        PhotoMarkerScope.groupFit(located.map { it.lat!! to it.lon!! })?.let { box ->
+            flyTo(box, maxZoom = PhotoMarkerScope.GROUP_MAX_ZOOM)
             return
         }
         if (located.isEmpty()) return
@@ -1604,13 +1574,10 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun renderDateFooter() {
         val normal = normalMode()
         // The selected activity's card takes the range's place at the head.
-        val footer = normal && panel.tab == PanelTab.ACTIVITIES && !panel.showsCard && activityDays.ready && activityDays.earliest != null
-        dateFooter.visibility = if (footer) View.VISIBLE else View.GONE
+        dateFooter.isVisible = MapChromeRules.dateFooterShown(normal, panel.tab, panel.showsCard, activityDays.ready, activityDays.earliest != null)
         // An editor over the map hides the sheet. The Sync tab stays while recording: what's on
         // the phone can be sent mid-walk.
-        val editing = editWindow.isOpen || privacyEditing()
-        val syncing = modeBarReady && mode == MapMode.NORMAL && panel.tab == PanelTab.SYNC
-        sheet.visibility = if ((normal || syncing) && !editing) View.VISIBLE else View.GONE
+        sheet.isVisible = MapChromeRules.sheetShown(normal, modeBarReady, mode, panel.tab, editWindow.isOpen || privacyEditing())
         if (!normal) panel.dismissPopups()
         onSheetChanged()
         renderSelectionBar()
@@ -1621,7 +1588,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun isRecording() = (recorder?.state ?: RecordingState.IDLE) != RecordingState.IDLE
 
     /** Normal mode, session ready, not recording: when the sheet and its editors have the map. */
-    private fun normalMode() = modeBarReady && mode == MapMode.NORMAL && !isRecording()
+    private fun normalMode() = MapChromeRules.normalMode(modeBarReady, mode, isRecording())
 
     private fun hasPermission(permission: String) =
         ContextCompat.checkSelfPermission(requireContext(), permission) == PackageManager.PERMISSION_GRANTED
@@ -1632,19 +1599,21 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun onRecordTap() {
         // A start from Sync or You goes to the map, where the recording is drawn.
         if (!isRecording()) host?.showMap()
-        if (isRecording()) {
-            if (recorder?.state == RecordingState.RECORDING) {
-                recordButton.performHapticFeedback(HapticFeedbackConstants.TOGGLE_OFF)
-                Toast.makeText(requireContext(), R.string.record_hold_to_stop, Toast.LENGTH_SHORT).show()
-            } else {
-                recordButton.performHapticFeedback(HapticFeedbackConstants.TOGGLE_ON)
-            }
-            requireContext().startService(RecordingService.intent(requireContext(), RecordingService.ACTION_TOGGLE))
-            return
-        }
         val missing = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.POST_NOTIFICATIONS)
             .filterNot(::hasPermission)
-        if (missing.isEmpty()) startRecording() else permissionLauncher.launch(missing.toTypedArray())
+        when (val tap = RecordTapRules.tap(recorder?.state ?: RecordingState.IDLE, missing)) {
+            RecordTap.Pause -> {
+                recordButton.performHapticFeedback(HapticFeedbackConstants.TOGGLE_OFF)
+                Toast.makeText(requireContext(), R.string.record_hold_to_stop, Toast.LENGTH_SHORT).show()
+                requireContext().startService(RecordingService.intent(requireContext(), RecordingService.ACTION_TOGGLE))
+            }
+            RecordTap.Resume -> {
+                recordButton.performHapticFeedback(HapticFeedbackConstants.TOGGLE_ON)
+                requireContext().startService(RecordingService.intent(requireContext(), RecordingService.ACTION_TOGGLE))
+            }
+            RecordTap.Start -> startRecording()
+            is RecordTap.AskPermissions -> permissionLauncher.launch(tap.missing.toTypedArray())
+        }
     }
 
     /** A two-second hold stops (`RecordButton`), so a stray touch can pause but never end a
@@ -1887,11 +1856,11 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         HoldMyTrackApi.verifySession { result ->
             verifying = false
             notice.removeCallbacks(showChecking)
-            hideNotice(Notice.CHECKING)
+            hideNotice(MapNotice.CHECKING)
             result.onSuccess { profile ->
                 Session.markVerified(profile)
                 AppLanguage.followAccount(requireContext().applicationContext, profile.locale)
-                hideNotice(Notice.UNREACHABLE)
+                hideNotice(MapNotice.UNREACHABLE)
             }.onFailure { failure ->
                 // Only a 401 means the token is dead. Any other failure keeps it for the next
                 // resume, and the notice says why the map is empty.
@@ -1900,7 +1869,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
                 } else {
                     Log.w(TAG, "could not verify the stored session", failure)
                     showNotice(
-                        Notice.UNREACHABLE,
+                        MapNotice.UNREACHABLE,
                         getString(R.string.map_unreachable),
                         failed = true,
                         action = R.string.retry,
@@ -1911,23 +1880,19 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
     }
 
-    /** The map's notices, most important first: when two apply, the earlier stays up. */
-    private enum class Notice { MAP_FAILED, UNREACHABLE, CHECKING, EMPTY }
-
     /**
      * Shows [text], an optional [detail] and at most one action. A less important notice never
-     * replaces a more important one ([Notice]).
+     * replaces a more important one ([MapNotice]).
      */
     private fun showNotice(
-        kind: Notice,
+        kind: MapNotice,
         text: String,
         detail: String? = null,
         failed: Boolean = false,
         action: Int? = null,
         onAction: (() -> Unit)? = null,
     ) {
-        val current = shownNotice
-        if (current != null && current.ordinal < kind.ordinal) return
+        if (!MapChromeRules.noticeReplaces(shownNotice, kind)) return
         shownNotice = kind
         noticeText.text = text
         noticeText.setTextColor(requireContext().getColor(if (failed) R.color.hmt_danger else R.color.hmt_ink))
@@ -1940,7 +1905,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /** Takes [kind] down if it's the one up; any other notice stays. */
-    private fun hideNotice(kind: Notice) {
+    private fun hideNotice(kind: MapNotice) {
         if (shownNotice != kind) return
         shownNotice = null
         updateNoticeVisibility()
@@ -1949,13 +1914,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /** The empty notice steps aside while recording and on the Sync tab it points to; failures
      *  stay up. */
     private fun updateNoticeVisibility() {
-        val kind = shownNotice
         val onSync = ::panel.isInitialized && panel.tab == PanelTab.SYNC
-        notice.visibility = when {
-            kind == null -> View.GONE
-            kind == Notice.EMPTY && (isRecording() || onSync) -> View.GONE
-            else -> View.VISIBLE
-        }
+        notice.isVisible = MapChromeRules.noticeShown(shownNotice, isRecording(), onSync)
     }
 
     /**
@@ -2079,13 +2039,13 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             val box = result.getOrNull()
             if (box == null) {
                 if (!Session.isDemo) {
-                    showNotice(Notice.EMPTY, getString(R.string.map_empty), action = R.string.nav_sync) {
+                    showNotice(MapNotice.EMPTY, getString(R.string.map_empty), action = R.string.nav_sync) {
                         host?.showTab(MainActivity.Tab.SYNC)
                     }
                 }
                 return@latestActivityBounds
             }
-            hideNotice(Notice.EMPTY)
+            hideNotice(MapNotice.EMPTY)
             // Reopening the app mid-recording: the camera belongs to the live track.
             if (isRecording()) return@latestActivityBounds
             flyTo(box)
@@ -2100,28 +2060,23 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         val instance = map ?: return
         val bounds = LatLngBounds.from(box[3], box[2], box[1], box[0])
         // Into the map left showing between the chrome row and the panel, not under either.
-        val card = findViewById<View>(R.id.edit_window)
         val banner = findViewById<View>(R.id.capture_banner)
-        val top = maxOf(
-            FRAME_PADDING_PX,
-            findViewById<View>(R.id.top_bar).bottom,
-            if (banner.isVisible) topChrome.top + banner.bottom + FRAME_PADDING_PX / 2 else 0,
-        )
+        val root = findViewById<View>(R.id.map_root)
+        val editor = listOf(R.id.edit_window, R.id.private_editor).map { findViewById<View>(it) }.firstOrNull { it.isVisible }
         // Above where the sheet rests or is heading, not mid-drag: View on map collapses it and
         // flies at once.
-        val root = findViewById<View>(R.id.map_root)
-        val editor = listOf(card, findViewById<View>(R.id.private_editor)).firstOrNull { it.isVisible }
-        val bottom = FRAME_PADDING_PX + when {
+        val covered = when {
             editor != null -> root.height - editor.top
             sheet.isVisible -> root.height - panel.restingTop(root.height)
             else -> 0
         }
-        // In landscape the top row and sheet can leave no gap; the fit keeps a strip, taken from
-        // the top first.
-        val minSpan = (MIN_FRAME_SPAN_DP * resources.displayMetrics.density).toInt()
-        val fitTop = top.coerceAtMost(maxOf(FRAME_PADDING_PX, root.height - bottom - minSpan))
-        val fitBottom = bottom.coerceAtMost(maxOf(FRAME_PADDING_PX, root.height - fitTop - minSpan))
-        val padding = intArrayOf(FRAME_PADDING_PX, fitTop, FRAME_PADDING_PX, fitBottom)
+        val padding = FrameRules.padding(
+            rootHeight = root.height,
+            chromeBottom = findViewById<View>(R.id.top_bar).bottom,
+            bannerBottom = if (banner.isVisible) topChrome.top + banner.bottom else null,
+            coveredBelow = covered,
+            minSpanPx = (MIN_FRAME_SPAN_DP * resources.displayMetrics.density).toInt(),
+        )
         val fitted = instance.getCameraForLatLngBounds(bounds, padding) ?: return
         val target = CameraPosition.Builder(fitted)
             .zoom(minOf(fitted.zoom, maxZoom))
@@ -2147,7 +2102,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun reportFailure(error: String) {
         Log.e(TAG, "map failed to load: $error")
         showNotice(
-            Notice.MAP_FAILED,
+            MapNotice.MAP_FAILED,
             getString(R.string.map_load_failed),
             detail = "${BuildConfig.API_BASE_URL} — $error",
             failed = true,
@@ -2178,7 +2133,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         captureMode.resume()
         // An empty map is checked again on every return, so the notice goes and the camera frames
         // the history once something arrives.
-        if (shownNotice == Notice.EMPTY) {
+        if (shownNotice == MapNotice.EMPTY) {
             framed = false
             frameActivities()
         }
@@ -2258,17 +2213,10 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         private const val RECORD_BUTTON_ACTIVE_DP = 60f
         private const val POP_SCALE = 1.15f
         private const val POP_HALF_MS = 100L
-        private const val FRAME_PADDING_PX = 64
         private const val MAX_FRAME_ZOOM = 15.0
 
         /** The least height of map a fit keeps between the top row and the sheet. */
         private const val MIN_FRAME_SPAN_DP = 96
-
-        /** A photo group spread wider than this zooms in to split; a tighter one opens its popup. */
-        private const val PHOTO_GROUP_SPREAD_M = 15.0
-
-        /** How far a photo group's tap zooms in: where 15 m is wider than a marker. */
-        private const val PHOTO_GROUP_MAX_ZOOM = 19.0
 
         /** How far from a tap a track still counts as tapped, as on the web. */
         private const val TAP_TOLERANCE_DP = 14
@@ -2289,8 +2237,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         /** Material's and the platform's minimum touch target. */
         private const val MIN_TOUCH_TARGET_DP = 48
 
-        /** The default range's length in activity days (`docs/SPEC.md` FR-6.1). */
-        private const val DEFAULT_RANGE_DAYS = 5
         private const val STATE_MODE = "mode"
         private const val STATE_FRAMED = "framed"
         private const val STATE_RANGE_FROM = "range_from"
