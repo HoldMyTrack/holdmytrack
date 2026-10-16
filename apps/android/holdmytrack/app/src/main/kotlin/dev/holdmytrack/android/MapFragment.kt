@@ -2,28 +2,19 @@ package dev.holdmytrack.android
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
-import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.RectF
 import android.os.Bundle
-import android.os.IBinder
 import android.util.Log
-import android.content.res.ColorStateList
-import android.os.SystemClock
-import android.view.HapticFeedbackConstants
 import android.view.View
 import android.widget.Button
-import android.widget.Chronometer
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -33,8 +24,6 @@ import androidx.core.view.isVisible
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.fragment.app.Fragment
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.progressindicator.LinearProgressIndicator
 import dev.holdmytrack.android.export.ExportViewfinder
 import dev.holdmytrack.android.map.ActivityDays
 import dev.holdmytrack.android.map.BoxUnion
@@ -86,14 +75,10 @@ import dev.holdmytrack.android.panel.SyncTab
 import dev.holdmytrack.android.photos.PhotoMarkerScope
 import dev.holdmytrack.android.sync.Candidate
 import dev.holdmytrack.android.sync.SyncProgress
-import dev.holdmytrack.android.recording.RecordButton
-import dev.holdmytrack.android.recording.RecordTap
-import dev.holdmytrack.android.recording.RecordTapRules
-import dev.holdmytrack.android.recording.RecordingFormat
+import dev.holdmytrack.android.recording.RecordingController
 import dev.holdmytrack.android.recording.RecordingService
 import dev.holdmytrack.android.ui.LargeText
-import dev.holdmytrack.android.recording.RecordingState
-import dev.holdmytrack.android.recording.db.LiveRecordingJournal
+import dev.holdmytrack.android.recording.RecordedPoint
 import dev.holdmytrack.android.settings.AppLanguage
 import dev.holdmytrack.android.web.WebPageActivity
 import org.maplibre.android.camera.CameraPosition
@@ -150,22 +135,12 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private lateinit var captureMode: CaptureMode
     /** Created with the map instance it reads the camera of. */
     private var showInArea: ShowInArea? = null
-    private lateinit var recordButton: RecordButton
     private lateinit var mapRail: View
     private lateinit var layersPanel: View
     private lateinit var modeChip: TextView
 
     /** Whether the served style has satellite imagery; the Layers menu offers it only then. */
     private var satelliteAvailable = false
-    private lateinit var recordingStatus: View
-    private lateinit var recordingStatusDot: View
-    private lateinit var recordingStatusTime: Chronometer
-    private lateinit var recordingStatusDetail: TextView
-    private lateinit var recordingStatusHold: LinearProgressIndicator
-
-    /** Whether a hold on the record button is counting down, which the status pill shows in
-     *  place of its detail line. */
-    private var holdingToStop = false
     private lateinit var locateButton: MaterialButton
 
     /** Find my location's panel, hidden whole while recording so no empty panel is left. */
@@ -303,55 +278,14 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  before the session would have. */
     private var modeBarReady = false
 
-    /** Bound from `onStart` to `onStop` to watch the recording; null between the two, or
-     *  before the bind answers. Null reads as [RecordingState.IDLE]. */
-    private var recorder: RecordingService? = null
-    private var recorderBound = false
-
-    /** Whether the camera has already flown in to the current recording's first fix; later
-     *  fixes only pan, so the user's chosen zoom sticks. Reset when a recording ends. */
-    private var followingRecording = false
-
-    /** The prompt for a recording a process death left behind, while it's up — every bind
-     *  asks again, and returning to the map mustn't stack a second one on it. */
-    private var leftoverDialog: AlertDialog? = null
-
-    /** The notification's Stop confirmation, while it's up; and whether one is owed to a Stop
-     *  that arrived before the bind answered, to be asked once it does. */
-    private var stopDialog: AlertDialog? = null
-    private var pendingStopConfirm = false
-
-    private val recorderConnection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName, binder: IBinder) {
-            val service = (binder as RecordingService.LocalBinder).service
-            recorder = service
-            service.onChange = ::renderRecording
-            renderRecording()
-            if (pendingStopConfirm) {
-                pendingStopConfirm = false
-                confirmStop()
-            }
-            if (service.state == RecordingState.IDLE) service.findLeftover(::offerLeftover)
-        }
-
-        override fun onServiceDisconnected(name: ComponentName) {
-            recorder = null
-            renderRecording()
-        }
-    }
-
-    /** Asked for on the record button's first tap, when the reason is obvious. Notifications
-     *  are asked too (without them there's no Pause or Stop in the shade), but only location is
-     *  required to start. */
-    private val permissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) {
-        if (hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
-            startRecording()
-        } else {
-            Toast.makeText(requireContext(), R.string.recording_needs_location, Toast.LENGTH_LONG).show()
-        }
-    }
+    /** GPS recording: the record button, its status pill, the service binding and the camera's follow. */
+    private val recording = RecordingController(
+        this,
+        onChanged = ::onRecordingChanged,
+        styleLoaded = { style != null },
+        map = { map },
+        showMap = { host?.showMap() },
+    )
 
     /** Asked for on a spot's Capture, when location isn't granted yet. Capture counts only
      *  fixes accurate to 25 m, so it needs precise location; approximate alone isn't enough. */
@@ -502,22 +436,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             frame = ::flyTo,
             onCaptured = spotPopup::renderCaptured,
         )
-        // The host's, in the middle of its bottom bar, since the recording is reachable from
-        // every tab; this fragment drives it, since the recording is the map's.
-        recordButton = requireActivity().findViewById(R.id.record_button)
-        recordButton.setOnClickListener { onRecordTap() }
-        recordButton.onHoldComplete = ::stopRecording
-        recordButton.onHoldProgress = ::renderHoldProgress
-        recordingStatus = findViewById(R.id.recording_status)
-        findViewById<View>(R.id.recording_status_stop).setOnClickListener { confirmStop() }
-        recordingStatusDot = findViewById(R.id.recording_status_dot)
-        recordingStatusTime = findViewById(R.id.recording_status_time)
-        recordingStatusDetail = findViewById(R.id.recording_status_detail)
-        recordingStatusHold = findViewById(R.id.recording_status_hold)
-        // The notification's own format rather than the Chronometer's, so the two agree.
-        recordingStatusTime.setOnChronometerTickListener {
-            it.text = RecordingFormat.duration(SystemClock.elapsedRealtime() - it.base)
-        }
+        recording.bind(view)
 
         locateButton = findViewById(R.id.locate_button)
         locatePanel = findViewById(R.id.locate_panel)
@@ -661,7 +580,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
         chrome.install()
         if (savedInstanceState == null) {
-            handleStopIntent(requireActivity().intent)
+            recording.handleIntent(requireActivity().intent)
             takeViewOnMap(requireActivity().intent)
         }
 
@@ -741,14 +660,14 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             MapSatellite.apply(loaded, MapSatellite.isOn(requireContext()), mode)
             MapOverlays.attachLiveTrack(loaded)
             syncSession()
-            renderRecording()
+            recording.render()
         }
     }
 
     /** A new intent to the host (`MainActivity.onNewIntent`): the notification's Stop, or the
      *  Sync screen's View on map. */
     fun onNewIntent(intent: Intent) {
-        handleStopIntent(intent)
+        recording.handleIntent(intent)
         takeViewOnMap(intent)
     }
 
@@ -761,40 +680,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         val day = intent.getStringExtra(MainActivity.EXTRA_VIEW_DAY) ?: return
         viewOnMapRequest = id to day
         framed = true
-    }
-
-    /** The notification's Stop comes through the app: the Save screen after a stop needs a
-     *  foreground window, and the stop is confirmed first ([confirmStop]). Ignored when relaunched
-     *  from recents, whose replayed intent would stop a recording started since. */
-    private fun handleStopIntent(intent: Intent) {
-        val fromHistory = intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
-        if (RecordTapRules.stopIntentApplies(intent.action == RecordingService.ACTION_STOP, fromHistory)) confirmStop()
-    }
-
-    /** The notification's Stop asks first: a tap in the shade is easy to make by mistake, where
-     *  the map's two-second hold ([RecordButton]) is its own confirmation. Before the bind
-     *  answers there are no stats to show, so `onServiceConnected` asks instead. */
-    private fun confirmStop() {
-        val service = recorder
-        if (service == null) {
-            pendingStopConfirm = true
-            return
-        }
-        if (service.state == RecordingState.IDLE || stopDialog?.isShowing == true || requireActivity().isFinishing) return
-        val stats = service.currentStats()
-        stopDialog = MaterialAlertDialogBuilder(requireContext(), R.style.ThemeOverlay_HoldMyTrack_Dialog_Destructive)
-            .setTitle(R.string.recording_stop_confirm_title)
-            .setMessage(
-                getString(
-                    R.string.recording_stop_confirm_message,
-                    RecordingFormat.duration(stats.elapsedMs),
-                    RecordingFormat.distance(resources, stats.distanceM),
-                ),
-            )
-            .setPositiveButton(R.string.recording_stop) { _, _ -> stopRecording() }
-            .setNegativeButton(R.string.recording_keep, null)
-            .setOnDismissListener { stopDialog = null }
-            .show()
     }
 
     /**
@@ -1423,92 +1308,13 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         renderPrivacy()
     }
 
-    private fun isRecording() = (recorder?.state ?: RecordingState.IDLE) != RecordingState.IDLE
+    private fun isRecording() = recording.isRecording
 
     /** Normal mode, session ready, not recording: when the sheet and its editors have the map. */
     private fun normalMode() = MapChromeRules.normalMode(modeBarReady, mode, isRecording())
 
     private fun hasPermission(permission: String) =
         ContextCompat.checkSelfPermission(requireContext(), permission) == PackageManager.PERMISSION_GRANTED
-
-    /** Idle: start, asking for missing permissions first. Recording or paused: toggle. Pausing
-     *  says how to stop, since a tap is the obvious guess at "stop". Every tap has a haptic, so
-     *  one that registered is never in doubt. */
-    private fun onRecordTap() {
-        // A start from Sync or You goes to the map, where the recording is drawn.
-        if (!isRecording()) host?.showMap()
-        val missing = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.POST_NOTIFICATIONS)
-            .filterNot(::hasPermission)
-        when (val tap = RecordTapRules.tap(recorder?.state ?: RecordingState.IDLE, missing)) {
-            RecordTap.Pause -> {
-                recordButton.performHapticFeedback(HapticFeedbackConstants.TOGGLE_OFF)
-                Toast.makeText(requireContext(), R.string.record_hold_to_stop, Toast.LENGTH_SHORT).show()
-                requireContext().startService(RecordingService.intent(requireContext(), RecordingService.ACTION_TOGGLE))
-            }
-            RecordTap.Resume -> {
-                recordButton.performHapticFeedback(HapticFeedbackConstants.TOGGLE_ON)
-                requireContext().startService(RecordingService.intent(requireContext(), RecordingService.ACTION_TOGGLE))
-            }
-            RecordTap.Start -> startRecording()
-            is RecordTap.AskPermissions -> permissionLauncher.launch(tap.missing.toTypedArray())
-        }
-    }
-
-    /** A two-second hold stops (`RecordButton`), so a stray touch can pause but never end a
-     *  recording. `RecordingService` then opens the Save screen. */
-    private fun stopRecording() {
-        requireContext().startService(RecordingService.intent(requireContext(), RecordingService.ACTION_STOP))
-    }
-
-    /** A confirm haptic and a pop of the button, ahead of what [renderRecording] shows once the
-     *  service reports in. */
-    private fun startRecording() {
-        recordButton.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-        recordButton.animate().cancel()
-        recordButton.animate().scaleX(POP_SCALE).scaleY(POP_SCALE).setDuration(POP_HALF_MS).withEndAction {
-            recordButton.animate().scaleX(1f).scaleY(1f).setDuration(POP_HALF_MS)
-        }
-        ContextCompat.startForegroundService(requireContext(), RecordingService.intent(requireContext(), RecordingService.ACTION_START))
-    }
-
-    /** A recording the process died during (`RecordingService.findLeftover`). Not cancellable:
-     *  it would come back on the next bind. Resume returns paused; Save goes to the Save screen;
-     *  Discard confirms first, since the journal is the only copy. */
-    private fun offerLeftover(leftover: LiveRecordingJournal.Leftover) {
-        if (leftoverDialog?.isShowing == true || requireActivity().isFinishing) return
-        leftoverDialog = MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.recording_leftover_title)
-            .setMessage(
-                getString(
-                    R.string.recording_leftover_message,
-                    RecordingFormat.duration(leftover.movingMs),
-                    RecordingFormat.distance(resources, leftover.distanceM),
-                ),
-            )
-            .setCancelable(false)
-            .setPositiveButton(R.string.recording_leftover_resume) { _, _ ->
-                if (recorder?.resumeLeftover(leftover) != true) {
-                    Toast.makeText(requireContext(), R.string.recording_needs_location, Toast.LENGTH_LONG).show()
-                }
-            }
-            .setNeutralButton(R.string.recording_leftover_save) { _, _ -> recorder?.saveLeftover(leftover) }
-            .setNegativeButton(R.string.recording_discard) { _, _ -> confirmDiscardLeftover(leftover) }
-            .show()
-    }
-
-    private fun confirmDiscardLeftover(leftover: LiveRecordingJournal.Leftover) {
-        leftoverDialog = MaterialAlertDialogBuilder(requireContext(), R.style.ThemeOverlay_HoldMyTrack_Dialog_Destructive)
-            .setTitle(R.string.recording_discard_confirm_title)
-            .setMessage(R.string.recording_discard_confirm_message)
-            .setCancelable(false)
-            .setPositiveButton(R.string.recording_discard) { _, _ -> recorder?.discardLeftover(leftover) }
-            .setNegativeButton(android.R.string.cancel) { _, _ ->
-                // Still showing during its own button's callback; cleared so the guard lets it back.
-                leftoverDialog = null
-                offerLeftover(leftover)
-            }
-            .show()
-    }
 
     /** A spot's Capture: capture mode on it (FR-2.8), once precise location is granted. */
     private fun onCaptureTap(spot: Spot) {
@@ -1560,31 +1366,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         )
     }
 
-    /** Brings the button, the mode toggle, the layers, the live track and the camera in line with
-     *  the recording: on bind, on every change and fix, and once the style has loaded. */
-    private fun renderRecording() {
-        val state = recorder?.state ?: RecordingState.IDLE
-        val active = state != RecordingState.IDLE
-        val (icon, background, description) = when (state) {
-            RecordingState.IDLE -> Triple(R.drawable.ic_record_start, R.drawable.bg_record_button, R.string.record_button_start)
-            RecordingState.RECORDING -> Triple(R.drawable.ic_pause, R.drawable.bg_record_button_recording, R.string.record_button_pause)
-            RecordingState.PAUSED -> Triple(R.drawable.ic_play, R.drawable.bg_record_button_paused, R.string.record_button_resume)
-        }
-        recordButton.setImageResource(icon)
-        // Pause and play are tinted for the button's surface; the idle red dot keeps its colour.
-        recordButton.imageTintList = when (state) {
-            RecordingState.IDLE -> null
-            RecordingState.RECORDING -> ColorStateList.valueOf(requireContext().getColor(R.color.hmt_record))
-            RecordingState.PAUSED -> ColorStateList.valueOf(requireContext().getColor(R.color.hmt_record_paused))
-        }
-        recordButton.setBackgroundResource(background)
-        recordButton.contentDescription = getString(description)
-        recordButton.holdEnabled = active
-        recordButton.pulsing = state == RecordingState.RECORDING
-        sizeRecordButton(active)
-        if (!active) stopDialog?.dismiss()
-        val points = if (active) recorder?.points().orEmpty() else emptyList()
-        renderRecordingStatus(state, hasFix = points.isNotEmpty())
+    /** The map follows the recording: while one runs the live track has the map, and the mode
+     *  toggle, Find my location, the export and every history layer step aside. */
+    private fun onRecordingChanged(active: Boolean, points: List<RecordedPoint>) {
         renderModeBar()
         locatePanel.visibility = if (active) View.GONE else View.VISIBLE
         // A recording has the map to itself; the export would draw what it hides.
@@ -1599,82 +1383,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         val loaded = style ?: return
         if (overlaysAttached) MapOverlays.setRecording(loaded, active, mode)
         MapOverlays.updateLiveTrack(loaded, points)
-
-        if (!active) {
-            followingRecording = false
-            return
-        }
-        val instance = map ?: return
-        val last = points.lastOrNull() ?: return
-        val target = LatLng(last.lat, last.lon)
-        if (!followingRecording) {
-            followingRecording = true
-            // The recording's own follow (below) owns the camera now, not Find my location's.
-            if (instance.locationComponent.isLocationComponentActivated) {
-                instance.locationComponent.cameraMode = CameraMode.NONE
-            }
-            val zoom = maxOf(instance.cameraPosition.zoom, RECORDING_ZOOM)
-            instance.animateCamera(CameraUpdateFactory.newLatLngZoom(target, zoom), FRAME_DURATION_MS)
-        } else {
-            instance.easeCamera(CameraUpdateFactory.newLatLng(target))
-        }
-    }
-
-    /** 56dp idle, 60dp while recording: a bigger target for the hold that stops it. */
-    private fun sizeRecordButton(active: Boolean) {
-        val density = resources.displayMetrics.density
-        val size = ((if (active) RECORD_BUTTON_ACTIVE_DP else RECORD_BUTTON_IDLE_DP) * density).toInt()
-        val params = recordButton.layoutParams
-        if (params.width == size) return
-        params.width = size
-        params.height = size
-        recordButton.layoutParams = params
-    }
-
-    /** The status pill while recording: a dot (amber when paused), the moving time, and the
-     *  distance or "Waiting for GPS…". A hold on the button takes the detail line
-     *  ([renderHoldProgress]). */
-    private fun renderRecordingStatus(state: RecordingState, hasFix: Boolean) {
-        val service = recorder
-        if (state == RecordingState.IDLE || service == null) {
-            recordingStatusTime.stop()
-            recordingStatus.visibility = View.GONE
-            return
-        }
-        recordingStatus.visibility = View.VISIBLE
-        val recording = state == RecordingState.RECORDING
-        val stats = service.currentStats()
-        recordingStatusTime.base = SystemClock.elapsedRealtime() - stats.elapsedMs
-        if (recording) {
-            recordingStatusTime.start()
-        } else {
-            // Trap: setBase redraws in the Chronometer's own format, so the text is set after it.
-            recordingStatusTime.stop()
-            recordingStatusTime.text = RecordingFormat.duration(stats.elapsedMs)
-        }
-        recordingStatusDot.backgroundTintList =
-            ColorStateList.valueOf(requireContext().getColor(if (recording) R.color.hmt_record else R.color.hmt_record_paused))
-        if (holdingToStop) return
-        val distance = RecordingFormat.distance(resources, stats.distanceM)
-        recordingStatusDetail.text = when {
-            !recording -> getString(R.string.recording_status_paused, distance)
-            !hasFix -> getString(R.string.recording_status_waiting)
-            else -> distance
-        }
-    }
-
-    /** The hold's countdown in the pill too, where the finger on the button can't hide it. */
-    private fun renderHoldProgress(progress: Float) {
-        val holding = progress > 0f
-        recordingStatusHold.progress = (progress * recordingStatusHold.max).toInt()
-        if (holding == holdingToStop) return
-        holdingToStop = holding
-        recordingStatusHold.visibility = if (holding) View.VISIBLE else View.GONE
-        if (holding) {
-            recordingStatusDetail.setText(R.string.recording_status_holding)
-        } else {
-            renderRecordingStatus(recorder?.state ?: RecordingState.IDLE, hasFix = recorder?.points()?.isNotEmpty() == true)
-        }
     }
 
     private fun openSignIn() {
@@ -1954,7 +1662,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         super.onStart()
         mapView.onStart()
         SyncProgress.addListener(syncProgressListener)
-        recorderBound = requireContext().bindService(Intent(requireContext(), RecordingService::class.java), recorderConnection, Context.BIND_AUTO_CREATE)
+        recording.start()
     }
 
     override fun onResume() {
@@ -1998,12 +1706,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         if (::panel.isInitialized) panel.syncTab.pause()
         if (::mapView.isInitialized) mapView.removeCallbacks(pendingPoll)
         SyncProgress.removeListener(syncProgressListener)
-        if (recorderBound) {
-            recorder?.onChange = null
-            requireContext().unbindService(recorderConnection)
-            recorderBound = false
-            recorder = null
-        }
+        recording.stop()
         mapView.onStop()
         super.onStop()
     }
@@ -2032,8 +1735,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
     override fun onDestroyView() {
         exportViewfinder.close()
-        leftoverDialog?.dismiss()
-        stopDialog?.dismiss()
+        recording.dismissDialogs()
         layersMenu.dismiss()
         captureMode.stop()
         mapView.onDestroy()
@@ -2044,10 +1746,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
     companion object {
         private const val TAG = "HoldMyTrack"
-        private const val RECORD_BUTTON_IDLE_DP = 56f
-        private const val RECORD_BUTTON_ACTIVE_DP = 60f
-        private const val POP_SCALE = 1.15f
-        private const val POP_HALF_MS = 100L
         private const val MAX_FRAME_ZOOM = 15.0
 
         /** The least height of map a fit keeps between the top row and the sheet. */
@@ -2058,9 +1756,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
         /** How often a list with Pending rows is read again. */
         private const val PENDING_POLL_MS = 2_000L
-
-        /** The zoom on a recording's first fix: street level, so the line visibly grows. */
-        private const val RECORDING_ZOOM = 16.0
 
         /** Find my location's minimum zoom: neighbourhood level. A closer zoom is kept. */
         private const val LOCATE_ZOOM = 14.0
