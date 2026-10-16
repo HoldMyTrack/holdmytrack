@@ -6,7 +6,6 @@ import android.graphics.RectF
 import android.os.Bundle
 import android.util.Log
 import android.view.View
-import android.widget.Button
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
@@ -39,15 +38,16 @@ import dev.holdmytrack.android.map.LocateController
 import dev.holdmytrack.android.map.MapBikePaths
 import dev.holdmytrack.android.map.MapSatellite
 import dev.holdmytrack.android.map.MapSpots
+import dev.holdmytrack.android.map.NoticePanel
 import dev.holdmytrack.android.map.PendingDiff
 import dev.holdmytrack.android.map.SpotsController
 import dev.holdmytrack.android.map.ZoomLevelNotice
 import dev.holdmytrack.android.net.Activity
-import dev.holdmytrack.android.net.ApiException
 import dev.holdmytrack.android.net.TrackMetrics
 import dev.holdmytrack.android.net.TrackPoint
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
+import dev.holdmytrack.android.net.SessionGate
 import dev.holdmytrack.android.panel.ActivitiesPanel
 import dev.holdmytrack.android.panel.ActivityFacets
 import dev.holdmytrack.android.panel.EditActivityWindow
@@ -62,8 +62,6 @@ import dev.holdmytrack.android.recording.RecordingController
 import dev.holdmytrack.android.recording.RecordingService
 import dev.holdmytrack.android.ui.LargeText
 import dev.holdmytrack.android.recording.RecordedPoint
-import dev.holdmytrack.android.settings.AppLanguage
-import dev.holdmytrack.android.web.WebPageActivity
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -94,19 +92,11 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
     private lateinit var mapView: MapView
     private lateinit var topChrome: View
-    private lateinit var notice: View
-    private lateinit var noticeText: TextView
-    private lateinit var noticeDetail: TextView
-    private lateinit var noticeAction: Button
+    /** The notice under the top row. */
+    private lateinit var notices: NoticePanel
 
-    /** Which notice is up, if any ([MapNotice]). */
-    private var shownNotice: MapNotice? = null
-
-    /** Posted when a session check starts, so "Checking your session…" appears only if the
-     *  check is slow enough to notice; removed when it answers. */
-    private val showChecking = Runnable {
-        showNotice(MapNotice.CHECKING, getString(R.string.checking_session))
-    }
+    /** Whether the session lets the map show the user's layers. */
+    private lateinit var gate: SessionGate
     private lateinit var modeBar: View
     private lateinit var modeButtons: Map<MapMode, MaterialButton>
     private lateinit var mapRail: View
@@ -233,10 +223,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  the camera MapLibre saved, which the opening world view mustn't replace. */
     private var restoringCamera = false
 
-    /** Guards against a second session check while one is in flight; every `onResume` calls
-     *  `syncSession`. */
-    private var verifying = false
-
     /** Whether `syncSession` has shown the mode toggle. Ending a recording mustn't show it
      *  before the session would have. */
     private var modeBarReady = false
@@ -324,10 +310,12 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         super.onViewCreated(view, savedInstanceState)
 
         topChrome = findViewById(R.id.top_chrome)
-        notice = findViewById(R.id.map_notice)
-        noticeText = findViewById(R.id.map_notice_text)
-        noticeDetail = findViewById(R.id.map_notice_detail)
-        noticeAction = findViewById(R.id.map_notice_action)
+        notices = NoticePanel(
+            findViewById(R.id.map_notice),
+            recording = ::isRecording,
+            onSync = { ::panel.isInitialized && panel.tab == PanelTab.SYNC },
+        )
+        gate = SessionGate(this, notices, onChecked = ::syncSession)
         modeBar = findViewById(R.id.mode_bar)
         modeButtons = mapOf(
             MapMode.NORMAL to findViewById(R.id.mode_normal),
@@ -400,7 +388,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
                 // The footer is the Activities tab's; renderDateFooter renders Privacy too.
                 renderDateFooter()
                 // The empty map's notice points to Sync, so it steps aside there.
-                updateNoticeVisibility()
+                notices.render()
                 // What's already synced steps aside for what's on offer.
                 style?.takeIf { overlaysAttached }?.let { MapOverlays.setSyncing(it, tab == PanelTab.SYNC, mode) }
                 // The bottom bar's Stories is this tab, so the bar follows it.
@@ -462,7 +450,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             onTabChanged = photos::render,
             onClose = ::onEditClosed,
         )
-        chrome = ChromeInsets(findViewById(R.id.map_root), findViewById(R.id.top_bar), topChrome, notice, sheet, panel) { map }
+        chrome = ChromeInsets(findViewById(R.id.map_root), findViewById(R.id.top_bar), topChrome, notices.view, sheet, panel) { map }
         chrome.restore(savedInstanceState)
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, collapseSheetOnBack)
         // Added after the sheet's, so it's asked first: Back ends selecting before it closes the sheet.
@@ -564,7 +552,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         overlaysAttached = false
         instance.setStyle(Style.Builder().fromUri(layers.styleUrl())) { loaded ->
             style = loaded
-            hideNotice(MapNotice.MAP_FAILED)
+            notices.hide(MapNotice.MAP_FAILED)
             layers.onStyleLoaded(loaded)
             MapOverlays.attachLiveTrack(loaded)
             syncSession()
@@ -590,34 +578,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         framed = true
     }
 
-    /**
-     * Brings the map in line with the stored credential, on style load and on every resume. No
-     * session goes to `SignInActivity`.
-     *
-     * A token restored from disk isn't trusted until the server confirms it: a revoked one would
-     * otherwise show as a blank map, its 401s visible only in logcat. An unconfirmed email goes
-     * to `VerifyEmailActivity`, since every tile and sync request would be a `403`.
-     */
+    /** Brings the map in line with the stored credential ([SessionGate]), on style load and on every resume. */
     private fun syncSession() {
-        if (!Session.isSignedIn) {
-            openSignIn()
-            return
-        }
-        if (!Session.verified) {
-            verifyStoredSession()
-            return
-        }
-        if (!Session.emailVerified) {
-            openVerifyEmail()
-            return
-        }
-        // The first run, as on the web: an account with no Country goes to Settings first. The
-        // Country decides the units, and nothing else asks for it.
-        if (!Session.isDemo && Session.country.isEmpty()) {
-            WebPageActivity.openOnboarding(requireContext())
-            requireActivity().finish()
-            return
-        }
+        if (!gate.passes()) return
 
         modeBarReady = true
         renderModeBar()
@@ -903,7 +866,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /** A Story copy arrived (`docs/SPEC.md` FR-14.8): new activities, refreshed as after an
      *  upload. The map has history now, so the empty notice goes. */
     private fun onStoryCopyArrived() {
-        hideNotice(MapNotice.EMPTY)
+        notices.hide(MapNotice.EMPTY)
         style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
         reloadList()
         activityDays.reload()
@@ -925,7 +888,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         // Tracks refetch at once; the tile version moves only after the coverage render.
         style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
         checkTileVersion()
-        if (shownNotice == MapNotice.EMPTY) {
+        if (notices.shown == MapNotice.EMPTY) {
             framed = false
             frameActivities()
         }
@@ -1135,92 +1098,13 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         export.setAvailable(!active)
         renderModeChip()
         renderDateFooter()
-        updateNoticeVisibility()
+        notices.render()
         // Like every history layer, the photos give the map to the live track.
         photos.render()
 
         val loaded = style ?: return
         if (overlaysAttached) MapOverlays.setRecording(loaded, active, mode)
         MapOverlays.updateLiveTrack(loaded, points)
-    }
-
-    private fun openSignIn() {
-        SignInActivity.open(requireContext())
-        requireActivity().finish()
-    }
-
-    private fun openVerifyEmail() {
-        VerifyEmailActivity.open(requireContext())
-        requireActivity().finish()
-    }
-
-    private fun verifyStoredSession() {
-        if (verifying) return
-        verifying = true
-        notice.postDelayed(showChecking, CHECKING_DELAY_MS)
-        HoldMyTrackApi.verifySession { result ->
-            verifying = false
-            notice.removeCallbacks(showChecking)
-            hideNotice(MapNotice.CHECKING)
-            result.onSuccess { profile ->
-                Session.markVerified(profile)
-                AppLanguage.followAccount(requireContext().applicationContext, profile.locale)
-                hideNotice(MapNotice.UNREACHABLE)
-            }.onFailure { failure ->
-                // Only a 401 means the token is dead. Any other failure keeps it for the next
-                // resume, and the notice says why the map is empty.
-                if (failure is ApiException && failure.code == 401) {
-                    Session.clear()
-                } else {
-                    Log.w(TAG, "could not verify the stored session", failure)
-                    showNotice(
-                        MapNotice.UNREACHABLE,
-                        getString(R.string.map_unreachable),
-                        failed = true,
-                        action = R.string.retry,
-                    ) { verifyStoredSession() }
-                }
-            }
-            syncSession()
-        }
-    }
-
-    /**
-     * Shows [text], an optional [detail] and at most one action. A less important notice never
-     * replaces a more important one ([MapNotice]).
-     */
-    private fun showNotice(
-        kind: MapNotice,
-        text: String,
-        detail: String? = null,
-        failed: Boolean = false,
-        action: Int? = null,
-        onAction: (() -> Unit)? = null,
-    ) {
-        if (!MapChromeRules.noticeReplaces(shownNotice, kind)) return
-        shownNotice = kind
-        noticeText.text = text
-        noticeText.setTextColor(requireContext().getColor(if (failed) R.color.hmt_danger else R.color.hmt_ink))
-        noticeDetail.text = detail
-        noticeDetail.visibility = if (detail == null) View.GONE else View.VISIBLE
-        noticeAction.visibility = if (action == null) View.GONE else View.VISIBLE
-        if (action != null) noticeAction.setText(action)
-        noticeAction.setOnClickListener { onAction?.invoke() }
-        updateNoticeVisibility()
-    }
-
-    /** Takes [kind] down if it's the one up; any other notice stays. */
-    private fun hideNotice(kind: MapNotice) {
-        if (shownNotice != kind) return
-        shownNotice = null
-        updateNoticeVisibility()
-    }
-
-    /** The empty notice steps aside while recording and on the Sync tab it points to; failures
-     *  stay up. */
-    private fun updateNoticeVisibility() {
-        val onSync = ::panel.isInitialized && panel.tab == PanelTab.SYNC
-        notice.isVisible = MapChromeRules.noticeShown(shownNotice, isRecording(), onSync)
     }
 
     /**
@@ -1278,13 +1162,13 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             val box = result.getOrNull()
             if (box == null) {
                 if (!Session.isDemo) {
-                    showNotice(MapNotice.EMPTY, getString(R.string.map_empty), action = R.string.nav_sync) {
+                    notices.show(MapNotice.EMPTY, getString(R.string.map_empty), action = R.string.nav_sync) {
                         host?.showTab(MainActivity.Tab.SYNC)
                     }
                 }
                 return@latestActivityBounds
             }
-            hideNotice(MapNotice.EMPTY)
+            notices.hide(MapNotice.EMPTY)
             // Reopening the app mid-recording: the camera belongs to the live track.
             if (isRecording()) return@latestActivityBounds
             flyTo(box)
@@ -1327,7 +1211,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  small print, and Try again. */
     private fun reportFailure(error: String) {
         Log.e(TAG, "map failed to load: $error")
-        showNotice(
+        notices.show(
             MapNotice.MAP_FAILED,
             getString(R.string.map_load_failed),
             detail = "${BuildConfig.API_BASE_URL} — $error",
@@ -1359,7 +1243,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         spots.resume()
         // An empty map is checked again on every return, so the notice goes and the camera frames
         // the history once something arrives.
-        if (shownNotice == MapNotice.EMPTY) {
+        if (notices.shown == MapNotice.EMPTY) {
             framed = false
             frameActivities()
         }
@@ -1437,9 +1321,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         /** How often a list with Pending rows is read again. */
         private const val PENDING_POLL_MS = 2_000L
         private const val FRAME_DURATION_MS = 900
-
-        /** How long a session check runs before the notice shows, so a fast one doesn't flash it. */
-        private const val CHECKING_DELAY_MS = 600L
 
         private const val STATE_MODE = "mode"
         private const val STATE_FRAMED = "framed"
