@@ -703,7 +703,7 @@ The first three never overlap: a way tagged as a cycleway or shared path that is
 **Preconditions**: Active session. The deployment configures imagery (`IMPLEMENTATION.md` §4.26); without it there is no Satellite button, and a saved Satellite choice shows the vector map.
 
 **Behavior**:
-1. Map by default. Choosing Satellite shows the imagery in place of the base map's background, land, water, landuse and building fills; roads stay on top at 40% opacity, so the ground shows through them; boundaries and place labels stay as they are, and so do tracks, Fog, Heatmap, trails and bike paths (FR-4.13) and Spots (FR-15). Choosing Map puts the fills back.
+1. Map by default. Choosing Satellite shows the imagery in place of the base map's background, land, water, landuse and building fills; roads stay on top at 40% opacity, so the ground shows through them; boundaries and place labels stay as they are, and so do tracks, Fog, Heatmap, trails and bike paths (FR-4.13) and Spots (FR-15). In Fog and Heatmap the roads go altogether — the lines, rail, street names and route shields — so the picture is the ground and what the account covered of it; switching back to Normal brings them back. Choosing Map puts the fills back.
 2. Switching doesn't reload the map: camera, mode and overlays stay as they were.
 3. It is independent of the map mode and survives a theme change (FR-4.12). Over imagery, Fog uses the cream veil the dark theme's base map has, whatever the theme.
 4. The choice is kept by this browser (or, in the Android app, this phone) only, not on the account, and applies again on the next visit. The Layers button's count (FR-4.13) doesn't include it.
@@ -736,7 +736,7 @@ The first three never overlap: a way tagged as a cycleway or shared path that is
 | **The recording in progress** (Android) | The GPS track being recorded | Its line in the track colour and a dot at the latest fix, alone on the map | While recording | Any | `apps/android/docs/SPEC.md` FR-5.1 |
 | **Your position** (Android) | Where the phone is | A position dot | After Find my location | Any | `apps/android/docs/SPEC.md` FR-2.5 |
 
-**Drawn over**: from the bottom up — the base map's fills and roads (or satellite imagery under the roads, FR-4.14); Fog's veil or Heatmap's heat; the paths, dirt tracks under trails under the three bike kinds; the tracks, then the pace-colored segments; the base map's labels (dimmed in Fog); Spot areas and badges, which Fog doesn't dim; and photo markers, over everything else on the map.
+**Drawn over**: from the bottom up — the base map's fills and roads (or satellite imagery under the roads, which Fog and Heatmap leave out over imagery, FR-4.14); Fog's veil or Heatmap's heat; the paths, dirt tracks under trails under the three bike kinds; the tracks, then the pace-colored segments; the base map's labels (dimmed in Fog); Spot areas and badges, which Fog doesn't dim; and photo markers, over everything else on the map.
 
 **Zoom levels**: what the map draws at each zoom. Bike and shared paths and points of interest show only for what is ticked in the Layers menu; with nothing ticked they draw at no zoom. Trails and dirt tracks are always drawn.
 

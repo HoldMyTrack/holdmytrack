@@ -801,7 +801,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             MapPaths.apply(loaded, shownPaths(MapPaths.get(requireContext())))
             // Only a deployment with imagery serves it; without, the Layers menu has no Satellite.
             satelliteAvailable = MapSatellite.isAvailable(loaded)
-            MapSatellite.apply(loaded, MapSatellite.isOn(requireContext()))
+            MapSatellite.apply(loaded, MapSatellite.isOn(requireContext()), mode)
             MapOverlays.attachLiveTrack(loaded)
             syncSession()
             renderRecording()
@@ -2087,6 +2087,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             renderModeLabel(button, active)
         }
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setMode(it, next) }
+        style?.let { MapSatellite.apply(it, satelliteAvailable && MapSatellite.isOn(requireContext()), next) }
         renderZoomLevelNotice()
         renderCoverageNotice()
         renderModeChip()
@@ -2130,7 +2131,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun setSatellite(on: Boolean) {
         MapSatellite.set(requireContext(), on)
         val loaded = style ?: return
-        MapSatellite.apply(loaded, on)
+        MapSatellite.apply(loaded, on, mode)
         if (overlaysAttached) MapOverlays.setDarkVeil(loaded, darkBase(loaded))
     }
 
@@ -2145,7 +2146,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun prepareExportStyle(loaded: Style) {
         val context = requireContext()
         MapPaths.apply(loaded, shownPaths(MapPaths.get(context)))
-        MapSatellite.apply(loaded, satelliteAvailable && MapSatellite.isOn(context))
+        MapSatellite.apply(loaded, satelliteAvailable && MapSatellite.isOn(context), mode)
         MapOverlays.attach(loaded, mode, selectedRange, darkBase(loaded), isNight(), storyId)
         MapPaths.apply(loaded, shownPaths(MapPaths.get(context)))
         MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.highlighted)

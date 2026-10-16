@@ -11,6 +11,7 @@ import { ensureHeatmapLayer } from './heatmap';
 import { raisePathLayers } from './paths';
 import { labelInsertionPoint } from './layers';
 import { setMapMode, type MapMode } from './mapMode';
+import { setSatelliteVisible } from './satellite';
 import { ATTRIBUTION_TEXT, buildStyle, isDarkBase, type Flavor, type PathOverlays } from './style';
 import { ensureTrackLayer, setHiddenTracks } from './tracks';
 
@@ -363,6 +364,7 @@ async function renderOffscreen(
     setBikePathsVisible(instance, state.paths);
     ensureTrackLayer(instance, beforeId, state.activityQuery);
     setMapMode(instance, state.mode);
+    setSatelliteVisible(instance, state.satellite, state.mode);
     setHiddenTracks(instance, state.hiddenIds);
 
     await waitForIdle(instance);
