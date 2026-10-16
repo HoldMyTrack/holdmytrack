@@ -16,10 +16,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/db"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mapstyle"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
+	"github.com/HoldMyTrack/platform/services/server/internal/db"
+	"github.com/HoldMyTrack/platform/services/server/internal/mapstyle"
+	"github.com/HoldMyTrack/platform/services/server/internal/storage"
+	"github.com/HoldMyTrack/platform/services/server/internal/web"
 )
 
 // Tests that need a real Postgres+PostGIS read TEST_DATABASE_URL and skip without it; CI's Go

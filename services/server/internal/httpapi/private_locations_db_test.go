@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
+	"github.com/HoldMyTrack/platform/services/server/internal/ingest"
 )
 
 // northGPX is a walk due north along lon, eleven fixes a minute and about 111 m apart, from

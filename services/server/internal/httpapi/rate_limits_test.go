@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/export"
+	"github.com/HoldMyTrack/platform/services/server/internal/export"
 )
 
 func TestRateKey(t *testing.T) {

@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
+	"github.com/HoldMyTrack/platform/services/server/internal/i18n"
+	"github.com/HoldMyTrack/platform/services/server/internal/web"
 )
 
 // settingsOption is one choice in a Settings list: the value `PATCH /v1/account/settings`

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/geo"
+	"github.com/HoldMyTrack/platform/services/server/internal/geo"
 )
 
 // tracksQuery is IMPLEMENTATION.md §4.3 verbatim, with three changes: user_id

@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mapstyle"
+	"github.com/HoldMyTrack/platform/services/server/internal/i18n"
+	"github.com/HoldMyTrack/platform/services/server/internal/mapstyle"
 )
 
 // handleMapStyle serves the MapLibre style document for one flavor — ARCHITECTURE.md §2.1's

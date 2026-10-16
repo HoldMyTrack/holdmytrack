@@ -15,7 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
+	"github.com/HoldMyTrack/platform/services/server/internal/i18n"
 )
 
 // Sign in with Google (docs/SPEC.md FR-1.9, docs/adr/0009-google-sign-in-server-side-code-flow.md)

@@ -9,8 +9,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storycopy"
+	"github.com/HoldMyTrack/platform/services/server/internal/i18n"
+	"github.com/HoldMyTrack/platform/services/server/internal/storycopy"
 )
 
 // Sending a copy of a Story (IMPLEMENTATION.md §4.23, ADR-0036). A Story's owner sends a copy

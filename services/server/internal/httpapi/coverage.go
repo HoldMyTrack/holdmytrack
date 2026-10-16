@@ -3,7 +3,7 @@ package httpapi
 import (
 	"net/http"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
+	"github.com/HoldMyTrack/platform/services/server/internal/fog"
 )
 
 // coverageRenderingQuery reports whether any job that changes this account's Fog/Heatmap

@@ -16,8 +16,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/metrics"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
+	"github.com/HoldMyTrack/platform/services/server/internal/metrics"
+	"github.com/HoldMyTrack/platform/services/server/internal/storage"
 )
 
 // R2's list prices per request, in US dollars. The free monthly allowance is left out, so the

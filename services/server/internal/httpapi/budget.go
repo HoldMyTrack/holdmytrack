@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/budget"
+	"github.com/HoldMyTrack/platform/services/server/internal/budget"
 )
 
 // The daily R2 budget (internal/budget, ADR-0044) as the API applies it: what adds objects is

@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
+	"github.com/HoldMyTrack/platform/services/server/internal/fog"
 )
 
 func TestSetTileCacheControl(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
+	"github.com/HoldMyTrack/platform/services/server/internal/i18n"
 )
 
 // activeImport is one row of the header's Upload menu (IMPLEMENTATION.md §4.0.1): an import

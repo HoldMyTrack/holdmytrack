@@ -6,7 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
+	"github.com/HoldMyTrack/platform/services/server/internal/fog"
 )
 
 // handleFogVectorTile serves Fog as vector shapes (IMPLEMENTATION.md §4.2): the veil and its

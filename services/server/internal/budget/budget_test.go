@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/db"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
+	"github.com/HoldMyTrack/platform/services/server/internal/db"
+	"github.com/HoldMyTrack/platform/services/server/internal/storage"
 )
 
 func TestSpend(t *testing.T) {

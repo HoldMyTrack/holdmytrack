@@ -12,10 +12,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/budget"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/db"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
+	"github.com/HoldMyTrack/platform/services/server/internal/budget"
+	"github.com/HoldMyTrack/platform/services/server/internal/db"
+	"github.com/HoldMyTrack/platform/services/server/internal/ingest"
+	"github.com/HoldMyTrack/platform/services/server/internal/storage"
 )
 
 // These read TEST_DATABASE_URL and skip without it, like internal/httpapi's database tests

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
+	"github.com/HoldMyTrack/platform/services/server/internal/i18n"
 )
 
 // languageCookieAge is how long the header's language choice lasts on a browser — long

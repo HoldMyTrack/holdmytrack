@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/tilemath"
+	"github.com/HoldMyTrack/platform/services/server/internal/tilemath"
 )
 
 // The Country and Region tiles are drawn from outlines kept per tile (admin_tile_geoms): the

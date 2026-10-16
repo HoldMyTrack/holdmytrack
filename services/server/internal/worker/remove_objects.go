@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
+	"github.com/HoldMyTrack/platform/services/server/internal/storage"
 )
 
 // removeActivityObjectsJob is a `remove_activity_objects` job's payload: the raw uploads of

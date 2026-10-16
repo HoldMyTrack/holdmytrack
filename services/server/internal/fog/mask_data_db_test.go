@@ -11,10 +11,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage/storagetest"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/tilemath"
+	"github.com/HoldMyTrack/platform/services/server/internal/parse"
+	"github.com/HoldMyTrack/platform/services/server/internal/storage"
+	"github.com/HoldMyTrack/platform/services/server/internal/storage/storagetest"
+	"github.com/HoldMyTrack/platform/services/server/internal/tilemath"
 )
 
 // maskStore is memStore that also counts the GETs it answers.

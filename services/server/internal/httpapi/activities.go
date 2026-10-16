@@ -12,8 +12,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
+	"github.com/HoldMyTrack/platform/services/server/internal/fog"
+	"github.com/HoldMyTrack/platform/services/server/internal/ingest"
 )
 
 // activityFilter is the from/to/types/story filter shape shared by §4.3's tracks tiles and

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/tilemath"
+	"github.com/HoldMyTrack/platform/services/server/internal/tilemath"
 )
 
 // The spots tiles (§4.25) carry the places and their areas from zoom 13 up, with OSM's text.

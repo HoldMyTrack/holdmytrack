@@ -19,7 +19,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	_ "golang.org/x/image/webp" // image.DecodeConfig for an uploaded WebP
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
+	"github.com/HoldMyTrack/platform/services/server/internal/ingest"
 )
 
 // Activity photos (IMPLEMENTATION.md §4.27, ADR-0024) — the user's own pictures on an

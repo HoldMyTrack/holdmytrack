@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/export"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storycopy"
+	"github.com/HoldMyTrack/platform/services/server/internal/export"
+	"github.com/HoldMyTrack/platform/services/server/internal/ingest"
+	"github.com/HoldMyTrack/platform/services/server/internal/parse"
+	"github.com/HoldMyTrack/platform/services/server/internal/storycopy"
 )
 
 // recorded ingests a walk for owner the way an upload does, from a GPX file in the store: 61

@@ -16,10 +16,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parallel"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/tilemath"
+	"github.com/HoldMyTrack/platform/services/server/internal/parallel"
+	"github.com/HoldMyTrack/platform/services/server/internal/parse"
+	"github.com/HoldMyTrack/platform/services/server/internal/storage"
+	"github.com/HoldMyTrack/platform/services/server/internal/tilemath"
 )
 
 // renderParallelism bounds how many tiles (or masks) a render works on at once. The work is

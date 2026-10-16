@@ -11,7 +11,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/metrics"
+	"github.com/HoldMyTrack/platform/services/server/internal/metrics"
 )
 
 func newMetricsTestServer() *Server {

@@ -3,7 +3,7 @@ package httpapi
 import (
 	"net/http"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
+	"github.com/HoldMyTrack/platform/services/server/internal/fog"
 )
 
 // setTileCacheControl is every per-user tile route's caching (IMPLEMENTATION.md §4.2's

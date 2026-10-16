@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
+	"github.com/HoldMyTrack/platform/services/server/internal/i18n"
+	"github.com/HoldMyTrack/platform/services/server/internal/web"
 )
 
 // The Sync page (IMPLEMENTATION.md §4.0.1, docs/SPEC.md FR-3.4): every finished import, newest

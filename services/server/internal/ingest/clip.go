@@ -10,7 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
+	"github.com/HoldMyTrack/platform/services/server/internal/parse"
 )
 
 // Zone is one of an account's Private locations (privacy_zones, IMPLEMENTATION.md §3.7): a

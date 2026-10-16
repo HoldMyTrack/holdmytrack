@@ -8,7 +8,7 @@ import (
 	"image/png"
 	"testing"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
+	"github.com/HoldMyTrack/platform/services/server/internal/fog"
 )
 
 // A Fog vector tile is traced from the account's stored coverage tile: one with a road across

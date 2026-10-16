@@ -11,7 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
+	"github.com/HoldMyTrack/platform/services/server/internal/ingest"
 )
 
 // Private locations (FR-8.1, IMPLEMENTATION.md §7) — circles on the map whose contents never

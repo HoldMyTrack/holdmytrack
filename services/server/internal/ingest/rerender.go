@@ -7,9 +7,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parallel"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
+	"github.com/HoldMyTrack/platform/services/server/internal/fog"
+	"github.com/HoldMyTrack/platform/services/server/internal/parallel"
+	"github.com/HoldMyTrack/platform/services/server/internal/storage"
 )
 
 // RerenderCoverage rebuilds every Fog and Heatmap tile of one account, or of every account with

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/budget"
+	"github.com/HoldMyTrack/platform/services/server/internal/budget"
 )
 
 // What the day's R2 spend stops, stage by stage: at the adding stage an upload, a sync and an

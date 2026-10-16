@@ -10,8 +10,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/budget"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
+	"github.com/HoldMyTrack/platform/services/server/internal/budget"
+	"github.com/HoldMyTrack/platform/services/server/internal/fog"
 )
 
 // heatCellsQuery is the account's ($1) zoomed-out cells in a heat-points tile: how many

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
+	"github.com/HoldMyTrack/platform/services/server/internal/i18n"
 )
 
 // Units: the distance/elevation formatting the server-rendered pages need, ported from

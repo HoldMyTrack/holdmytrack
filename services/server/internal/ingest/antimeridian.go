@@ -3,7 +3,7 @@ package ingest
 import (
 	"math"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
+	"github.com/HoldMyTrack/platform/services/server/internal/parse"
 )
 
 // unwrapLons returns points with each longitude within 180° of the one before, the first in

@@ -14,7 +14,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
+	"github.com/HoldMyTrack/platform/services/server/internal/ingest"
 )
 
 const resumeGPX = `<?xml version="1.0"?>

@@ -19,13 +19,13 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/budget"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mail"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/mapstyle"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/metrics"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
+	"github.com/HoldMyTrack/platform/services/server/internal/budget"
+	"github.com/HoldMyTrack/platform/services/server/internal/ingest"
+	"github.com/HoldMyTrack/platform/services/server/internal/mail"
+	"github.com/HoldMyTrack/platform/services/server/internal/mapstyle"
+	"github.com/HoldMyTrack/platform/services/server/internal/metrics"
+	"github.com/HoldMyTrack/platform/services/server/internal/storage"
+	"github.com/HoldMyTrack/platform/services/server/internal/web"
 )
 
 // maxUploadBytes bounds the single read into memory this handler does. The parse step

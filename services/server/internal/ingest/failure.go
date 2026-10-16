@@ -3,7 +3,7 @@ package ingest
 import (
 	"errors"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
+	"github.com/HoldMyTrack/platform/services/server/internal/parse"
 )
 
 // The failure codes an ingest job can end with, stored in jobs.error_code beside last_error's

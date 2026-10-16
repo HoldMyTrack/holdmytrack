@@ -15,10 +15,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/export"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
+	"github.com/HoldMyTrack/platform/services/server/internal/export"
+	"github.com/HoldMyTrack/platform/services/server/internal/fog"
+	"github.com/HoldMyTrack/platform/services/server/internal/ingest"
+	"github.com/HoldMyTrack/platform/services/server/internal/storage"
 )
 
 // Job is the `story_copy` job's payload: copy the Story, as it is when the job runs, into the
