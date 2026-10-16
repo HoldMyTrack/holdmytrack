@@ -12,7 +12,7 @@ Everything runs in Docker, the Vite dev server included: `docker compose up`, th
 
 ### Server-rendered pages in dev
 
-Every page, the map's shell included, is rendered by Go (`IMPLEMENTATION.md` §4.19), but you open everything at `localhost:5173`. Vite proxies the page paths (`pageRoutes` in `vite.config.ts`) to `API_PROXY_TARGET` (`http://api:8080` in compose, `localhost:8080` by default on the host) and marks each request `X-HoldMyTrack-Vite: dev`; a dev Go server then answers with a shell that loads the app from Vite, with Fast Refresh. `vite preview` proxies without the marker, so the shell loads the build. Both `verify:map` and `verify:build` need a running Go server.
+Every page, the map's shell included, is rendered by Go (`IMPLEMENTATION.md` §4.19), but you open everything at `localhost:5173`. Vite proxies the page paths (`pageRoutes` in `vite.config.ts`) to `API_PROXY_TARGET` (`http://api:8080` in compose, `localhost:8080` by default on the host) and marks each request `X-HoldMyTrack-Vite: dev`; a dev Go server then answers with a shell that loads the app from Vite, with Fast Refresh. `vite preview` proxies without the marker, so the shell loads the build. `verify:map` and `verify:build` need a running Go server; `verify:map`'s flows, which upload activities, the worker too.
 
 `compose.yaml` mounts `services/server/internal/web` into `api` with `WEB_DEV_DIR` set, so templates and stylesheets are re-read on every request; a Go handler change needs `docker compose up -d --build api`. A new page path goes in both `registerPages` (`server.go`) and `pageRoutes`, whose patterns must allow a query string; a path missing from either 404s in dev only, since production's Caddy sends every non-static path to Go.
 
@@ -24,7 +24,7 @@ The Android suite's sample files (`/testing`) are generated. After changing `dem
 docker run --rm -v "$PWD":/src -w /src golang:1.25-bookworm go run ./cmd/make-testing-files
 ```
 
-Use the Go version `go.mod` names: another release compresses the zips and encodes the JPEGs differently, and the Go tests fail while the committed files differ from the output.
+Use the Go version `go.mod` names: another release compresses the zips and JPEGs differently, failing the Go tests.
 
 ### Text and translations
 
@@ -157,7 +157,7 @@ On the host, `npm run build` must precede `verify:build`, and `npm run basemap` 
 - **The IDE needs a host `node_modules`**, about 300 MB, refreshed by hand when the lockfile changes.
 - **Adding a dependency takes three steps**: install in the container, rebuild the image, install on the host.
 - **`vite build` copies the 326 MB archive through VirtioFS**, taking seconds.
-- **Playwright renders on SwiftShader**, a rasteriser no user has.
+- **Playwright renders on SwiftShader**, which no user has.
 - **HMR can go deaf over VirtioFS.**
 
 Open follow-up: `scripts/build-basemap.sh` pins a Protomaps build that their seven-day retention ages out. Resolving the newest key from `https://build-metadata.protomaps.dev/builds.json` when `BUILD` is unset would make CI's cache miss self-healing ("CI" above).

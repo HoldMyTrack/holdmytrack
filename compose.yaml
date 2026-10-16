@@ -38,6 +38,8 @@ services:
     init: true
     depends_on:
       api: { condition: service_started }
+      # tests/flows.mjs uploads activities, which a job parses.
+      worker: { condition: service_started }
     # Shares the api container's network stack instead of reaching it over service-name DNS
     # (`api:8080`) as a separate host. Auth's session cookie (services/server/internal/
     # httpapi/auth.go) is SameSite=Lax, which browsers only attach to cross-*site* fetches
