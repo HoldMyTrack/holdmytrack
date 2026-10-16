@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { activityQuery as queryFor } from './activityQuery';
-import { flyToBBox, flyToView, unionBBox } from './bbox';
-import { firstListFit, needsFallbackView } from './cameraRules';
-import { satelliteSource, WORLD_VIEW } from './config';
-import { countryView } from './countryView';
+import { flyToBBox, unionBBox } from './bbox';
+import { satelliteSource } from './config';
 import { defaultRange } from './defaultRange';
 import type { MapMode } from './mapMode';
 import { loadOverlays, saveOverlays, type Overlays } from './overlays';
@@ -13,17 +11,19 @@ import { initialSession, mapSessionReducer } from './session';
 import { invertedChecks, mapHiddenIds as hiddenOnMap, toolbarTarget } from './selection';
 import { storiesTabParam, storyParam, urlWithStory, type StoryNav } from './storyUrl';
 import type { SpotCategory } from './spots';
-import { clearTrackBands, setTrackBands } from './trackBands';
-import { refreshTrackLayer, setHiddenTracks, setHoveredTrack, setSelectedTracks, setTrackInteractivityHandlers } from './tracks';
+import { refreshTrackLayer } from './tracks';
 import { useCoverageRefresh } from './useCoverageRefresh';
 import { useExportFlow } from './useExportFlow';
 import { useFileDrop } from './useFileDrop';
 import { useHashSync, useInitialView } from './useInitialView';
+import { useListFlight } from './useListFlight';
 import { useMapInstance } from './useMapInstance';
 import { useMapLayers } from './useMapLayers';
 import { usePhotoLayer } from './usePhotoLayer';
+import { useSelectionLayers } from './useSelectionLayers';
 import { useSpots } from './useSpots';
-import { getActivityTrackMetrics, type Activity, type ActivityTrackMetrics, type Story } from '../api';
+import { useTrackMetrics } from './useTrackMetrics';
+import { type Activity, type Story } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
 import { ActivitiesPanel, type PanelTab, type StoriesPanel } from '../ui/ActivitiesPanel';
@@ -97,8 +97,6 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // feature-state. A preview only: it never moves the camera.
   const [hoveredActivityId, setHoveredActivityId] = useState<string | null>(null);
 
-  // The focused activity's pace-colored segments (trackBands.ts); null whenever nothing is focused.
-  const [trackMetrics, setTrackMetrics] = useState<ActivityTrackMetrics | null>(null);
   // Bumped when a reprocess finishes, so the bands refetch against the new points.
   const [trackMetricsVersion, setTrackMetricsVersion] = useState(0);
 
@@ -311,105 +309,32 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     fitToSelection(visible);
   }, [activities, toolbarTargetIds, mapHiddenIds, fitToSelection]);
 
-  // Read by the range fly below without being its dependency: the fly is keyed on the range, but
-  // must still leave out tracks that aren't drawn.
-  const mapHiddenIdsRef = useRef(mapHiddenIds);
-  useEffect(() => {
-    mapHiddenIdsRef.current = mapHiddenIds;
-  }, [mapHiddenIds]);
-
-  // Camera moves on a newly loaded list:
-  // - The first list's fit is cameraRules.ts's firstListFit.
-  // - After that, only a range the user picked or a Story opened from the map flies, to what's visible.
-  // Keyed on the query the list was fetched for, because `activities` is a new array on every reload:
-  // the Pending poll, a finished upload or a Private location change must not move the camera.
-  // Arriving on one activity (`/?activity=`) flies to it instead, so the first-list fly stands aside.
-  const hasFlownToActivitiesRef = useRef(initialActivity !== null);
-  const flownRangeKeyRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!map || activitiesLoadedKey === null) return;
-    if (activitiesLoadedKey === flownRangeKeyRef.current) return;
-    flownRangeKeyRef.current = activitiesLoadedKey;
-    if (!hasFlownToActivitiesRef.current) {
-      const fit = firstListFit(activities, storyId, initial.hash.view != null);
-      if (fit === null) return;
-      // The first list, even an empty one: an account with no history gets the fallback view
-      // below, and its first upload doesn't fly either.
-      hasFlownToActivitiesRef.current = true;
-      if (fit.length > 0) fitToSelection(fit);
-      return;
-    }
-    if (!session.flyRequest) return;
-    dispatch({ type: 'flyConsumed' });
-    const visible = activities.filter((a) => !mapHiddenIdsRef.current.has(a.id));
-    const flyBounds = unionBBox(visible.flatMap((a) => (a.bbox ? [a.bbox] : [])));
-    if (flyBounds) flyToBBox(map, flyBounds);
-  }, [map, activities, activitiesLoadedKey, fitToSelection, storyId, session.flyRequest]);
-
-  // An account with no history at all: the account's Country view if set, else WORLD_VIEW; never geolocation.
-  const hasFlownToFallbackRef = useRef(false);
-  useEffect(() => {
-    if (!map || hasFlownToFallbackRef.current) return;
-    if (!needsFallbackView(initial.hash.view != null, activities.length, daysReady, earliest)) return;
-    hasFlownToFallbackRef.current = true;
-    flyToView(map, countryView(user.country) ?? WORLD_VIEW);
-  }, [map, activities, daysReady, earliest, user.country]);
-
-  // A click on a track focuses it as a row click does; a click away clears the focus and leaves
-  // the checked group. While the Edit window is open the handlers go quiet: its group and focus must
-  // stay, and during a track session every click is aimed at a point.
-  useEffect(() => {
-    setTrackInteractivityHandlers(
-      editOpen
-        ? { onSelect: () => {}, onHover: () => {}, onClickAway: () => {} }
-        : { onSelect: focusActivity, onHover: setHoveredActivityId, onClickAway: clearFocus },
-    );
-  }, [focusActivity, clearFocus, editOpen]);
+  useListFlight(map, {
+    activities,
+    loadedKey: activitiesLoadedKey,
+    storyId,
+    flyRequest: session.flyRequest,
+    onFlown: () => dispatch({ type: 'flyConsumed' }),
+    mapHiddenIds,
+    urlView: initial.hash.view != null,
+    arrivingOnActivity: initialActivity !== null,
+    daysReady,
+    earliest,
+    country: user.country,
+    fitTo: fitToSelection,
+  });
 
   const spots = useSpots(map, spotsShown);
-
-  // Only the focused track is bold; checked tracks aren't.
-  useEffect(() => {
-    if (map) setSelectedTracks(map, focusedActivityId !== null ? [focusedActivityId] : []);
-  }, [map, focusedActivityId]);
-
-  useEffect(() => {
-    if (map) setHoveredTrack(map, hoveredActivityId);
-  }, [map, hoveredActivityId]);
-
-  useEffect(() => {
-    if (map) setHiddenTracks(map, [...mapHiddenIds]);
-  }, [map, mapHiddenIds]);
-
-  // Fetches the focused activity's per-vertex speed. Until it lands the previous activity's may be
-  // in hand, so drawing checks `activityId` against the focus.
-  useEffect(() => {
-    if (!focusedActivityId) {
-      setTrackMetrics(null);
-      return;
-    }
-    const controller = new AbortController();
-    getActivityTrackMetrics(focusedActivityId, controller.signal)
-      .then(setTrackMetrics)
-      .catch(() => {
-        if (!controller.signal.aborted) setTrackMetrics(null);
-      });
-    return () => controller.abort();
-  }, [focusedActivityId, trackMetricsVersion]);
-
-  // Draws the bands from data in hand. Not while the focused track is hidden: the bands are a
-  // layer above the track and would keep painting it. Not while its edit is pending: they'd paint
-  // the old shape over the new one.
-  const bands = useMemo(() => {
-    if (focusedActivityId === null || trackMetrics?.activityId !== focusedActivityId) return null;
-    if (mapHiddenIds.has(focusedActivityId) || pendingIds.includes(focusedActivityId)) return null;
-    return trackMetrics;
-  }, [trackMetrics, focusedActivityId, mapHiddenIds, pendingIds]);
-  useEffect(() => {
-    if (!map) return;
-    if (bands) setTrackBands(map, bands.points);
-    else clearTrackBands(map);
-  }, [map, bands]);
+  useSelectionLayers(map, {
+    focusedId: focusedActivityId,
+    hoveredId: hoveredActivityId,
+    mapHiddenIds,
+    editOpen,
+    onFocus: focusActivity,
+    onHover: setHoveredActivityId,
+    onClickAway: clearFocus,
+  });
+  const bands = useTrackMetrics(map, focusedActivityId, trackMetricsVersion, mapHiddenIds, pendingIds);
 
   // Fog and Heatmap are re-rendered by queued jobs, so after an upload or delete this waits for the
   // account's jobs to drain and then refetches both (useCoverageRefresh.ts). `coverageRendering`
