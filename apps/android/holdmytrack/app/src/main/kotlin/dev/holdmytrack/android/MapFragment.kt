@@ -1,9 +1,7 @@
 package dev.holdmytrack.android
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.RectF
 import android.os.Bundle
@@ -11,11 +9,8 @@ import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
-import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.core.view.AccessibilityDelegateCompat
 import androidx.core.view.ViewCompat
@@ -41,6 +36,7 @@ import dev.holdmytrack.android.map.MapNotice
 import dev.holdmytrack.android.map.MapModeButton
 import dev.holdmytrack.android.map.MapOverlays
 import dev.holdmytrack.android.map.LayersMenu
+import dev.holdmytrack.android.map.LocateController
 import dev.holdmytrack.android.map.MapLayersSwitch
 import dev.holdmytrack.android.map.MapBikePaths
 import dev.holdmytrack.android.map.MapPaths
@@ -75,8 +71,6 @@ import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
-import org.maplibre.android.location.LocationComponentActivationOptions
-import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
@@ -125,10 +119,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
     /** Whether the served style has satellite imagery; the Layers menu offers it only then. */
     private var satelliteAvailable = false
-    private lateinit var locateButton: MaterialButton
-
-    /** Find my location's panel, hidden whole while recording so no empty panel is left. */
-    private lateinit var locatePanel: View
 
     /** The Activities sheet, the date range at its head. */
     private lateinit var sheet: View
@@ -271,18 +261,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         showMap = { host?.showMap() },
     )
 
-    /** Asked for on the first tap of Find my location. Approximate is enough to show the
-     *  user roughly where they are, so either grant counts. */
-    private val locatePermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) {
-        if (hasLocationPermission()) {
-            showMyLocation()
-        } else {
-            Toast.makeText(requireContext(), R.string.locate_needs_location, Toast.LENGTH_LONG).show()
-        }
-    }
-
     /** What the Sync tab has the map draw (`map/SyncCandidatesOverlay`), kept for a style
      *  reload, which drops the layers. */
     private var syncCandidates: List<Candidate> = emptyList()
@@ -303,6 +281,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         frame = { box, maxZoom -> flyTo(box, maxZoom) },
         onPopupOpening = { spots.closePopup() },
     )
+
+    /** Find my location's dot and tracking camera. */
+    private val locate = LocateController(this, map = { map }, style = { style })
 
     /** Points of interest: the shown places, their badges and popup, and capture mode. */
     private val spots = SpotsController(this, map = { map }, style = { style?.takeIf { overlaysAttached } }, frame = { flyTo(it) })
@@ -393,9 +374,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         photos.bind(view) { topChrome.bottom }
         recording.bind(view)
 
-        locateButton = findViewById(R.id.locate_button)
-        locatePanel = findViewById(R.id.locate_panel)
-        locateButton.setOnClickListener { onLocateTap() }
+        locate.bind(view)
         exportViewfinder = ExportViewfinder(
             host = findViewById(R.id.map_root),
             map = { map.takeIf { style != null } },
@@ -1165,51 +1144,11 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /** Normal mode, session ready, not recording: when the sheet and its editors have the map. */
     private fun normalMode() = MapChromeRules.normalMode(modeBarReady, mode, isRecording())
 
-    private fun hasPermission(permission: String) =
-        ContextCompat.checkSelfPermission(requireContext(), permission) == PackageManager.PERMISSION_GRANTED
-
-    private fun hasLocationPermission() =
-        hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) || hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
-
-    private fun onLocateTap() {
-        if (hasLocationPermission()) {
-            showMyLocation()
-        } else {
-            locatePermissionLauncher.launch(
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-            )
-        }
-    }
-
-    /**
-     * Turns on MapLibre's position dot and tracking camera, which flies to the first fix and
-     * follows until the user pans, like the web's geolocate control. Activated on the first tap,
-     * so a user who never asks is never located.
-     */
-    @SuppressLint("MissingPermission") // Only reached once hasLocationPermission() holds.
-    private fun showMyLocation() {
-        val instance = map ?: return
-        val loaded = style ?: return
-        val location = instance.locationComponent
-        if (!location.isLocationComponentActivated) {
-            location.activateLocationComponent(LocationComponentActivationOptions.Builder(requireContext(), loaded).build())
-        }
-        location.isLocationComponentEnabled = true
-        location.setCameraMode(
-            CameraMode.TRACKING,
-            FRAME_DURATION_MS.toLong(),
-            maxOf(instance.cameraPosition.zoom, LOCATE_ZOOM),
-            null,
-            null,
-            null,
-        )
-    }
-
     /** The map follows the recording: while one runs the live track has the map, and the mode
      *  toggle, Find my location, the export and every history layer step aside. */
     private fun onRecordingChanged(active: Boolean, points: List<RecordedPoint>) {
         renderModeBar()
-        locatePanel.visibility = if (active) View.GONE else View.VISIBLE
+        locate.setShown(!active)
         // A recording has the map to itself; the export would draw what it hides.
         findViewById<View>(R.id.export_panel).visibility = if (active) View.GONE else View.VISIBLE
         if (active && ::exportViewfinder.isInitialized) exportViewfinder.close()
@@ -1584,9 +1523,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
         /** How often a list with Pending rows is read again. */
         private const val PENDING_POLL_MS = 2_000L
-
-        /** Find my location's minimum zoom: neighbourhood level. A closer zoom is kept. */
-        private const val LOCATE_ZOOM = 14.0
         private const val FRAME_DURATION_MS = 900
 
         /** How long a session check runs before the notice shows, so a fast one doesn't flash it. */
