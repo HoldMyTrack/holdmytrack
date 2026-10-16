@@ -3,6 +3,7 @@ package dev.holdmytrack.android.photos
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
+/** Photo markers that would overlap share one (`apps/android/docs/SPEC.md` FR-2.10). */
 class PhotoClustersTest {
 
     @Test

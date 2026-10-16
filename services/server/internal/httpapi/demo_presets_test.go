@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md FR-2.2 (seeding the demo account).
+
 import (
 	"context"
 	"io/fs"

@@ -17,6 +17,9 @@ import { knownTimeZone } from './timeZone';
  * what let the map's own ScaleControl drift to a hardcoded, wrong default for so long
  * unnoticed (see useMapInstance.ts) — a formatter that owns its own suffix can't drift that
  * way, since there's nowhere else for the unit to be decided.
+ *
+ * services/server/internal/web/format.go ports these for the server-rendered pages, so a change
+ * here changes there too.
  */
 
 const EM_DASH = '—';
@@ -44,7 +47,7 @@ export function metersToFeet(meters: number): number {
 /**
  * A date and time of an activity's, in `timeZone`, the zone it was recorded in
  * (IMPLEMENTATION.md §4.30): a row's fallback primary line for an activity with no name set
- * (ActivitiesPanel.tsx prefers `activity.name` when present — §4.7's revised decision), and a
+ * (ActivitiesPanel.tsx prefers `activity.name` when present — §4.7), and a
  * photo's capture time. The full datetime, not a bare date, since it's carrying the whole
  * "when" on its own.
  */

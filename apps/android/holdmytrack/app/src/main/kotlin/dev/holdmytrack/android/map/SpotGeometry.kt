@@ -15,7 +15,7 @@ data class GeoPoint(val lat: Double, val lon: Double)
 typealias SpotArea = List<List<List<GeoPoint>>>
 
 /**
- * What capture mode measures a position against (`apps/android/docs/IMPLEMENTATION.md` §3.3):
+ * What capture mode measures a position against (`apps/android/docs/SPEC.md` FR-2.8):
  * inside a spot's area or not, how far from it, and which way. A spot is metres to hundreds of
  * metres across, so each measure is taken on a flat projection centred on the position —
  * equirectangular, x scaled by cos(latitude) — which is well under a metre off at that size.

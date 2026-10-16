@@ -18,7 +18,7 @@ import dev.holdmytrack.android.recording.RecordingService
 
 /**
  * The app's main window: the bottom bar — Map, Stories, Record, Sync, You — and the tab above it
- * (`apps/android/docs/ARCHITECTURE.md` §1.1). Map, Stories
+ * (`apps/android/docs/IMPLEMENTATION.md` §1.3). Map, Stories
  * and Sync are all the map ([MapFragment]): Stories and Sync are its panel's Stories and Sync
  * tabs, Sync's list drawn on the map it covers. You is [YouFragment]. Tabs are shown and hidden
  * rather than replaced, so the map — its camera, its layers, a recording on it — is just as it
@@ -26,7 +26,7 @@ import dev.holdmytrack.android.recording.RecordingService
  * (`MapFragment.onRecordTap`).
  *
  * Never shows the map without a session: a signed-out visitor is handed straight to
- * `SignInActivity`, mirroring web's `AuthGate` (`docs/IMPLEMENTATION.md` §4.13), before any layout
+ * `SignInActivity`, as the web's page shell redirects one to `/signin` (`docs/IMPLEMENTATION.md` §4.19), before any layout
  * or `MapView` exists. A bare basemap with none of the three user layers — all behind
  * `requireAuth` server-side — would be a weak first impression next to the Demo account that
  * screen offers one tap away.

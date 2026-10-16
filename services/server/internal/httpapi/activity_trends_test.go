@@ -7,7 +7,7 @@ import (
 )
 
 // Trends returns every week or month its window touches, an empty one as zeroes, so a chart
-// drawn one bar per period spans the whole window (docs/SPEC.md FR-9 behavior 1).
+// drawn one bar per period spans the whole window (docs/SPEC.md FR-9.1).
 func TestTrendsFillEmptyPeriods(t *testing.T) {
 	d := newDBTest(t)
 	me := d.newAccount(false)

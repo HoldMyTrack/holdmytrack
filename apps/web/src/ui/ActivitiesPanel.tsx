@@ -43,7 +43,9 @@ import { lang, t, tn } from '../i18n';
  * A header toolbar sits directly above the row list. Every single-item action (edit, delete,
  * hide) lives here, not on the row — a row has only its checkbox and its text; there are no
  * per-row icon buttons at all. The toolbar acts on its *target* (MapView's toolbarTargetIds):
- * the checked group whenever anything is checked, else the selected row alone. A master
+ * the checked group whenever anything is checked, else the selected row alone, never the two
+ * together: a group is built one tick at a time while a row is focused just by looking at it,
+ * so a union would sweep the last-clicked row into a Delete. A master
  * checkbox mirrors the checked group's state, then icon actions over the target — Show/hide,
  * Edit (the Edit window, EditActivityWindow.tsx: its Activity tab edits Type/Name/Description
  * for exactly one activity and Type only for more than one, its Track tab one activity's

@@ -7,7 +7,7 @@
 #
 #   17 3 * * * root /srv/holdmytrack/scripts/backup.sh --nightly >> /var/log/holdmytrack-backup.log 2>&1
 #
-# and by hand, without it, before a deploy or a migration (DEPLOY.md §6), as a rollback point.
+# and by hand, without it, before a deploy or a migration (DEPLOY.md §7), as a rollback point.
 # Only a nightly run counts for the "Backup overdue" alert and fills the bucket's history: a
 # deploy-day's manual runs would otherwise crowd it with near-identical dumps, and could hide a
 # nightly job that stopped running.
@@ -40,6 +40,15 @@
 # from the database and raw/ (DEPLOY.md §11's restore steps), so the dump doesn't grow with them.
 #
 set -euo pipefail
+# pg_dump runs inside the live db container, so the client always matches the server's version.
+# The object sync keeps what it removes or overwrites in objects-deleted/ (--backup-dir): without
+# it, a deletion or overwrite in the app bucket would reach the backup the next night.
+#
+# Not covered: losing the Cloudflare account, which holds both buckets, and up to a day of
+# writes (no continuous WAL archiving). Droplet snapshots aren't a backup: a snapshot of a
+# running Postgres is only crash-consistent, leaves out R2, and can't be restored beside the
+# live database to drill.
+#
 # A dump is the whole database, so it's root's alone like .env.prod: nothing written here is
 # readable by anyone else (docs/DEPLOY.md §12).
 umask 077

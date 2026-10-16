@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A photo's popup (map/PhotoPopup, docs/SPEC.md FR-16.7), the web's .photo-popup in the spot
+<!-- A photo's popup (map/PhotoPopup, apps/android/docs/SPEC.md FR-2.10), the web's .photo-popup in the spot
      popup's frame: the picture at the popup's width with its close button over it, ‹ "n of m" ›
      for a group taken at one spot, the caption, when it was taken, and Full size. Placed over
      the photo's marker by PhotoPopup. -->

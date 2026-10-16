@@ -102,7 +102,7 @@ export function useMapInstance({
     instance.addControl(new NavigationControl({ showCompass: false }), 'top-right');
     // One-shot "find me", not continuous tracking: trackUserLocation stays false
     // deliberately, since a "follow me as I move" mode reads as live GPS tracking, which
-    // §1.1 of the business plan draws a hard line against ("no start button, no live GPS").
+    // `VISION.md` §1.1 draws a hard line against ("no start button, no live GPS").
     // This is a map-camera convenience only — a single browser geolocation lookup on click,
     // nothing persisted or sent to the backend; showUserLocation just marks the found point
     // with the usual blue dot so the fly-to has a visible target to confirm against.

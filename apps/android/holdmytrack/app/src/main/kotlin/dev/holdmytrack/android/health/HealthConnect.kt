@@ -20,6 +20,10 @@ import androidx.health.connect.client.records.ExerciseSessionRecord
  *    → *Additional access* → *Access exercise routes* → *Always allow*, a screen two levels
  *    below the app's main permission page and not linked from it. So the onboarding flow has
  *    to send the user there and say what to tap; "grant permissions" is not one flow here.
+ *
+ * Even granted, routes other apps wrote read back as `ConsentRequired` in the background, with
+ * "Always allow" set too, so every read runs in the foreground (`sync/SyncRunner`). Samsung
+ * Health writes no route geometry at all, so a Galaxy Watch session never has a map.
  */
 object HealthConnect {
 

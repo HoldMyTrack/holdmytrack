@@ -16,7 +16,7 @@ import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Story
 
 /**
- * Create story and Edit story, the web's `StoryDialog.tsx` (`docs/SPEC.md` FR-5.16, FR-14.6
+ * Create story and Edit story, the web's `StoryDialog.tsx` (`docs/SPEC.md` FR-14.2, FR-14.6
  * item 7): Name (required, up to 200 characters) and Description (optional, up to 2000) over
  * `dialog_story`. The confirm button stays disabled until Name has something besides spaces,
  * and the keyboard's Done in Name does the same as tapping it. The dialog stays up while its

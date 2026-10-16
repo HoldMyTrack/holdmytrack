@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md FR-1.12 (download your data).
+
 import (
 	"context"
 	"io"

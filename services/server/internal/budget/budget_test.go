@@ -1,5 +1,7 @@
 package budget
 
+// Covers docs/SPEC.md FR-17.1 (the daily budget).
+
 import (
 	"context"
 	"log/slog"

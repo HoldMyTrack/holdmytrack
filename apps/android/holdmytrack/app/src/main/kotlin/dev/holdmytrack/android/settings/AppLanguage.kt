@@ -12,7 +12,7 @@ import android.os.LocaleList
  * "Automatic" is the one case that can't be told apart from a choice made in Android's
  * settings: an account that has never picked a language also reads as automatic. So a sign-in or
  * a session check only ever *applies* an account's explicit language ([followAccount]), and
- * only a save from Settings, where the user just chose Automatic, clears a per-app language
+ * only the You tab's Language save, where the user just chose Automatic, clears a per-app language
  * ([apply] with `clearOnAutomatic`).
  */
 object AppLanguage {

@@ -22,7 +22,7 @@ import dev.holdmytrack.android.recording.TypeCount
 
 /**
  * The Edit window, after the web's `apps/web/src/ui/EditActivityWindow.tsx` (`docs/SPEC.md`
- * FR-5.10, FR-5.14, FR-16.6): a card over the top of the map, opened from the Activities
+ * FR-5.10, FR-5.14, FR-16): a card over the top of the map, opened from the Activities
  * toolbar's Edit over its target, with three tabs behind one Save and Cancel.
  *
  *  - **Activity**: one activity edits Type, Name and Description; several edit Type only —
@@ -422,7 +422,7 @@ class EditActivityWindow(
     }
 
     /** A split leaving one part inside a Private location: the server's explanation, and the
-     *  choice to go ahead (`docs/SPEC.md` FR-5.17 behavior 7). */
+     *  choice to go ahead (`docs/SPEC.md` FR-5.17). */
     private fun confirmHiddenSplit(id: String, message: String) {
         MaterialAlertDialogBuilder(context, R.style.ThemeOverlay_HoldMyTrack_Dialog)
             .setTitle(R.string.edit_track_split_hidden_title)

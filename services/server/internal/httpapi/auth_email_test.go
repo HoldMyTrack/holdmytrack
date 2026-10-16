@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md FR-1.8 (email verification).
+
 import (
 	"context"
 	"fmt"

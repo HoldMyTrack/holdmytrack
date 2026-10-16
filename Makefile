@@ -1,6 +1,6 @@
-# Thin wrapper around docker compose. The front door now that the repository spans two
-# languages: nothing here is logic, and anything that grows logic belongs in a script
-# under the package it serves, not in this file.
+# Thin wrapper around docker compose, the front door for every language in the repository.
+# Nothing here is logic; anything that grows logic belongs in a script under the package it
+# serves. `make help` is the command reference docs/DEVELOPMENT.md points to.
 
 COMPOSE := docker compose
 TEST    := $(COMPOSE) --profile test run --rm test
@@ -20,28 +20,28 @@ GO      := docker run --rm -v $(CURDIR)/services/server:/src -w /src \
 help: ## List targets
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  %-14s %s\n", $$1, $$2}'
 
-up: ## Start the web client on http://localhost:5173
+up: ## Start the whole stack (web on :5173, api on :8080, db, rustfs, migrate, worker)
 	$(COMPOSE) up
 
-down: ## Stop everything; keeps the node_modules volume
+down: ## Stop the stack; keeps every volume
 	$(COMPOSE) down
 
-logs: ## Follow the web service log
+logs: ## Follow the web (Vite) log; docker compose logs -f worker for ingest jobs
 	$(COMPOSE) logs -f web
 
 shell: ## Interactive shell in the web container
 	$(COMPOSE) run --rm web bash
 
-build: ## Typecheck and build apps/web to dist/
+build: ## Typecheck and build apps/web to dist/ (run before verify:build outside make)
 	$(COMPOSE) run --rm web npm run build
 
-typecheck: ## tsc --noEmit
+typecheck: ## Typecheck apps/web (tsc --noEmit)
 	$(COMPOSE) run --rm web npm run typecheck
 
-basemap: ## Re-cut the .pmtiles extract (pmtiles is baked into the dev image)
+basemap: ## Re-cut the test basemap extract (404s once build-basemap.sh's BUILD ages out)
 	$(COMPOSE) run --rm web npm run basemap
 
-test-go: ## Go unit tests (services/server), the database ones against compose's db
+test-go: ## Go tests (services/server), one package at a time, against compose's holdmytrack_test db
 	$(COMPOSE) up -d --wait db
 	$(COMPOSE) exec -T db sh -c 'createdb -U holdmytrack holdmytrack_test 2>/dev/null || true'
 	$(GO) go test -p 1 ./...
@@ -49,18 +49,18 @@ test-go: ## Go unit tests (services/server), the database ones against compose's
 # verify:style compares against services/server/internal/mapstyle/styles, and verify:api-types
 # against the API contract in services/server/api, which the web container does not otherwise
 # see; each mounted where the scripts' own relative paths land.
-test-unit: ## Web unit tests, plus the style documents' and the API types' drift checks
+test-unit: ## Web unit tests and drift checks (fix: npm run build:style / gen:api-types)
 	$(COMPOSE) run --rm -v $(CURDIR)/services/server/internal/mapstyle/styles:/services/server/internal/mapstyle/styles:ro \
 	  -v $(CURDIR)/services/server/api:/services/server/api:ro \
 	  web sh -c "npm run test:unit && npm run verify:style && npm run verify:api-types"
 
-verify: ## Headless map checks against a dev server (test profile)
+verify: ## Headless Playwright map checks against a dev server (test profile)
 	$(TEST) npm run verify:map
 
-verify-build: ## Build, then ask the same questions of the production bundle
+verify-build: ## Build, then run the same checks against the production bundle
 	$(TEST) sh -c "npm run build && npm run verify:build"
 
-test: test-go test-unit verify verify-build ## Every suite: Go, web unit, and both verification suites
+test: test-go test-unit verify verify-build ## Every CI suite except the doc-refs check and Android tests
 
-clean: ## Stop and drop the node_modules volume; next up re-seeds it
+clean: ## Stop and drop every volume (database, object store, node_modules)
 	$(COMPOSE) down -v

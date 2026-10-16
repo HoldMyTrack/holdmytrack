@@ -5,7 +5,7 @@ import { formatActivityType, formatDistance, formatDuration, formatStartedAt } f
 import type { UnitSystem } from './units';
 import { t, tn } from '../i18n';
 
-/** A row's primary line: its user-entered name (§4.7's revised decision) when it has one, else
+/** A row's primary line: its user-entered name (§4.7) when it has one, else
  *  its start date/time — also how the toolbar names a single selected activity. */
 export function rowLabel(activity: Activity): string {
   return activity.name?.trim() || formatStartedAt(activity.startedAt, activity.timezone);
@@ -48,7 +48,7 @@ export function ActivityRow({
 }: ActivityRowProps) {
   const isPending = activity.pending;
   const otherStories = activity.stories.filter((s) => s.id !== openStoryId);
-  // A user-entered name (§4.7's revised decision) leads; started_at is the fallback for a row
+  // A user-entered name (§4.7) leads; started_at is the fallback for a row
   // that has none — never the reverse, so an activity's date doesn't disappear from the list
   // just because it also has a name (shown in the meta line below instead). Sorting itself is
   // untouched either way: the list's order comes entirely from the server's own
@@ -65,7 +65,7 @@ export function ActivityRow({
     <li
       data-activity-id={activity.id}
       className={classes.join(' ')}
-      // The description (§4.7.4) shows as a hover tooltip only — no second visible line, and
+      // The description (docs/SPEC.md FR-5.10) shows as a hover tooltip only — no second visible line, and
       // undefined (not an empty string) when there is none, so a row with nothing written there
       // gets no title attribute at all rather than an empty one a browser might still render as
       // an inert tooltip.

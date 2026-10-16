@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md FR-7 (the activity graph).
+
 import (
 	"strings"
 	"testing"

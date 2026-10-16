@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md FR-4.15 and IMPLEMENTATION.md §4.2.6 (tile caching).
+
 import (
 	"context"
 	"net/http/httptest"

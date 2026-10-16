@@ -13,7 +13,7 @@ CREATE TABLE users (
     last_seen_at         TIMESTAMPTZ,   -- the UTC day it was last used; IMPLEMENTATION.md §4.32
     created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     demo_expires_at      TIMESTAMPTZ,   -- dropped in 0035
-    display_name         VARCHAR(255),  -- §4.12 account settings
+    display_name         VARCHAR(255),  -- FR-1.7 account settings
     country              CHAR(2),       -- ISO 3166-1 alpha-2; NULL means unset, defaults the UI
                                         -- to metric units
     avatar_key           TEXT,          -- object storage key; overwritten on re-upload, not
@@ -84,7 +84,7 @@ CREATE TABLE user_identities (
     UNIQUE (user_id, provider)
 );
 
--- §3.18 auth_handoffs -- one-time sign-in codes for a native app (FR-1.10, IMPLEMENTATION.md §4.22). The
+-- §3.18 auth_handoffs -- one-time sign-in codes for a native app (FR-1.10, IMPLEMENTATION.md §4.9). The
 -- browser-tab callback stores a row and redirects to the app with its id; the app redeems it once
 -- at POST /v1/auth/handoff with the PKCE verifier for `challenge`, so the id alone is worthless to
 -- anyone who intercepts the redirect. Deleted on use; expired rows are purged on each insert.

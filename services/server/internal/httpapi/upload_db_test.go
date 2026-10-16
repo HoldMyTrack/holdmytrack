@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md FR-3.1, FR-3.5 and FR-3.8 (upload refusals, duplicates, sync ids).
+
 import (
 	"bytes"
 	"context"

@@ -24,7 +24,7 @@ import (
 // the smallest thing that removes the old placeholder-user stand-in, with no vendor to depend
 // on, the same bias Path 3 uploads already made. Sign in with Google (google_auth.go) is an
 // optional second way into the same accounts and the same sessions, off unless configured —
-// email+password never depends on it. Password reset (IMPLEMENTATION.md §4.11) and email verification (docs/SPEC.md FR-1.8)
+// email+password never depends on it. Password reset (IMPLEMENTATION.md §4.9) and email verification (docs/SPEC.md FR-1.8)
 // share the same token-table shape. Rate limiting is partially built: see demoLimiter/forgotPasswordLimiter
 // below, added specifically because their endpoints are reachable with no credentials at all,
 // and storySendLimiter and Server.uploadLimiter, per account.
@@ -120,7 +120,7 @@ type authResponseWithSession struct {
 	// response — a browser client can ignore this field entirely, it already has the
 	// credential via Set-Cookie. A native client with no shared cookie jar (or one that needs
 	// to inject the credential into MapLibre Native's own tile requests, which bypass the
-	// app's own HTTP client — apps/android/docs/ARCHITECTURE.md §1.1's bearer-token
+	// app's own HTTP client — docs/ARCHITECTURE.md §3's bearer-token
 	// decision) stores this and sends it back as `Authorization: Bearer <SessionToken>`.
 	SessionToken string `json:"session_token"`
 }
@@ -950,7 +950,7 @@ func clientIP(r *http.Request) string {
 // startSession returns the new session id, alongside setting it as the holdmytrack_session
 // cookie — a browser client needs nothing more, but the four callers that mint a fresh
 // session (signup, login, demo-start, reset-password) also thread this value into
-// authResponseWithSession.SessionToken, apps/android/docs/ARCHITECTURE.md §1.1's
+// authResponseWithSession.SessionToken, docs/ARCHITECTURE.md §3's
 // bearer-token path for a native client with no browser-style cookie handling.
 func (s *Server) startSession(w http.ResponseWriter, ctx context.Context, userID string, ttl time.Duration) (string, error) {
 	expiresAt := time.Now().Add(ttl)
@@ -988,7 +988,7 @@ const bearerPrefix = "Bearer "
 // `Authorization: Bearer <session-id>` for a native client. This is not a second credential
 // system — it's the same sessions.id value, just presented a second way, because a mobile
 // app needs to inject it into MapLibre Native's own tile requests via a per-request header
-// hook (apps/android/docs/ARCHITECTURE.md §1.1's bearer-token decision), which a cookie
+// hook (docs/ARCHITECTURE.md §3's bearer-token decision), which a cookie
 // sitting in the app's own cookie jar wouldn't reach.
 func sessionIDFromRequest(r *http.Request) (string, bool) {
 	if cookie, err := r.Cookie(sessionCookieName); err == nil && cookie.Value != "" {

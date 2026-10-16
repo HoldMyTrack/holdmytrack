@@ -75,7 +75,7 @@ class ActivitiesPanel(
     private val onOpenStory: (storyId: String) -> Unit,
     /** The Stories tab has no Story left to open. */
     private val onCloseStory: () -> Unit,
-    /** Add to story's New story… made one of the toolbar's target (`docs/SPEC.md` FR-5.16). */
+    /** Add to story's New story… made one of the toolbar's target (`docs/SPEC.md` FR-14). */
     private val onStoryCreated: (Story) -> Unit,
     /** A Story renamed, deleted or added to: the rows' Story badges are out of date. */
     private val onStoriesChanged: () -> Unit,
@@ -657,7 +657,7 @@ class ActivitiesPanel(
     }
 
     /**
-     * Add to story's menu under its button (`docs/SPEC.md` FR-5.16): New story…, then every
+     * Add to story's menu under its button (`docs/SPEC.md` FR-14): New story…, then every
      * Story, newest first — read each time the menu opens — with how many activities it holds.
      * One that already holds all of the target is ticked and can't be picked. Picking a Story
      * adds the target to it in one request and closes the menu; a failure stays in the menu.

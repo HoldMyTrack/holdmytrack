@@ -5,6 +5,7 @@ import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
+/** The date range's scrubber (`apps/android/docs/SPEC.md` FR-2.6). */
 class ScrubberBarsTest {
 
     @Test

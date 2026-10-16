@@ -149,7 +149,7 @@ class RecordedActivityStore(context: Context) {
     }
 
     /** Removes every recording of the signed-in account — its account was just deleted
-     *  (`SettingsActivity`), so nothing of it should wait here to be synced into a new one
+     *  (`settings/AccountDeletion`), so nothing of it should wait here to be synced into a new one
      *  made with the same email. */
     suspend fun deleteAll() = withContext(Dispatchers.IO) {
         helper.writableDatabase.delete(RecordingDbHelper.TABLE, "account = ?", arrayOf(account()))

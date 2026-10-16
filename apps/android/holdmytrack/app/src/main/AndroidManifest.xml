@@ -35,7 +35,7 @@
 
     <!--
       In-app GPS recording (docs/adr/0007-in-app-gps-recording-submits-directly.md,
-      apps/android/docs/IMPLEMENTATION.md §7) — foreground-only, deliberately. Not
+      apps/android/docs/IMPLEMENTATION.md §5): foreground-only. Not
       ACCESS_BACKGROUND_LOCATION: that's a separately-reviewed permission with its own Play
       Store "prominent disclosure" burden, needed only if recording had to survive the app
       having no foreground presence at all. A declared foreground service with location type
@@ -113,7 +113,7 @@
 
         <!-- Exported, unlike SignInActivity, because the browser launches it: a Facebook
              sign-in in a Custom Tab ends at holdmytrack://oauth, which this forwards to
-             SignInActivity (docs/IMPLEMENTATION.md §4.22). -->
+             SignInActivity (docs/IMPLEMENTATION.md §4.9). -->
         <activity
             android:name=".OAuthRedirectActivity"
             android:exported="true"

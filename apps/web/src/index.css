@@ -1,7 +1,12 @@
 /* The design tokens (--fm-*: palette, spacing, radius, type, weight, elevation) aren't
    defined here: they're services/server/internal/web/static/tokens.css, which the page this
    app mounts into (the Go server's templates/app/app.html) loads before this stylesheet, and
-   which the server-rendered pages share. */
+   which the server-rendered pages share.
+
+   Every icon is Lucide, so they share one geometry. No rule sets `stroke`, `stroke-width` or
+   `fill` on an icon; its colour comes from the element's `color`. The exceptions are Google's
+   sign-in mark, which Google's branding rules require unmodified, and MapLibre's own controls.
+   The Android app converts the same set at the same version, so a Lucide upgrade is both. */
 
 html,
 body {
@@ -443,7 +448,7 @@ body {
   font-size: var(--fm-text-sm);
 }
 
-/* DistanceFilter.tsx — the DISTANCE dual slider, standalone and always visible (§4.7.6)
+/* DistanceFilter.tsx — the DISTANCE dual slider, standalone and always visible (docs/SPEC.md FR-5.3)
    between the subtext line and the header toolbar, not hidden behind any toggle. TYPE moved
    out to its own dropdown (checkboxes inline in ActivitiesPanel.tsx, reusing
    .activity-filters__type-* below directly). */
@@ -643,7 +648,7 @@ body {
 }
 
 /* The selected (focused) row — reached by clicking the row's own text or its track on the map.
-   A checked row doesn't get this: its ticked checkbox is its only mark (§4.7.3). */
+   A checked row doesn't get this: its ticked checkbox is its only mark (docs/SPEC.md FR-5.1). */
 .activities-panel__row--selected {
   background: rgb(var(--fm-accent-rgb) / 8%);
   box-shadow: inset 3px 0 0 var(--fm-accent-strong);
@@ -844,7 +849,7 @@ button.activities-panel__story-badge:hover {
   white-space: nowrap;
 }
 
-/* §4.7.6's toolbar icon buttons — Show/Edit/Create story/Delete/Focus all operate on the toolbar's target:
+/* The toolbar icon buttons (docs/SPEC.md FR-5.1) — Show/Edit/Create story/Delete/Focus all operate on the toolbar's target:
    the checked group, else the selected row (there are no per-row action icons). One shared chip look, matching the
    mockup: a soft tinted square rather than a bare icon, so the group actions read as one
    family regardless of which one is destructive. */
@@ -915,7 +920,7 @@ button.activities-panel__story-badge:hover {
   color: var(--fm-danger);
 }
 
-/* §4.7.6's header toolbar — right above the row list. There are no more per-row action
+/* The header toolbar (docs/SPEC.md FR-5.1) — right above the row list. There are no more per-row action
    columns to stay aligned with (Visible/Edit/Delete moved here entirely), so this is now a
    plain compact strip rather than a column-aligned header: the select-all checkbox, the Type
    dropdown, a flex spacer pushing the rest right, the group action chips, a divider, then the
@@ -2183,7 +2188,7 @@ button.activities-panel__story-badge:hover {
   background: rgb(var(--fm-ink-rgb) / 7%);
 }
 
-/* The Edit window (EditActivityWindow.tsx, §4.7.4/§4.7.7) — floats over the map's top-left
+/* The Edit window (EditActivityWindow.tsx, IMPLEMENTATION.md §4.7.7) — floats over the map's top-left
    while it's open, the same white card treatment as the mode toggle.
    The top-left is free because the mode toggle is hidden while it's open; the top-right
    belongs to MapLibre's own zoom/locate controls. Class names are the Edit track window's,
@@ -2357,7 +2362,7 @@ button.activities-panel__story-badge:hover {
   color: var(--fm-ink-secondary);
 }
 
-/* PhotosTab.tsx (FR-16.6): Add photos, then the photos as rows — a thumbnail, a name, Edit and
+/* PhotosTab.tsx (FR-16): Add photos, then the photos as rows — a thumbnail, a name, Edit and
    Delete — one of which may be open with its slider and caption. The list scrolls inside the
    window rather than growing it past the map. */
 .photos-tab {
@@ -2735,9 +2740,10 @@ button.activities-panel__story-badge:hover {
    rule above this point is the desktop layout, unmodified and unaffected outside this
    query. Scope is "core flows fully touch-usable," a direct decision, not full parity with
    every desktop interaction: the map-track-hover ↔ Activities-row-underline two-way
-   highlight (FR-4.1/FR-5.4) stays mouse-only on purpose — a continuous-position hover
-   read with no discrete point to tap. See docs/SPEC.md §19
-   and docs/IMPLEMENTATION.md §5.9. */
+   highlight stays mouse-only — a continuous-position hover read with no discrete point to
+   tap (docs/SPEC.md §19). Desktop phone emulation has a fixed viewport, no browser toolbar,
+   no iOS focus-zoom and a pointer-precise "tap", so it passes layouts that fail on a phone:
+   the traps below were each found on a real one. */
 @media (max-width: 768px) {
   /* Defensive backstop, not a fix for a specific known overflow (those are fixed at their
      own source below) — a phone browser turns any stray horizontal overflow into a
@@ -2899,7 +2905,9 @@ button.activities-panel__story-badge:hover {
 
   /* The date slider leaves the sheet for the bottom of the screen, so the range can be changed
      with the sheet collapsed and the map in view. Still rendered by the panel (fixed
-     positioning escapes its `overflow: hidden`), so it comes and goes with the Activities tab.
+     positioning escapes its `overflow: hidden`, but only while the sheet has no `transform`,
+     which would make the sheet its containing block), so it comes and goes with the Activities
+     tab.
      A fixed height (its content is one 32px row plus one label line), since the sheet is
      anchored to its top edge by that same number. */
   .activities-panel__dates {

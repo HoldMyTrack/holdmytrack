@@ -11,9 +11,9 @@ import android.webkit.CookieManager
  *
  * Process-wide rather than per-Activity because two unrelated HTTP surfaces read it — the
  * app's own API calls, and MapLibre Native's internal tile fetching, which never goes through
- * the app's client at all. That split is exactly why the roadmap chose a bearer token over a
- * cookie jar (`apps/android/docs/ARCHITECTURE.md` §1.1): one
- * per-request interceptor can reach both, a cookie jar reaches only the first.
+ * the app's client at all. That split is why the session is a bearer token, not a cookie jar
+ * (`apps/android/docs/IMPLEMENTATION.md` §2.1): one per-request interceptor reaches both, a
+ * cookie jar only the first.
  *
  * The token is mirrored in a `@Volatile` field as well as in SharedPreferences because the
  * interceptor reads it on every tile request, on MapLibre's own threads — a disk-backed read

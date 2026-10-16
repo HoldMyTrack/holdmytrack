@@ -147,7 +147,7 @@ describe('basemap foundation', () => {
       return { bounds: source.bounds, minzoom: source.minzoom, maxzoom: source.maxzoom };
     });
     assert.equal(src.minzoom, 0, 'archive minzoom');
-    assert.equal(src.maxzoom, 14, 'archive maxzoom — z14 per §1.2');
+    assert.equal(src.maxzoom, 14, 'archive maxzoom — z14 per ARCHITECTURE.md §1.2');
     assert.deepEqual(
       src.bounds.map((n) => Math.round(n * 100) / 100),
       [OHIO_BOUNDS.minLon, OHIO_BOUNDS.minLat, OHIO_BOUNDS.maxLon, OHIO_BOUNDS.maxLat],

@@ -1,7 +1,7 @@
 import type { DateRange } from './dateMath';
 
 /**
- * Where the date slider's range-shift buttons move a selection (`SPEC.md` FR-6.7): the same
+ * Where the date slider's range-shift buttons move a selection: the same
  * number of activity-days, packed right up against the old range on the side it moves toward.
  * Counted in activity-days like the rest of the slider, so a shift never lands on days with
  * nothing recorded.

@@ -1,5 +1,5 @@
 /**
- * The photo viewer's zoom and pan (PhotoViewer.tsx, FR-16.8), as plain math over a view: the
+ * The photo viewer's zoom and pan (PhotoViewer.tsx), as plain math over a view: the
  * picture fitted to the stage and centered is scale 1 at (0, 0); `scale` multiplies that and
  * `x`/`y` move its center, in CSS pixels from the stage's center. Kept apart from the component
  * so it can be tested without a browser.

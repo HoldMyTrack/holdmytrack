@@ -1,5 +1,5 @@
--- Activities and what hangs off them: activities (IMPLEMENTATION.md §3.3), activity_streams
--- (§3.4), privacy_zones (§3.7) and connections (§3.2).
+-- Activities and what hangs off them: activities (IMPLEMENTATION.md §3.3), activity_streams,
+-- privacy_zones (§3.7) and connections (§3.2).
 
 -- §3.3 activities
 CREATE TABLE activities (
@@ -28,12 +28,12 @@ CREATE TABLE activities (
     raw_payload_key   TEXT,                    -- object storage key for the raw ingest payload:
                                                -- uploaded file (Path 3), provider push (Path 1),
                                                -- or synced point batch (Path 2). See §4.1 step 6.
-    description       TEXT,                    -- §4.7.4; user-editable free text. NULL means never set.
+    description       TEXT,                    -- FR-5.10; user-editable free text. NULL means never set.
     created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 
     -- Dropped in 0028 (ADR-0039).
     superseded_by     UUID REFERENCES activities(id) ON DELETE SET NULL,
-    name              VARCHAR(200),            -- §4.7.4; user-entered title, never parsed from a file
+    name              VARCHAR(200),            -- FR-5.10; user-entered title, never parsed from a file
     in_heatmap_window BOOLEAN NOT NULL DEFAULT true,  -- §4.2.2; flipped true -> false only by
                                                -- internal/worker/heatmap_aging.go's daily sweep
     track_edit        JSONB,                   -- §4.7.7 Edit track spec, in unix-ms timestamps,
@@ -57,7 +57,7 @@ CREATE INDEX idx_activities_type        ON activities (user_id, activity_type);
 -- heatmap_aging.go's "still-in-window rows old enough to have aged out".
 CREATE INDEX idx_activities_in_heatmap_window ON activities (started_at) WHERE in_heatmap_window;
 
--- §3.4 activity_streams -- per-point sensor data, kept out of the hot query path.
+-- activity_streams -- per-point sensor data, kept out of the hot query path.
 CREATE TABLE activity_streams (
     activity_id  UUID PRIMARY KEY REFERENCES activities(id) ON DELETE CASCADE,
     point_count  INT NOT NULL,

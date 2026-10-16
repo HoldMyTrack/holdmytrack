@@ -105,7 +105,9 @@ done
 [[ $(drill_psql 'SELECT count(*) FROM activity_tile_mask_data') -eq 0 ]] ||
   fail "the restored activity_tile_mask_data isn't empty — is backup.sh still leaving its data out?"
 
-# Every key the restored database refers to, against what's in the backup bucket.
+# Every key the restored database refers to, against what's in the backup bucket, built with
+# the server's own key expressions. A new kind of stored object goes here and in backup.sh's
+# --include filter.
 drill_psql "
   SELECT raw_payload_key FROM activities WHERE raw_payload_key IS NOT NULL
   UNION ALL SELECT image_key FROM activity_photos

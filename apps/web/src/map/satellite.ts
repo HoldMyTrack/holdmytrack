@@ -16,7 +16,8 @@ import {
  * or the reverse; boundaries and place labels stay as they are either way.
  * Diffs before setting, like paths.ts: reattachOverlays calls this on every 'styledata', and an
  * unconditional setLayoutProperty would keep re-firing it (docs/DEVELOPMENT.md). A no-op when
- * the style has no imagery (no deployment config).
+ * the style has no imagery (no deployment config). MapLibre CORS-fetches imagery tiles, since
+ * WebGL can't draw a tainted image, so they never taint the export's canvas either.
  */
 export function setSatelliteVisible(map: MapLibreMap, on: boolean, mode: MapMode): void {
   if (!map.getLayer(SATELLITE_LAYER_ID)) return;

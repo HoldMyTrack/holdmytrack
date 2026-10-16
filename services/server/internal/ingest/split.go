@@ -251,10 +251,9 @@ func MergeEdits(pieces []piece) TrackEdit {
 // survives — the row first split, when it's among them, since a split always leaves a row the
 // earlier part and inserts the later one, so it keeps its own external_id — takes the joined range,
 // the merged track edit (MergeEdits) and the others' photos and Stories, and goes Pending with
-// an `edit_track` job to rebuild it. The others are deleted. Returns the survivor and the
-// deleted ids — whose masks in object storage the caller removes, since the cascade only
-// reaches their rows. ErrSplitConflict when ids aren't two or more adjacent, idle pieces of
-// one split owned by userID.
+// an `edit_track` job to rebuild it. The others are deleted, their masks with them by the
+// cascade. Returns the survivor and the deleted ids. ErrSplitConflict when ids aren't two or
+// more adjacent, idle pieces of one split owned by userID.
 func MergePieces(ctx context.Context, pool *pgxpool.Pool, userID string, ids []string) (string, []string, error) {
 	ids = slices.Compact(slices.Sorted(slices.Values(ids)))
 	if len(ids) < 2 {

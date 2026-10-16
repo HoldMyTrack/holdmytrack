@@ -21,10 +21,13 @@ import (
 // calls beginOAuth, its callback calls readOAuthCallback, resolves the account its own way,
 // and ends in finishOAuth — or failOAuth.
 //
-// A native app can run the same round trip in a browser tab (docs/IMPLEMENTATION.md §4.22):
+// A native app can run the same round trip in a browser tab (docs/IMPLEMENTATION.md §4.9):
 // it starts it with ?app_challenge=, the S256 challenge of a verifier only the app holds, and
 // instead of a session cookie in that tab the callback hands the app a one-time code at
-// appRedirectURI, which only the verifier redeems (handleAuthHandoff).
+// appRedirectURI, which only the verifier redeems (handleAuthHandoff). The redirect carries a
+// code, not a session token, because any app registered for holdmytrack:// can read it and the
+// browser's history keeps it. An https:// App Link would keep other apps from receiving it, but
+// needs assetlinks.json per domain and can't work against a local stack.
 
 const (
 	// oauthCookieName carries state + PKCE verifier + the browser's timezone (+ an app's
@@ -135,7 +138,9 @@ func (s *Server) finishOAuth(w http.ResponseWriter, r *http.Request, rt oauthRou
 }
 
 // failOAuth ends a failed round trip with an error code — on the sign-in page for a browser,
-// back in the app for a native round trip, which shows its own wording for the same codes.
+// back in the app for a native round trip, which shows its own wording for the same codes. A
+// callback whose round-trip cookie couldn't be read has nothing saying an app started it, so it
+// fails to the sign-in page.
 func (s *Server) failOAuth(w http.ResponseWriter, r *http.Request, rt oauthRoundTrip, code string) {
 	if rt.appChallenge != "" {
 		http.Redirect(w, r, appRedirectURI+"?"+url.Values{"error": {code}}.Encode(), http.StatusFound)

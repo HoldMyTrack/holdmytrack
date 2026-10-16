@@ -6,11 +6,11 @@
 // apps/web/scripts/build-style.mjs renders that function to the JSON files embedded below,
 // one per label language and flavor (styles/<lang>/<flavor>.json).
 // Nothing in this package knows what a layer is, which is the point: a Go definition of the
-// style would be the second hand-maintained copy §2.1 exists to prevent. Regenerate with
+// style would be the second hand-maintained copy `ARCHITECTURE.md` §2.1 exists to prevent. Regenerate with
 // `npm run build:style` in apps/web; `npm run verify:style` fails the build if the committed
 // JSON has drifted from style.ts.
 //
-// Consumers: MapLibre Native on Android (apps/android/docs/ARCHITECTURE.md §2.1) and
+// Consumers: MapLibre Native on Android (docs/ARCHITECTURE.md §3) and
 // eventually the headless export renderer (IMPLEMENTATION.md §5.5). The web client still
 // calls buildStyle() in-process — it already has the function, and fetching a document it
 // can construct locally would add a round trip to first paint for no gain.
@@ -210,7 +210,7 @@ func withSatellite(doc []byte, sat Satellite) ([]byte, error) {
 // ETag is a strong validator over the document's actual bytes. The style changes only when
 // style.ts is regenerated or the configured origin changes, so a client that caches one can
 // revalidate cheaply instead of refetching ~100 KB of layer definitions on every launch —
-// which matters more on a phone than in the browser (apps/android/docs/ARCHITECTURE.md §2.1).
+// which matters more on a phone than in the browser (docs/ARCHITECTURE.md §3).
 func ETag(doc []byte) string {
 	sum := sha256.Sum256(doc)
 	return `"` + hex.EncodeToString(sum[:16]) + `"`

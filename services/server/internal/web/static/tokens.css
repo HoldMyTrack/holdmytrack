@@ -1,12 +1,13 @@
 /* The design tokens — the one copy, for every page: the server-rendered ones (templates/
    layout.html) and the map app's shell (templates/app/app.html) both load this first, so
    header.css, pages.css and the React app's index.css all draw on it and define none of their
-   own. Moved here from index.css's :root when every page came to be served by the Go server
-   (ADR-0012); its scales are IMPLEMENTATION.md §4.18.
+   own (ADR-0012). A value off its scales is a design decision: add a step or take the
+   nearest. The Android theme carries the same palette, fonts and scales (IMPLEMENTATION.md
+   §4.19), so a change here needs the matching change in its res/values.
 
    Two palettes: the light one below, and a dark one further down that replaces only the
    colors. Which one applies is data-theme on <html> — "light" or "dark", set by theme.html's
-   script from the hmt_theme localStorage key Settings' Theme control writes (§4.18) — and, with no
+   script from the hmt_theme localStorage key Settings' Theme control writes — and, with no
    data-theme (the "System" choice), the OS's prefers-color-scheme. The Android app's
    res/values/colors.xml and res/values-night/colors.xml carry the same two palettes.
 

@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md FR-14.4 (the story filter).
+
 import (
 	"context"
 	"fmt"

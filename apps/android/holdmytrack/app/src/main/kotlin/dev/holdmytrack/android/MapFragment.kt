@@ -422,7 +422,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * Whose photos the map shows (`docs/SPEC.md` FR-16.7), the web's `photoScope` — in Normal
+     * Whose photos the map shows (`apps/android/docs/SPEC.md` FR-2.10), the web's `photoScope` — in Normal
      * mode only: the one activity the Edit window is open on, whose Photos tab manages them (none
      * for a group); else the selected activity's, the route a person is looking at; else the open
      * Story's, the whole trip's pictures along its days. As `"activity:<id>"` or `"story:<id>"`.
@@ -1440,7 +1440,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         zoomLevelNotice.render(mode, active = modeBarReady && !isRecording())
     }
 
-    /** "Your map is still being updated…" (`docs/SPEC.md` FR-4.2 behavior 6): in Fog and Heatmap,
+    /** "Your map is still being updated…" (`docs/SPEC.md` FR-4.2): in Fog and Heatmap,
      *  while the coverage watch's last read found the account's coverage still being worked on. */
     private fun renderCoverageNotice() {
         if (!::coverageNotice.isInitialized) return
@@ -1576,7 +1576,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * The photo markers (`docs/SPEC.md` FR-16.7): the scope's photos on their tracks, with the
+     * The photo markers (`apps/android/docs/SPEC.md` FR-2.10): the scope's photos on their tracks, with the
      * Photos tab's unsaved changes merged in while it shows — not while the Track tab has the
      * map, nor for a route hidden on the map.
      */
@@ -1603,7 +1603,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     /**
-     * A marker's tap (FR-16.7): one photo opens its popup. A group the map can separate — its
+     * A marker's tap (FR-2.10): one photo opens its popup. A group the map can separate — its
      * photos more than [PHOTO_GROUP_SPREAD_M] apart — zooms in to fit them, at most to z19, where
      * that spread is wider than a marker; one it can't (several taken at one spot) opens the
      * popup on its first photo, to step through the rest. Only saved photos open: one the Photos

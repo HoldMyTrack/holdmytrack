@@ -4,16 +4,16 @@ React + MapLibre GL JS on a self-hosted Protomaps basemap, described in `docs/AR
 
 ## Getting started
 
-Everything runs in Docker from the repository root — see the root `README.md` for the full picture. The short version:
+Everything runs in Docker from the repository root (root `README.md`):
 
 ```bash
 docker compose up                            # http://localhost:5173
 docker compose run --rm web npm run basemap  # cut/re-cut the .pmtiles extract
 ```
 
-The basemap archive is not tracked in git — it is a 326 MB build artifact. `npm run basemap` needs the `pmtiles` CLI (`go-pmtiles` v1.31.2) on `PATH`; the Docker image carries it, so the `docker compose run` form above needs no host install. Set `DRY_RUN=1` to see the tile count and archive size without downloading anything.
+The basemap archive, a 326 MB build artifact, is not tracked in git. `npm run basemap` needs the `pmtiles` CLI (`go-pmtiles` v1.31.2) on `PATH`; the Docker image carries it, so the `docker compose run` form above needs no host install. Set `DRY_RUN=1` to see the tile count and archive size without downloading anything.
 
-Working directly in this directory also works and is sometimes faster:
+Working directly in this directory also works:
 
 ```bash
 npm install
@@ -26,12 +26,12 @@ npm run dev
 | Script | What it does |
 | :-- | :-- |
 | `npm run dev` | Vite dev server; serves the archive from `public/` over range requests |
-| `npm run build` | Typecheck, then build to `dist/` (~346 MB — the archive is copied in) |
+| `npm run build` | Typecheck, then build to `dist/` (~346 MB, the archive copied in) |
 | `npm run verify:map` | Headless Playwright checks against the dev server (`tests/smoke.mjs`) |
-| `npm run verify:build` | The same question asked of the production bundle, which is not the same question |
+| `npm run verify:build` | The same checks against the production bundle |
 | `npm run basemap` | Re-cut the `.pmtiles` extract |
 | `npm run typecheck` | `tsc --noEmit` |
-| `npm run test:unit` | Plain `node --test` unit tests (the track editor's edit ops) |
+| `npm run test:unit` | Plain `node --test` unit tests |
 | `npm run test:coverage` | `test:unit` under c8, counting every file in `src/`; the report lands in `coverage/` |
 | `npm run build:style` | Regenerate the style documents the API serves (`services/server/internal/mapstyle/styles`) from `src/map/style.ts` |
 | `npm run verify:style` | Fail if those committed style documents have drifted from `style.ts` |
@@ -59,8 +59,8 @@ src/ui/                    # ImportPanel, ActivitiesPanel and the rest of the UI
 
 ## Three things that are easy to break
 
-**`style.ts` must stay pure and DOM-free.** No React, no `window`. It is the seam the print pipeline needs to render an identical map headlessly at print DPI. This is why `buildStyle` takes an `origin` argument instead of reading `window.location` — MapLibre 6 rejects relative sprite URLs, and the fix had to not cost the purity.
+**`style.ts` must stay pure and DOM-free.** No React, no `window`: `npm run build:style` renders it in Node for the API to serve (`docs/ARCHITECTURE.md` §2.1). That is why `buildStyle` takes an `origin` argument instead of reading `window.location`, since MapLibre 6 rejects relative sprite URLs.
 
 **Fog and track layers go *beneath* the first symbol layer.** Fog painted over labels buries every place name and reads as a rendering bug. `layers.ts` computes that insertion point, and every overlay inserts there.
 
-**Dev passing tells you nothing about the bundle.** MapLibre derives its worker URL from its own `import.meta.url`, which bundling invalidates — the result is a blank grey map with no console error and no failed request. `src/map/worker.ts` pins the URL explicitly and `npm run verify:build` guards it.
+**Dev passing says nothing about the bundle.** MapLibre derives its worker URL from its own `import.meta.url`, which bundling invalidates, leaving a blank grey map with no console error and no failed request. `src/map/worker.ts` pins the URL explicitly and `npm run verify:build` guards it.

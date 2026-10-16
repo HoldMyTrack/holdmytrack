@@ -12,7 +12,7 @@ data class TimedPoint(val lon: Double, val lat: Double, val t: Long)
 
 /**
  * A track as the Photos tab's slider walks it, the web's `apps/web/src/ui/photoTrack.ts`
- * (`docs/SPEC.md` FR-16.6): the display points with their moments
+ * (`apps/android/docs/SPEC.md` FR-2.10): the display points with their moments
  * (`GET /v1/activities/track-metrics/{id}`'s `time_s`), measured along their length. The slider
  * runs by distance, not time, so a long stop doesn't take up half its travel; a photo's place is
  * still kept as a moment (`route_at`), which is what the server stores.
@@ -62,7 +62,7 @@ class PhotoTrack(val points: List<TimedPoint>) {
     }
 
     /**
-     * Where a waiting photo's slider starts (FR-16.6): just after the photo picked before it,
+     * Where a waiting photo's slider starts (FR-2.10): just after the photo picked before it,
      * which is where the next picture of a walk usually is. A previous one that waited is
      * followed by where the user put it ([placed]), or past it to its own predecessor if it was
      * removed (null there). The first of a batch, or one after nothing placed at all, starts at

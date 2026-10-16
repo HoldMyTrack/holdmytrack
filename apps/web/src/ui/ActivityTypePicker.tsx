@@ -29,7 +29,7 @@ function typeOption(type: string, count?: number): PickerOption {
 /**
  * The Edit window's Type field (EditActivityWindow.tsx) — the same picker as Settings' Country and
  * Timezone (search-picker.js there), over this account's existing types (formatted, with how many activities use each),
- * but open-ended: activity_type is free-form (§4.7.2), not a controlled vocabulary, so any
+ * but open-ended: activity_type is free-form (§4.7), not a controlled vocabulary, so any
  * search text that doesn't exactly match an existing type offers itself as a last "Add …" row
  * and saves exactly as typed. A value that isn't among the loaded types (just added, or
  * carried by an activity whose type no other loaded activity shares) still appears in the

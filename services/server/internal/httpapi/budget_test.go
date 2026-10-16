@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md FR-17.1 (the daily budget's stages).
+
 import (
 	"context"
 	"log/slog"

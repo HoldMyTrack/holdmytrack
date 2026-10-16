@@ -81,6 +81,7 @@ object SyncCandidates {
     /**
      * Every session in Health Connect since [now] less [WINDOW] that has a readable route. A
      * session without one — a gym session, a swim — has no place on a map and isn't listed.
+     * Without the history permission Health Connect itself cuts the window to 30 days.
      */
     suspend fun readHealthConnect(client: HealthConnectClient, now: Instant = Instant.now()): HealthConnectRead {
         val sessions = mutableListOf<Candidate>()

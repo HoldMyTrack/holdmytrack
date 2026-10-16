@@ -19,7 +19,7 @@ import { refreshHeatmapLayers } from './heatmap';
  *
  * While it waits, it also refetches whenever the status's `version` changes: a track edit or
  * Private location change renders once with its Pending activities left out of coverage and
- * again once they're back (IMPLEMENTATION.md §4.7.7), and the first of those is only shown if
+ * again once they're back (IMPLEMENTATION.md §4.2.5), and the first of those is only shown if
  * picked up mid-job. The first read of a page only sets the baseline.
  *
  * It also watches once on its own as soon as the map exists, so a page opened while the

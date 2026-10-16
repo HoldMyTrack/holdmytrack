@@ -12,8 +12,7 @@ import { shiftRange } from './rangeShift';
  * calendar window: a page is exactly N days however sparse the history is. Asking for a
  * window instead would mean guessing a `from`/`to`, counting what came back, and widening the
  * guess until it was enough — several round trips per pan step for a user who rides once a
- * month, and a different wrong guess for every user. (That was the alternative; §4.7 records
- * why this one won.)
+ * month, and a different wrong guess for every user.
  *
  * Paging only ever goes backwards, which is why there is no `after=` request: the first page
  * is the most recent N days, so everything between wherever the view sits and today is

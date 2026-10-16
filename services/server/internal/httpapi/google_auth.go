@@ -143,7 +143,7 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGoogleToken serves `POST /v1/auth/google/token` `{id_token, tz}` — Sign in with Google
-// for a native client (docs/IMPLEMENTATION.md §4.15). The Android app gets the id_token from
+// for a native client (docs/IMPLEMENTATION.md §4.9). The Android app gets the id_token from
 // Credential Manager's account picker and posts it here; its signature is verified
 // (verifyGoogleIDToken), the account resolved exactly as the web callback does, and the answer
 // is the same session JSON as a password sign-in. Every failure is a 401 with the web's own
@@ -234,9 +234,9 @@ func (s *Server) exchangeGoogleCode(ctx context.Context, code, verifier string) 
 	return parseGoogleIDToken(tok.IDToken, s.google.ClientID, time.Now())
 }
 
-// parseGoogleIDToken decodes an id_token's payload and applies OpenID Connect Core
-// §3.1.3.7's checks that still apply when the token came straight from the token endpoint over
-// TLS: issuer, audience, expiry — plus email_verified, since the email is what an existing
+// parseGoogleIDToken decodes an id_token's payload and applies the checks of
+// OpenID Connect Core §3.1.3.7 that still apply when the token came straight from the token
+// endpoint over TLS: issuer, audience, expiry — plus email_verified, since the email is what an existing
 // account gets linked by (resolveGoogleUser) and an unverified one proves nothing.
 func parseGoogleIDToken(idToken, clientID string, now time.Time) (googleClaims, error) {
 	segs := strings.Split(idToken, ".")

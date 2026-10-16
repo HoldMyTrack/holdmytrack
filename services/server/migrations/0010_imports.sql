@@ -1,4 +1,4 @@
--- The header's Upload menu and the /sync page (IMPLEMENTATION.md §4.0.1): when an import job
+-- The header's Upload menu and the /sync page (IMPLEMENTATION.md §4.0): when an import job
 -- finished, and when its account last looked at its finished imports — a failure after that
 -- is flagged on the header's Sync item.
 

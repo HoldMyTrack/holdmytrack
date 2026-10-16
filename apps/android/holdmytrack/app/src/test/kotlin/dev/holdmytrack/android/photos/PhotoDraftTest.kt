@@ -9,6 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 
+/** The Photos tab's unsaved changes (`apps/android/docs/SPEC.md` FR-2.10). */
 class PhotoDraftTest {
 
     private fun saved(id: String, routeAt: Long, caption: String? = null) = Photo(

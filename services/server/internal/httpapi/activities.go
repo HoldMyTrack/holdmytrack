@@ -153,7 +153,7 @@ ORDER BY started_at DESC, id DESC`
 // Name (migrations/0002_activities.sql) is a user-entered title, nullable — a row with
 // none has never had one set, and the client falls back to started_at for its primary line
 // (§4.7 revised its earlier "no name column" decision to add exactly this, and nothing
-// more: still no parser reads a name out of a source file). Description (§4.7.4,
+// more: still no parser reads a name out of a source file). Description (docs/SPEC.md FR-5.10,
 // migrations/0002_activities.sql's activities.description) stays separate free-text, shown only
 // as a hover tooltip — a row with nothing written there has never been edited, not "an
 // empty description."
@@ -322,9 +322,9 @@ func activityIDFromPath(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return strings.ToLower(id), true
 }
 
-// handleUpdateActivity serves `PATCH /v1/activities/{id}` (§4.7.4) — the "rename a
-// mis-tagged upload" / "describe a non-sport GPS trace" feature. §4.7.2 already resolved
-// activity_type as free-form, not a controlled vocabulary, so a manual rename here is
+// handleUpdateActivity serves `PATCH /v1/activities/{id}` (docs/SPEC.md FR-5.10) — the "rename a
+// mis-tagged upload" / "describe a non-sport GPS trace" feature. activity_type is free-form
+// (IMPLEMENTATION.md §4.7), not a controlled vocabulary, so a manual rename here is
 // architecturally identical to what ingest itself already writes — nothing to validate
 // against an allow-list, just a length bound matching the column.
 //

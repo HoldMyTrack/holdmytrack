@@ -124,9 +124,9 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
  * are nullable because the schema is — a file that carried no distance is not a
  * zero-distance activity, and the UI says "—" rather than "0.0 km".
  *
- * `name` (§4.7's revised "no name column" decision — a user-entered title only, never
+ * `name` (§4.7: a user-entered title only, never
  * parsed from a source file) is what a row leads with when set; `startedAt` is the fallback
- * for a row that has none. `description` (§4.7.4) stays a separate, later addition — longer
+ * for a row that has none. `description` (`docs/SPEC.md` FR-5.10) stays a separate, later addition — longer
  * free text, shown only as a hover tooltip, not the row's visible title. Both are edited via
  * `updateActivity` below, and `null` means never set for either, not "set to empty."
  */
@@ -217,7 +217,7 @@ export async function listActivities(query: ActivityQuery = {}, signal?: AbortSi
 }
 
 /**
- * §4.7.4's `PATCH /v1/activities/{id}` — the Edit window's Save, for its Activity tab's
+ * `PATCH /v1/activities/{id}` (`docs/SPEC.md` FR-5.10) — the Edit window's Save, for its Activity tab's
  * fields. Full-replace-on-save, not per-field: all three fields commit together.
  * Returns the updated row so the caller can `reload()` the list (EditActivityWindow.tsx's caller does,
  * matching the "just refetch" convention an upload completion already uses) rather than

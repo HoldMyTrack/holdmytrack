@@ -5,6 +5,7 @@ import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
+/** What's waiting on the Sync tab (`apps/android/docs/SPEC.md` FR-3.2). */
 class SyncCandidatesTest {
 
     private fun candidate(source: String, id: String, startedAt: String) = SyncCandidates.build(

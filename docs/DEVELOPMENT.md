@@ -1,178 +1,162 @@
 # HoldMyTrack: Development
 
-The practical guide to running HoldMyTrack locally, verifying a change, and not rediscovering the same bug twice. `docs/ARCHITECTURE.md` covers *why* the system is shaped this way; `docs/IMPLEMENTATION.md` covers *how* each feature works; this document covers neither — it's the day-to-day operating manual.
+Running HoldMyTrack locally, verifying a change, and bugs already hit once.
 
 ## Running it locally
 
-Everything runs in Docker, including the Vite dev server.
-
-```bash
-docker compose up            # http://localhost:5173
-```
-
-`make help` lists the wrapper targets. See "Verification" below for the full checklist. Working directly in `apps/web` with `npm run dev` still works and is sometimes faster; the container is the default path, not the only one.
+Everything runs in Docker, the Vite dev server included: `docker compose up`, then open `http://localhost:5173`. `make help` lists the wrapper targets.
 
 ### The backend's compose services
 
-`db` (`postgis/postgis:16-3.4`), `rustfs` (RustFS, an S3-compatible server standing in for Cloudflare R2 locally; it replaced MinIO once MinIO stopped publishing free images), `migrate` (applies the schema, then exits), `api` (`cmd/holdmytrack serve`) and `worker` (`cmd/holdmytrack work`) all start by default with `docker compose up` — `api` and `worker` build from the *same* `services/server` image with different `command:` arguments, not two separate images, per `docs/ARCHITECTURE.md` §1.2's "one binary, two modes." `api`/`worker`/`migrate` depend on `db` being healthy; `api`/`worker` also depend on `migrate` completing successfully, so a fresh `docker compose up` can't race the schema. There's no healthcheck on `minio` specifically — `cmd/holdmytrack` retries its own Postgres and MinIO connections with backoff at startup instead of requiring one, since not every `minio` image build can be assumed to ship a specific health-check client binary.
-
-Env vars (`POSTGRES_*`, `S3_*`) are Compose interpolation, set in `/.env` (see `.env.example`) — never in `apps/web/.env`, and never seen by Vite. No custom `networks:` block: Compose's default network already resolves `db`/`rustfs` by service name.
+`docker compose up` starts `web`, `db` (PostGIS), `rustfs` (S3-compatible, standing in for Cloudflare R2), `migrate` (applies the schema, then exits), `api` (`holdmytrack serve`) and `worker` (`holdmytrack work`), the last two from one image (`docs/ARCHITECTURE.md` §1.2). Both wait for a healthy `db` and a successful `migrate`. `rustfs` has no healthcheck; `holdmytrack` retries its Postgres and S3 connections at startup instead. Env vars (`POSTGRES_*`, `S3_*`) are Compose interpolation from the root `.env` (see `.env.example`), never `apps/web/.env`.
 
 ### Server-rendered pages in dev
 
-Every page is rendered by the Go server (`IMPLEMENTATION.md` §4.19) — the map included, which is a Go-rendered shell around the React app — but you still open everything at `localhost:5173`: Vite's dev server proxies the page paths to `api` (`vite.config.ts`'s `pageRoutes`, target `API_PROXY_TARGET`, which compose sets to `http://api:8080`) and serves the React app's modules itself. It marks each proxied request (`X-HoldMyTrack-Vite: dev`), and a dev Go server answers with a shell that loads the app from Vite (`/@vite/client`, `/src/main.tsx`, Fast Refresh working) instead of the built `/assets/app.js`. One origin for pages and app, as in production, is also what the pages' same-origin check on form POSTs relies on. `compose.yaml` bind-mounts `services/server/internal/web` into `api` with `WEB_DEV_DIR` set, so templates and stylesheets are re-read on every request — edit one and reload, no rebuild. A change to the Go handlers themselves (`internal/httpapi/pages.go`, `auth_pages.go`) still needs `docker compose up -d --build api`. Running Vite on the host (`npm run dev`) proxies to `localhost:8080` unless `API_PROXY_TARGET` says otherwise. A new page path goes in `registerPages` (`server.go`) and `pageRoutes` (whose patterns must allow a query string — Vite matches them against the full URL); production's Caddy already sends every non-static path to Go. A path on neither list gets Vite's own 404 in dev, Go's 404 page in production. To try the email-verification flow, set `SKIP_EMAIL_VERIFICATION=false`: with no `SMTP_HOST`, the server logs each email, link included, instead of sending it.
+Every page, the map's shell included, is rendered by Go (`IMPLEMENTATION.md` §4.19), but you open everything at `localhost:5173`. Vite proxies the page paths (`pageRoutes` in `vite.config.ts`) to `API_PROXY_TARGET` (`http://api:8080` in compose, `localhost:8080` by default on the host) and marks each request `X-HoldMyTrack-Vite: dev`; a dev Go server then answers with a shell that loads the app from Vite, with Fast Refresh. `vite preview` proxies without the marker, so the shell loads the build. Both `verify:map` and `verify:build` need a running Go server.
 
-The Android test suite's sample files (`/testing`, `IMPLEMENTATION.md` §4.14) are generated, not edited: after changing `demo_data/` or `cmd/make-testing-files`, run it with the Go version `go.mod` names, the one CI and the server image build with, and commit what it writes to `internal/web/static/testing/`: `docker run --rm -v "$PWD":/src -w /src golang:1.25-bookworm go run ./cmd/make-testing-files` from `services/server`. The Go tests fail while the committed files differ from what it writes, and another Go release compresses the zips and encodes the JPEGs differently, so files written with a newer local Go fail CI's tests.
+`compose.yaml` mounts `services/server/internal/web` into `api` with `WEB_DEV_DIR` set, so templates and stylesheets are re-read on every request; a Go handler change needs `docker compose up -d --build api`. A new page path goes in both `registerPages` (`server.go`) and `pageRoutes`, whose patterns must allow a query string; a path missing from either 404s in dev only, since production's Caddy sends every non-static path to Go.
 
-`vite preview` proxies the same paths without the dev marker, so the Go server's shell loads the build (`tests/build.mjs` relies on that). Both `npm run verify:map` and `verify:build` need a Go server to sign in against and to render the pages.
+To try email verification, set `SKIP_EMAIL_VERIFICATION=false`: with no `SMTP_HOST`, the server logs each email, link included.
+
+The Android suite's sample files (`/testing`) are generated. After changing `demo_data/` or `cmd/make-testing-files`, run this from `services/server` and commit what it writes to `internal/web/static/testing/`:
+
+```bash
+docker run --rm -v "$PWD":/src -w /src golang:1.25-bookworm go run ./cmd/make-testing-files
+```
+
+Use the Go version `go.mod` names: another release compresses the zips and encodes the JPEGs differently, and the Go tests fail while the committed files differ from the output.
 
 ### Text and translations
 
-Every piece of text a person reads is a catalog key, in English and Russian (`IMPLEMENTATION.md` §4.21). Adding text means adding it to both languages in the same change, on the surface it belongs to:
+Every piece of text a person reads is a catalog key in English and Russian (`IMPLEMENTATION.md` §4.21), and new text goes into both in the same change:
 
-- **A server page, email or error message:** a key in `services/server/internal/i18n/locales/en.json` and `ru.json`. Call it `{{t "key"}}` in a template (`tn` for a count, `th` for a message with its own markup), or `l.T("key")` / `accountFailure(status, "key")` / `httpErrorT(w, r, status, "key")` in Go. About and Help are the exception: edit `about.html`/`help.html` and their `.ru.html` twins together.
-- **The map app:** a key in `apps/web/src/i18n/en.ts` and `ru.ts`, called as `t('key')` or `tn('key', n)`. `tsc` fails until `ru.ts` has it.
-- **Android:** `res/values/strings.xml` and `res/values-ru/strings.xml`. Lint's `MissingTranslation` catches a gap.
+- **Server page, email or error:** `services/server/internal/i18n/locales/en.json` and `ru.json`; `{{t "key"}}` in a template (`tn` for a count, `th` for markup), `l.T("key")`, `accountFailure(status, "key")` or `httpErrorT(w, r, status, "key")` in Go. About and Help are whole templates: edit `about.html`/`help.html` and their `.ru.html` twins together.
+- **Map app:** `apps/web/src/i18n/en.ts` and `ru.ts`, as `t('key')` or `tn('key', n)`; `tsc` fails until `ru.ts` has the key.
+- **Android:** `res/values/strings.xml` and `res/values-ru/strings.xml`; Lint's `MissingTranslation` catches a gap.
 
-A count needs every plural form its language uses: `.one`/`.other` in English, `.one`/`.few`/`.many`/`.other` in Russian (the tests list what's missing). Keep placeholders identical across languages. `go test ./internal/i18n` and `npm run test:unit` check both.
+A count needs every plural form: `.one`/`.other` in English, `.one`/`.few`/`.many`/`.other` in Russian. Placeholders stay identical. `go test ./internal/i18n` and `npm run test:unit` check both. To see Russian, use the language menu or `curl -H 'Accept-Language: ru' localhost:5173/help`; the menu's `hmt_lang` cookie beats the header and an account's Language setting beats both.
 
-To see a page in Russian, use the header's language menu, set the browser's language, or send the header: `curl -H 'Accept-Language: ru' localhost:5173/help`. The menu's `hmt_lang` cookie beats the header, and a signed-in account's Language setting beats both. The dev server never caches pages, so there's no stale language to clear; production caches each signed-out page per language.
-
-Adding a *language* is a catalog on each surface, `about`/`help` translations, its plural rule (`i18n.PluralForm`) and separators (`Localizer.separators`), and its code in `i18n.Supported`/`Names`, `locales_config.xml` and `build.gradle.kts`'s `localeFilters`, then `npm run build:style` for the map's served styles in that language.
+Adding a language takes a catalog on each surface, `about`/`help` translations, its plural rule (`i18n.PluralForm`) and separators (`Localizer.separators`), its code in `i18n.Supported`/`Names`, `locales_config.xml` and `build.gradle.kts`'s `localeFilters`, then `npm run build:style`.
 
 ### Seeding a fresh database
 
-`migrate` creates the schema and the Demo Customer's `users` row, but no data — three one-off subcommands fill that in, and `docker compose up` runs none of them. Without them, "Try it now" signs into a demo account with zero activities, Fog's Country/Region zoom tiers have no boundaries to draw, and every activity shows its account's timezone rather than the one it was recorded in. The boundaries come from a file the stack doesn't have: make it with `scripts/boundaries-extract.sh ~/boundaries` (`docs/DEPLOY.md` §6, a few minutes and the [duckdb](https://duckdb.org/docs/installation) CLI) and hand it over with `--file`. The timezone polygons are timezone-boundary-builder's release zip, downloaded as is (`curl -sSfL -o ~/boundaries/timezones-with-oceans-2026d.geojson.zip https://github.com/evansiroky/timezone-boundary-builder/releases/download/2026d/timezones-with-oceans.geojson.zip`). Run all three once against any new or recreated database:
+`migrate` creates the schema and the Demo Customer's `users` row but no data, and `docker compose up` runs no seeds. Without them "Try it now" opens an empty account, Fog's Country/Region tiers have no boundaries, and activities show their account's timezone. Make the boundaries file with `scripts/boundaries-extract.sh ~/boundaries` (`docs/DEPLOY.md` §6; needs the [duckdb](https://duckdb.org/docs/installation) CLI), then:
 
 ```bash
-docker compose run --rm -v ~/boundaries:/data:ro api seed-admin-boundaries --file /data/overture-2026-09-23.0-boundaries.csv.gz   # country/region outlines (IMPLEMENTATION.md §4.2.4)
-docker compose run --rm -v ~/boundaries:/data:ro api seed-timezones --file /data/timezones-with-oceans-2026d.geojson.zip   # each activity's own timezone (IMPLEMENTATION.md §4.30)
-docker compose run --rm api seed-demo-customer      # the Demo Customer's activities, if demo_data/ has any yet (IMPLEMENTATION.md §4.10 / SPEC.md FR-2.2)
+curl -sSfL -o ~/boundaries/timezones-with-oceans-2026d.geojson.zip https://github.com/evansiroky/timezone-boundary-builder/releases/download/2026d/timezones-with-oceans.geojson.zip
+docker compose run --rm -v ~/boundaries:/data:ro api seed-admin-boundaries --file /data/overture-2026-09-23.0-boundaries.csv.gz   # IMPLEMENTATION.md §4.2.4
+docker compose run --rm -v ~/boundaries:/data:ro api seed-timezones --file /data/timezones-with-oceans-2026d.geojson.zip       # IMPLEMENTATION.md §4.30
+docker compose run --rm api seed-demo-customer   # IMPLEMENTATION.md §4.10, SPEC.md FR-2.2
 ```
 
-Boundaries and timezones first, so the demo's activities get their country/region matches and zones at ingest — the other order also works, since both seeds re-match every activity already present. All three are idempotent: re-running skips whatever is already loaded (`--force` makes either seed reload the same file). Loading the whole world's outlines takes a few minutes, the timezones under two. `seed-demo-customer` pushes every file through the real ingest pipeline, so it takes a few minutes. Re-running it never changes or removes an activity already seeded, so after `demo_data/` itself changes (a pull that edits the demo history), run `docker compose run --rm api seed-demo-customer --reset` once — it deletes the demo account's activities first and seeds from scratch. After a change to how Fog/Heatmap tiles are drawn (`internal/fog`), `docker compose run --rm api rerender-coverage` queues a re-render of every account's tiles (`--user <id>` for one; `--masks` to redraw every activity's masks first, after a stroke change), which the `worker` picks up.
+Each takes a few minutes. Seeding boundaries and timezones first matches the demo at ingest; either order works. All three skip what is already loaded (`--force` makes either seed reload). `seed-demo-customer` never changes an activity already seeded, so after `demo_data/` changes run it once with `--reset`, which deletes the demo's activities first.
 
-Spots (`SPEC.md` FR-15) has no places until some are imported. Make a small extract from a [Geofabrik](https://download.geofabrik.de/) region with `docs/DEPLOY.md` §6's two osmium commands, put `spots.geojsonseq` in `/tmp/spots`, and run `docker compose run --rm -v /tmp/spots:/data:ro api import-spots /data/spots.geojsonseq`.
+After a change to how Fog/Heatmap tiles are drawn (`internal/fog`), `docker compose run --rm api rerender-coverage` queues a re-render of every account's tiles (`--user <id>` for one; `--masks` to redraw masks first, after a stroke change).
 
-Bike paths, Shared paths and Mountain bike trails (`SPEC.md` FR-4.13) draw nothing until their ways are imported the same way: `scripts/bike-paths-extract.sh <work-dir> <geofabrik-url>` (given the work-dir the Spots extract used, it reuses that download), put `bike-paths.geojsonseq` in `/tmp/bike-paths`, and run `docker compose run --rm -v /tmp/bike-paths:/data:ro api import-bike-paths /data/bike-paths.geojsonseq`. Ohio's file is about 17,200 ways, of which the import keeps about 16,300; the rest are roads with a designated bike lane or rated forest roads.
+Spots (`SPEC.md` FR-15) needs an import: cut a small extract with `scripts/spots-extract.sh <work-dir> <geofabrik-pbf-url>` from a [Geofabrik](https://download.geofabrik.de/) region (`docs/DEPLOY.md` §6), put `spots.geojsonseq` in `/tmp/spots`, and run `docker compose run --rm -v /tmp/spots:/data:ro api import-spots /data/spots.geojsonseq`. Bike paths (`SPEC.md` FR-4.13) likewise: `scripts/bike-paths-extract.sh <work-dir> <geofabrik-url>` (the Spots work-dir reuses its download), then `docker compose run --rm -v /tmp/bike-paths:/data:ro api import-bike-paths /data/bike-paths.geojsonseq`.
 
-The Android app shows Settings, Profile, the Sync page and About as these same pages in a WebView (`IMPLEMENTATION.md` §4.19). Against the dev stack they load, but every form on them — Settings' Save, its avatar — is refused with a `403`: a page form must come from `APP_BASE_URL`'s origin, which is Vite's `http://localhost:5173`, while an emulator reaches the API at `http://10.0.2.2:8080`. To try them, run the app against an origin that is both: `adb reverse tcp:8080 tcp:8080`, `APP_BASE_URL=http://localhost:8080` for `api`, and `holdmytrack.apiBaseUrl=http://localhost:8080` for the app.
+### Admin, stats and the Android WebView
 
-To see the admin panel (`/admin`, `IMPLEMENTATION.md` §4.20), sign up a local account and make it an admin: `docker compose run --rm api set-admin you@example.com true`.
+For the admin panel (`/admin`, `IMPLEMENTATION.md` §4.20), sign up locally and run `docker compose run --rm api set-admin you@example.com true`.
 
-The daily service statistics (`IMPLEMENTATION.md` §4.32) are taken by `worker` within an hour of midnight UTC, and once at its start. To read them: `docker compose run --rm api stats` prints the newest day's values, `stats 2026-10-13` one day's, and `stats activities_by_source --days 90` a key's series, or every key under that prefix, one row per day. To have a day to read without waiting, `stats --take` writes yesterday's snapshot now (`--take 2026-10-13` another day's); its state values are today's, whatever day it's for, so it's for trying things out locally, not for a real deployment. A day already taken is never overwritten: to take one again, delete its rows from `daily_stats`.
+`worker` takes the daily statistics (`IMPLEMENTATION.md` §4.32) within an hour of midnight UTC and at its start. `docker compose run --rm api stats` prints the newest day, `stats 2026-10-13` one day, `stats activities_by_source --days 90` a key's (or prefix's) series. `stats --take [day]` writes a snapshot now, yesterday by default, but with today's state values, so use it only locally. To retake a day, delete its `daily_stats` rows.
+
+The Android app shows Settings, Profile, Sync and About as these pages in a WebView. Against the stock dev stack their forms get `403`: a form must come from `APP_BASE_URL`'s origin (`localhost:5173`), while the emulator reaches `10.0.2.2:8080`. To try them, run `adb reverse tcp:8080 tcp:8080` and set `APP_BASE_URL=http://localhost:8080` for `api` and `holdmytrack.apiBaseUrl=http://localhost:8080` for the app.
 
 ### Dev uses the planet basemap from `tiles.holdmytrack.com`
 
-Local dev draws the same full-planet basemap Production does, once `apps/web/.env.local` sets `VITE_BASEMAP_ORIGIN=https://tiles.holdmytrack.com/<YYYYMMDD>` (the dated prefix production uses, `docs/DEPLOY.md` §5). The file is gitignored, so each checkout adds that line itself; restart `web` after changing it. This works because the zone's response header rule answers every basemap response with `Access-Control-Allow-Origin: *` (`docs/DEPLOY.md` §5) and the bucket's own CORS policy, which answers preflights, lists `http://localhost:5173` alongside the production origin — without them every tile, font and sprite request fails CORS. The zone's custom rule refuses every other `Origin` (`docs/DEPLOY.md` §5), so a dev server on another port gets `403` for the basemap. Each tile loaded counts as a production R2 request. The Playwright suites use a small regional extract instead, `apps/web/public/basemap/basemap.pmtiles` (roughly Ohio, z0–14, cut by `npm run basemap`; CI cuts and caches its own), so they never depend on or bill production. `.env.local` is in `apps/web/.dockerignore`, so no image bakes it in, but the `test` service bind-mounts `apps/web` and Vite would read it from there; `compose.yaml` pins `VITE_BASEMAP_ORIGIN` (empty, same-origin) and `VITE_API_BASE_URL` on that service, and real env vars outrank every `.env` file, so `verify:map` keeps using the local extract and the local API.
+Set `VITE_BASEMAP_ORIGIN=https://tiles.holdmytrack.com/<YYYYMMDD>` (production's dated prefix, `docs/DEPLOY.md` §5) in `apps/web/.env.local`, which is gitignored, and restart `web`. This works because the zone answers basemap responses with `Access-Control-Allow-Origin: *` and the bucket's CORS policy lists `http://localhost:5173` for preflights; the zone refuses every other `Origin`, so a dev server on another port gets `403`. Each tile counts as a production R2 request.
+
+The Playwright suites use a regional extract, `apps/web/public/basemap/basemap.pmtiles` (Ohio, z0–14, cut by `make basemap`). The `test` service bind-mounts `apps/web`, so Vite would read `.env.local` there; `compose.yaml` pins `VITE_BASEMAP_ORIGIN` (empty) and `VITE_API_BASE_URL` on that service, and real env vars outrank `.env` files.
 
 ### Satellite imagery in dev
 
-Off unless configured, like in production (`docs/SPEC.md` FR-4.14). For the web, add `VITE_SATELLITE_TILES`, `VITE_SATELLITE_TILE_SIZE`, `VITE_SATELLITE_MAXZOOM` and `VITE_SATELLITE_ATTRIBUTION` to `apps/web/.env.local` and restart `web`; for the style document Android fetches, set `SATELLITE_*` in the root `.env` and recreate `api`. A MapTiler key needs `http://localhost:5173` in its allowed origins, and every tile counts against its monthly quota. For a quick check without a key, Esri World Imagery answers keyless at `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}` (tile size 256, note `{y}` before `{x}`). That's fine for local testing only, not for a deployment. `tests/smoke.mjs` step 9 exercises the switch whenever its dev server sees `VITE_SATELLITE_TILES`, and checks the switch is absent otherwise.
+Off unless configured (`docs/SPEC.md` FR-4.14). For the web, add `VITE_SATELLITE_TILES`, `VITE_SATELLITE_TILE_SIZE`, `VITE_SATELLITE_MAXZOOM` and `VITE_SATELLITE_ATTRIBUTION` to `apps/web/.env.local` and restart `web`; for Android's style document, set `SATELLITE_*` in the root `.env` and recreate `api`. A MapTiler key needs `http://localhost:5173` in its allowed origins. For a keyless local check (never a deployment), use Esri World Imagery: `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`, tile size 256. `tests/smoke.mjs` step 9 tests the switch when `VITE_SATELLITE_TILES` is set and its absence otherwise.
 
 ## Verification
 
-Confirmed working end to end as of 2026-09-13 (`linux/aarch64` VM, Docker 29.7.2, Compose v5.5.1) — re-confirmed repeatedly since via `verify:map`/`verify:build` after each feature, most recently password recovery. Re-run the full checklist below after any change to `compose.yaml`, either Dockerfile, or the Vite config — containerisation is the part most likely to break silently.
+Re-run this after any change to `compose.yaml`, a Dockerfile or the Vite config:
 
-1. `docker compose up` → `localhost:5173` renders Columbus with streets, labels and sprites, in both light and dark.
-2. Edit `apps/web/src/ui/VersionBanner.tsx` on the host → the container's Vite logs an `hmr update` line within a second or two, with no manual refresh needed. If not, set `VITE_WATCH_POLL=1` and confirm that was the cause.
-3. `curl -H "Range: bytes=0-1023" http://localhost:5173/basemap/basemap.pmtiles` → `206`, never a full-file `200`.
-4. `docker compose --profile test run --rm test npm run verify:map` → all 7 checks pass.
-5. `docker compose --profile test run --rm test sh -c 'npm run build && npm run verify:build'` → all 4 checks pass, including the worker-asset check.
-6. `docker compose run --rm web pmtiles show public/basemap/basemap.pmtiles` → z0–14, 63,948 addressed tiles, proving no host binary is needed.
-7. `cd apps/web && npm run dev` still works and binds loopback-only (`Network: use --host to expose`) since `VITE_DEV_HOST` is unset outside the container — the container is the default path, not the only one.
-
-Step 4 was the riskiest part of the whole design going in: SwiftShader WebGL under headless Chromium on `linux/arm64` was the one combination that had never been verified. It passed cleanly on first run.
+1. `docker compose up` → `localhost:5173` renders Columbus with streets, labels and sprites, in light and dark.
+2. Edit `apps/web/src/ui/VersionBanner.tsx` on the host → the container's Vite logs `hmr update` within a couple of seconds. If not, try `VITE_WATCH_POLL=1`.
+3. `curl -H "Range: bytes=0-1023" http://localhost:5173/basemap/basemap.pmtiles` → `206`, never `200`.
+4. `make verify` → all 7 checks pass.
+5. `make verify-build` → all 4 checks pass.
+6. `docker compose run --rm web pmtiles show public/basemap/basemap.pmtiles` → z0–14, 63,948 addressed tiles.
+7. `npm run dev` in `apps/web` still works and binds loopback-only, since `VITE_DEV_HOST` is unset outside the container.
 
 ### Backend verification
 
-Also confirmed against a live stack, not assumed:
+After a change to ingest, the queue or tiles, check against a live stack:
 
-- `docker compose up` brings up `web`, `db`, `rustfs`, `migrate`, `api` and `worker` together; `migrate` applies every `*.sql` file under `services/server/migrations/` (embedded via `go:embed`, tracked in `schema_migrations`) and exits. It holds a Postgres advisory lock while it runs, so the Go test packages that migrate the test database at once take turns.
-- A real `.gpx` upload (`curl -F file=@sample.gpx http://localhost:8080/v1/activities/upload`) round-trips through the job queue into `activities`, with a correctly typed `LINESTRING M` trajectory.
-- A real `.tcx` upload round-trips the same way; the heart rate in it is ignored (ADR-0017).
-- **Idempotency** (`IMPLEMENTATION.md` §4.0's explicit invariant): the same file uploaded twice sequentially returns `already_processed` from the fast-path check; five *concurrent* uploads of identical new content all enqueue (the fast path can't see each other), but the persist-time `ON CONFLICT (user_id, source, external_id) DO NOTHING` still collapses them to exactly one `activities` row.
-- Malformed input is rejected before processing: unsupported extensions (415) and empty files (400) never reach the parser or the queue.
-- **Track tiles** (`IMPLEMENTATION.md` §4.3): `GET /tiles/v1/tracks/{z}/{x}/{y}.mvt` returns valid, non-empty MVT bytes with a `tracks` layer for a tile covering an uploaded activity, and a clean `200`/0-byte response (not an error) for a tile with none. End to end through the real UI, not just curl: uploading a file through the header's Upload menu renders it on the map — confirmed via `querySourceFeatures`/`queryRenderedFeatures` in a real Playwright-driven browser session, not assumed from the component wiring — with zero manual page refresh.
+- `curl -F file=@sample.gpx http://localhost:8080/v1/activities/upload` lands in `activities` with a `LINESTRING M` trajectory (`docker compose logs worker -f` shows the job); a `.tcx` likewise, heart rate ignored (ADR-0017). An unsupported extension gets 415 and an empty file 400.
+- The same file twice returns `already_processed`; five concurrent uploads of new identical content leave one row (`IMPLEMENTATION.md` §4.0).
+- `GET /tiles/v1/tracks/{z}/{x}/{y}.mvt` returns a `tracks` layer over an upload and an empty `200` elsewhere; a file uploaded through the Upload menu appears on the map without a refresh.
 
 ### Go database tests
 
-Go tests that need Postgres+PostGIS — so far `internal/httpapi`'s Story tests — build a real `Server` over the database `TEST_DATABASE_URL` names (`dbtest_test.go`), and skip when it isn't set, so a bare `go test ./...` still passes without a database. They migrate that database and delete the accounts they create, so every row they wrote goes with them. `make test-go` creates a `holdmytrack_test` database in compose's `db` (starting it if needed) and runs the whole Go suite against it; with the stack already up, `TEST_DATABASE_URL=postgres://holdmytrack:holdmytrack@localhost:5432/holdmytrack_test go test -p 1 ./...` from `services/server` does the same, after a one-time `docker compose exec db createdb -U holdmytrack holdmytrack_test`. The object store is an in-test fake that holds nothing, enough for an activity delete's cleanup calls; a test that reads back what it stores uses `internal/storage/storagetest`'s in-memory S3 instead, which `internal/fog`'s render tests use too. `internal/worker`, `internal/fog`, `internal/spots` and `internal/bikepaths` have database tests of their own, on the same `TEST_DATABASE_URL`. They all share that one database, so the suite runs one package at a time (`-p 1`, in `make test-go` and CI): `go test` otherwise runs packages side by side, and the worker's tests claim whatever job is runnable, another package's included.
+Go tests that need PostGIS use the database `TEST_DATABASE_URL` names (`internal/httpapi/dbtest_test.go`) and skip without it. They migrate it (under an advisory lock) and delete the accounts they create. `make test-go` creates `holdmytrack_test` in compose's `db` and runs the suite. With the stack up, the same from `services/server`, after a one-time `docker compose exec db createdb -U holdmytrack holdmytrack_test`:
 
-Every request `internal/httpapi`'s tests send through `dbTest.do`, `dbTest.send` (for a body that isn't JSON, such as a multipart upload) or, in a test without a database, `serveChecked` is also checked against the API contract in `services/server/api/` (`IMPLEMENTATION.md` §4.31). A failure names the exchange and the schema path that didn't match: `contract: 200 response to GET /v1/activities doesn't match ../../api/openapi.yaml`, then something like `Error at "/activities": Value is not nullable`. Fix whichever side is wrong: the handler if it broke the contract, the contract if the change was intended. A new endpoint fails `TestContractCoversEveryRoute` until it's in the contract: add its operations to its area's file in `api/paths/` and a line for its path to `openapi.yaml`'s index, mark response objects `additionalProperties: false` so an extra field fails too, and run the package's tests: any test that already calls the endpoint is checked from then on, and its failures show where the contract and the handler disagree. `go test -run TestContract ./internal/httpapi` checks the contract alone and its coverage of the routes, without a database. After any change to the contract, `npm run gen:api-types` in `apps/web` regenerates the web's types from it (`src/apiSchema.ts`, committed); CI's `verify:api-types` fails while they're stale, and `tsc` then shows any web code the change breaks. The Android app's `WireContractTest` (`./gradlew :app:testDebugUnitTest` in `apps/android/holdmytrack`) fails on any wire class in `net/Wire.kt` the change no longer matches.
+```bash
+TEST_DATABASE_URL=postgres://holdmytrack:holdmytrack@localhost:5432/holdmytrack_test go test -p 1 ./...
+```
+
+Several packages share that database, so the suite runs one package at a time (`-p 1`, in `make test-go` and CI): the worker's tests claim any runnable job, another package's included. A test that reads back stored objects uses `internal/storage/storagetest`'s in-memory S3.
+
+Every request `internal/httpapi`'s tests send through `dbTest.do`, `dbTest.send` or `serveChecked` is checked against the API contract in `services/server/api/` (`IMPLEMENTATION.md` §4.31). A failure names the exchange and schema path; fix whichever side is wrong. A new endpoint fails `TestContractCoversEveryRoute` until its operations are in `api/paths/` and its path in `openapi.yaml`'s index; mark response objects `additionalProperties: false`. `go test -run TestContract ./internal/httpapi` runs without a database. After a contract change, run `npm run gen:api-types` in `apps/web` (CI's `verify:api-types` fails while `src/apiSchema.ts` is stale) and the Android tests, whose `WireContractTest` checks `net/Wire.kt`.
+
+### Android verification
+
+The app has JUnit tests over its pure logic (`./gradlew :app:testDebugUnitTest` in `apps/android/holdmytrack`) and no instrumentation tests or Health Connect test double; the rest is checked by hand. After a change to the sync code, re-check on a physical device with real Health Connect data: a run cut off midway, a route not handed over, a reinstall (synced sessions must not come back) and an activity deleted on the web (its session must). Only one device and one provider (Fitbit) have been tested; Samsung's missing routes rest on Samsung's documentation.
 
 ### CI
 
-`.github/workflows/ci.yml` runs on every push to `main` and every pull request, in four parallel jobs: `go test ./...`, with a PostGIS service container for the database tests; the web client's `typecheck`, `test:unit` (as `test:coverage`, under c8) and `verify:style` (on the runner's own Node, not in Docker); the Android app's JUnit tests, through AGP's `createDebugUnitTestCoverageReport` on the runner's JDK 17 and preinstalled Android SDK; and `make verify verify-build` against the full compose stack. The basemap extract isn't in git, so that last job caches it keyed on `apps/web/scripts/build-basemap.sh` and cuts it with `make basemap` on a miss — which fails with a 404 once the script's pinned Protomaps build has aged out of their bucket (about a week); bump `BUILD` in the script. Screenshots and the `api`/`migrate` logs are kept when that job fails. The Go, web and Android jobs upload their coverage to Codecov under the flags `go`, `typescript` and `kotlin` (one README badge each, and no PR comment). That's unit tests only — the Playwright suites aren't instrumented, and the Android app is otherwise verified by hand — so all three numbers are low by design; c8 runs with `all` (`apps/web/.c8rc.json`) so a file no test imports counts as uncovered rather than being left out. `codecov.yml` keeps both of Codecov's status checks informational so coverage never blocks a merge. `make test` runs the same set locally, except the Android tests, which run from `apps/android/holdmytrack` with `./gradlew :app:testDebugUnitTest`. CI never deploys; deploys are run by hand (`docs/DEPLOY.md` §6, and `docs/BRAINSTORM.md` for deploying on merge).
+`.github/workflows/ci.yml` runs on every push to `main` and every pull request, in five parallel jobs: `scripts/check-doc-refs.sh`, which fails on a `§`, FR or ADR citation whose heading no longer exists; `go test -p 1 ./...` with a PostGIS service; the web `typecheck`, `test:coverage`, `verify:style` and `verify:api-types`; the Android JUnit tests; and `make verify verify-build` against the compose stack. That last job caches the basemap extract keyed on `apps/web/scripts/build-basemap.sh` and cuts it on a miss, which 404s once the pinned Protomaps build ages out (about a week): bump `BUILD` in the script.
 
-This verification pass is what caught two of the gotchas below (the PostGIS M-ordinate bug and the `styledata`/`isStyleLoaded` timing bug) — see "Gotchas worth not rediscovering."
+The Go, web and Android jobs upload unit-test coverage to Codecov (flags `go`, `typescript`, `kotlin`), so the numbers are low by design; c8's `all` (`apps/web/.c8rc.json`) counts untested files. `codecov.yml` keeps the status checks informational. CI never deploys (`docs/DEPLOY.md` §6).
 
 ## Writing a migration
 
-A deploy runs the new migrations while the previous release's `api` and `worker` are still serving (`DEPLOY.md` §7), so a migration has to work with the code that's already deployed as well as with the code it ships with. Most do without trying:
+A deploy runs new migrations while the previous release's `api` and `worker` still serve (`DEPLOY.md` §7), so a migration must work with the old code too:
 
-- **Fine:** a new table, a new column that's nullable or has a default, a new index, a short `UPDATE`, queueing jobs (`0024_antimeridian_reprocess.sql`). The old code never reads what it doesn't know about.
-- **Not fine:** dropping or renaming a table or column the old code reads or writes, `NOT NULL` without a default on a column the old code inserts into, changing a column's type, a new constraint the old code can break, or anything that holds a table lock for more than a moment (rewriting a large table, a long backfill).
+- **Fine:** a new table, a nullable or defaulted column, a new index, a short `UPDATE`, queueing jobs.
+- **Not fine:** dropping or renaming what the old code uses, `NOT NULL` without a default on a column it inserts into, changing a column's type, a constraint it can break, or a lock held for more than a moment (rewriting a large table, a long backfill).
 
-Removing or renaming something takes two releases: the first stops using it, the next drops it. When a migration can't be made compatible, its first line says so, `-- Deploy: maintenance — <why>`, and the deploy puts the site into maintenance mode for it (`DEPLOY.md` §7). Without that line, a deploy runs it with the site up.
+Removing or renaming takes two releases: stop using it, then drop it. A migration that can't be compatible starts with `-- Deploy: maintenance — <why>`, and the deploy runs it in maintenance mode (`DEPLOY.md` §7); without that line it runs with the site up.
 
 ## Gotchas worth not rediscovering
 
-All verified directly against the repo, the registries, or a real `docker compose` run — not guessed.
-
-- **Never bind-mount host `node_modules` into a container.** Vite 8 is Rolldown-based and the tree contains native Mach-O binaries (`@rolldown/binding-darwin-arm64`, `lightningcss-darwin-arm64`). A Linux container handed macOS binaries dies on startup. `compose.yaml` puts a container-owned named volume at `/app/node_modules` for exactly this reason, and `apps/web/docker/entrypoint.sh` reconciles that volume against the lockfile hash when it goes stale.
-- **Headless Chromium needs an explicit SwiftShader flag or MapLibre never renders.** There is no GPU in the container, and since roughly Chrome 130 Chromium refuses to fall back to software rasterisation for WebGL silently. Without `--enable-unsafe-swiftshader` (plus `--use-gl=angle --use-angle=swiftshader`) the map never acquires a context and the test failure does not name its cause. The flags are passed as `PW_CHROMIUM_ARGS` by the `test` compose service and read by `tests/smoke.mjs` and `tests/build.mjs`'s `chromium.launch()` calls — confirmed working end to end (this document, "Verification").
-- **The `go-pmtiles` image has no shell and `WorkingDir "/"`.** The binary is at **`/go-pmtiles`**, not `/pmtiles`. Two consequences: `docker run ... protomaps/go-pmtiles <args>` needs `-w /work` or relative output paths are written inside the container and lost, and `scripts/build-basemap.sh` cannot run inside that image at all. The Dockerfile copies the binary into the dev image at `/usr/local/bin/pmtiles` instead.
-- **`vite.config.ts` needs its own `process.env` ambient type.** `tsconfig.json`'s `types` is deliberately just `["vite/client"]` — no `@types/node` for the sake of one config file reading `VITE_DEV_HOST`/`VITE_WATCH_POLL`. The file declares `process` locally instead. `npm run build` runs `tsc --noEmit` first, so this breaks loudly if a future edit reintroduces a bare `process` reference elsewhere.
-- **Playwright is pinned exactly, not caret-ranged.** It had drifted (`^1.56.0` resolved to 1.63.0) because Playwright ships browser builds keyed to its own version; `package.json` now pins `1.63.0` directly so the npm dependency and the image's browser build can't diverge again.
-- **`ST_SimplifyPreserveTopology` drops the M ordinate in PostGIS 3.4.** Confirmed directly against this stack, not assumed: simplifying a `LineStringM` returns a plain `LINESTRING`, no M at all (`SELECT GeometryType(...)` on the simplified result confirms it) — `IMPLEMENTATION.md`'s "M dimension carries epoch seconds" requirement silently breaks if you call it on the timestamped trajectory directly. `internal/ingest/simplify.go` simplifies X/Y only, then reattaches each surviving vertex's original timestamp by matching coordinates in original sequence order — valid because Douglas-Peucker-style simplification only selects a subset of the original vertices, never moves or interpolates them. If you touch trajectory simplification, read that file's doc comment before "simplifying" it back to one call. First caught by backend verification: a real `.gpx` upload round-tripped with a trajectory that had silently lost its M ordinate.
-- **A `styledata`-only listener can silently never fire on first load, and adding a source afterward makes `isStyleLoaded()` dip back to `false`.** Two related gotchas found together adding the tracks layer. First: `MapView`'s overlay-attach function was wired only to the `styledata` event, but that listener itself gets attached *after* `map` state is set, which is itself set inside the initial `'load'` handler — a later `styledata` isn't guaranteed to fire again on its own, and on first page load it didn't, so the tracks overlay silently never attached until a theme toggle triggered a real restyle. Fixed by calling the overlay-attach function once directly, not only from the listener. Second: that same overlay attach adds a new source, which makes `isStyleLoaded()` dip back to `false` for a moment while its first tiles load — `tests/smoke.mjs`'s `styleLoaded()` helper now waits for the flag to hold `true` across two checks 150ms apart, not just the first `true` it sees. If you add fog the same way, this is already handled for you; if you add any *other* async-loading thing to the map, remember `isStyleLoaded()` isn't a one-shot signal once overlays exist.
-- **Inside the `test` compose service, `localhost` is that container, not `api`.** Chromium in `tests/smoke.mjs`/`tests/build.mjs` runs *inside* the `test` container, so `apps/web/src/api.ts`'s default `API_BASE_URL` (`http://localhost:8080`, correct for the `web` service where the browser runs on the host) resolves to nothing there. The fix is `network_mode: "service:api"` on `compose.yaml`'s `test` service, which puts the test container on `api`'s network stack so `localhost:8080` reaches it — and keeps the browser, the test's Vite server and `api` same-site, so the `SameSite=Lax` session cookie is still attached (a service-name `api:8080` base lost it). Discovered because the tracks source made this concrete: an unreachable-inside-the-test-network tile source, not a flaky one.
-- **The idempotency guarantee lives at persist time, not receive time.** `internal/httpapi`'s upload handler checks for an existing `(user_id, source, external_id)` before enqueuing, but that's a fast path only — two identical uploads can both pass it while racing. The actual guarantee is `internal/ingest.Process`'s `INSERT ... ON CONFLICT (user_id, source, external_id) DO NOTHING`, verified against a real race: 5 concurrent uploads of identical content all completed their jobs, and exactly one row landed in `activities`. If you add a second job kind that writes `activities`, it needs the same `ON CONFLICT`, not just a check-then-insert.
-- **`map.setFilter`/`map.setLayoutProperty` (the public `Map` methods) call `_update(true)` unconditionally, even when the value is unchanged** — confirmed by reading the installed maplibre-gl 6.9.0 bundle directly, not assumed. That marks sources dirty and forces a full source re-check on the next render frame regardless of whether anything actually needs to change. `reattachOverlays` (`MapView.tsx`) re-applies `setMapMode` and `setHiddenTracks` on every `'styledata'` event by design (`addLayer` always resets visibility/filter, so a `styledata`-triggered layer recreation would otherwise silently undo the current mode/hidden-set). Calling either unconditionally from inside that handler self-sustains: `setFilter`/`setLayoutProperty` → `_update(true)` → next frame re-fires `'styledata'` → handler runs again → calls them again → repeat forever, and `isStyleLoaded()` never settles. Root-caused this exact way after `setHiddenTracks` (added for the eye icon) started making it fatal — the live, network-backed tracks source made the forced per-frame re-check expensive enough that `verify:map`'s test timed out instead of merely wasting cycles. Both `mapMode.ts`'s `setVisible` and `tracks.ts`'s `setHiddenTracks` now diff against the layer's current value first and skip the call when nothing would change; if you add a third thing to `reattachOverlays` that calls a `map.set*` method, give it the same guard.
-- **`go:embed` can't reach across `services/server/internal/db/` into `services/server/migrations/`.** Patterns can't cross out of the directory containing the source file, and the SQL has to live in `migrations/` (services/server/README.md commits to that). `migrations/embed.go` is the one file that lives beside the `.sql` and embeds it; `internal/db` imports that package rather than embedding directly.
+- **Never bind-mount host `node_modules` into a container.** Its native macOS binaries (Rolldown, lightningcss) kill a Linux container. `compose.yaml` mounts a named volume at `/app/node_modules`, which `apps/web/docker/entrypoint.sh` reconciles against the lockfile hash.
+- **Headless Chromium needs SwiftShader flags or MapLibre never renders.** With no GPU, Chromium won't fall back to software WebGL on its own, and the test failure doesn't name the cause. The `test` service passes `--enable-unsafe-swiftshader --use-gl=angle --use-angle=swiftshader` as `PW_CHROMIUM_ARGS`.
+- **The `go-pmtiles` image has no shell and `WorkingDir "/"`.** The binary is `/go-pmtiles`; `docker run` needs `-w /work` or relative outputs stay in the container, and `build-basemap.sh` can't run there. The dev image copies the binary to `/usr/local/bin/pmtiles`.
+- **`vite.config.ts` declares its own `process`.** `tsconfig.json`'s `types` is only `["vite/client"]`, so a bare `process` elsewhere fails `tsc`.
+- **Playwright is pinned exactly.** Its browser build is keyed to its version; a caret range let the package drift from the image's browser.
+- **`ST_SimplifyPreserveTopology` drops the M ordinate in PostGIS 3.4**, returning a plain `LINESTRING` without the epoch seconds. `internal/ingest/simplify.go` simplifies X/Y, then reattaches each surviving vertex's timestamp by matching coordinates in order; read its doc comment before collapsing it to one call.
+- **A `styledata`-only listener can miss first load, and adding a source makes `isStyleLoaded()` dip to `false`.** The listener is attached after `'load'`, so `MapView` also calls its overlay attach directly. A new source drops `isStyleLoaded()` while its tiles load, so `tests/smoke.mjs`'s `styleLoaded()` waits for `true` on two checks 150ms apart. Once overlays exist, `isStyleLoaded()` is no one-shot signal.
+- **Inside the `test` service, `localhost` is that container.** `network_mode: "service:api"` puts it on `api`'s network stack so `localhost:8080` works and browser, Vite and `api` stay same-site for the `SameSite=Lax` session cookie; a base of `api:8080` loses the cookie.
+- **Idempotency lives at persist time.** The upload handler's existing-row check is a fast path racing uploads can both pass; the guarantee is `internal/ingest.Process`'s `ON CONFLICT (user_id, source, external_id) DO NOTHING`. Any new job kind writing `activities` needs the same.
+- **`map.setFilter`/`map.setLayoutProperty` call `_update(true)` even when nothing changes** (maplibre-gl 6.9.0). `reattachOverlays` (`MapView.tsx`) re-applies mode and hidden tracks on every `'styledata'`, since `addLayer` resets them, so an unconditional setter there loops forever (setter → `'styledata'` → setter) and `isStyleLoaded()` never settles. `mapMode.ts`'s `setVisible` and `tracks.ts`'s `setHiddenTracks` diff first; any `map.set*` call on that path needs the same guard.
+- **`go:embed` can't reach from `internal/db/` into `migrations/`.** `migrations/embed.go` embeds the SQL beside it and `internal/db` imports that package.
 
 ## Commands
 
-Local development runs in Docker; the containerised path is the default, not the only one.
+`make help` lists the wrapper targets; `make test` runs every CI suite except the doc check and the Android tests. Not wrapped:
 
 ```bash
-docker compose up                   # web on :5173, api on :8080, plus db/rustfs/worker
-docker compose --profile test run --rm test npm run verify:map
-docker compose --profile test run --rm test sh -c 'npm run build && npm run verify:build'
-docker compose run --rm web pmtiles show public/basemap/basemap.pmtiles
-
-curl -F file=@activity.gpx http://localhost:8080/v1/activities/upload
-docker compose exec db psql -U holdmytrack -d holdmytrack -c 'SELECT * FROM activities;'
-docker compose logs worker -f               # watch ingest jobs process
+scripts/check-doc-refs.sh                                         # citation check
+cd apps/web && npm run gen:api-types                              # after a contract change
+cd apps/web && npm run build:style                                # after src/map/style.ts changes
+cd apps/android/holdmytrack && ./gradlew :app:testDebugUnitTest   # Android JUnit tests
 ```
 
-The `Makefile` at the root wraps these; `make help` lists the targets. `make test` runs every suite CI runs: Go unit tests (`make test-go`, in a throwaway `golang` container), the web unit tests and style-drift check (`make test-unit`), then `verify` and `verify-build`.
-
-Working inside the web client directly (`cd apps/web`) also works and is sometimes faster:
-
-| Script | What it does |
-| :-- | :-- |
-| `npm run dev` | Vite dev server on 5173, serving the archive over HTTP range requests |
-| `npm run build` | `tsc --noEmit`, then `vite build` to `dist/` |
-| `npm run typecheck` | `tsc --noEmit` alone |
-| `npm run basemap` | Re-cut the `.pmtiles` extract (needs the `pmtiles` CLI on `PATH`) |
-| `npm run verify:map` | Headless Playwright checks against a dev server it spawns itself |
-| `npm run verify:build` | The same questions asked of the production bundle, which is not the same question |
-| `npm run test:unit` | Plain `node --test` unit tests (the track editor's edit ops) |
-| `npm run test:coverage` | `test:unit` under c8, counting every file in `src/`; the report lands in `coverage/` |
-| `npm run verify:style` | Fails if the style documents under `services/server/internal/mapstyle/styles` have drifted from `src/map/style.ts`; `npm run build:style` regenerates them |
-
-Run `npm run build` before `npm run verify:build`.
+On the host, `npm run build` must precede `verify:build`, and `npm run basemap` needs `pmtiles` on `PATH`.
 
 ## Known costs
 
-"Everything in Docker" is a real trade, not a free win:
+- **The IDE needs a host `node_modules`**, about 300 MB, refreshed by hand when the lockfile changes.
+- **Adding a dependency takes three steps**: install in the container, rebuild the image, install on the host.
+- **`vite build` copies the 326 MB archive through VirtioFS**, seconds instead of an instant APFS clone.
+- **Playwright renders on SwiftShader**, a rasteriser no user has.
+- **HMR can go deaf over VirtioFS**, which the host never does.
 
-- **The IDE still needs a host `node_modules`.** Roughly 300 MB of darwin-only packages the container never touches, kept only so tsserver works, refreshed by hand when the lockfile changes.
-- **Adding a dependency is a three-step operation** — install in the container, rebuild the image, then install on the host for the IDE.
-- **`vite build` copies the 326 MB archive through VirtioFS** instead of letting APFS `clonefile` it. Near-instant becomes a few seconds.
-- **Playwright renders on SwiftShader, not Metal.** The verification suites assert against a rasteriser no user will ever have — a genuine fidelity loss in exactly the tests written to catch rendering bugs.
-- **HMR gains a failure mode that doesn't exist on the host.** When it goes deaf the question is about VirtioFS, not the code.
-
-One open follow-up, cheap now and irritating later: `scripts/build-basemap.sh` pins a dated basemap build key that Protomaps' rolling seven-day retention window ages out silently. Teaching the script to resolve the newest key from `https://build-metadata.protomaps.dev/builds.json` when `BUILD` is unset (keeping the pinned value as an explicit override) would turn a future 404-with-no-obvious-cause into a normal fresh-clone experience — and into a self-healing cache miss in CI, whose map job cuts the extract with this same script whenever its cache is empty ("CI" above).
+Open follow-up: `scripts/build-basemap.sh` pins a Protomaps build that their seven-day retention ages out. Resolving the newest key from `https://build-metadata.protomaps.dev/builds.json` when `BUILD` is unset would make CI's cache miss self-healing ("CI" above).

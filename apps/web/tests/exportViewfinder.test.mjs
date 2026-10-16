@@ -1,3 +1,4 @@
+// Covers docs/SPEC.md FR-4.10 (map image export).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {

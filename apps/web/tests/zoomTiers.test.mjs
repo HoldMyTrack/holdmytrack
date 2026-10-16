@@ -1,3 +1,4 @@
+// Covers docs/SPEC.md FR-4.2 and FR-4.3 (the zoom levels the map names).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 // Plain .mjs, like bbox.test.mjs: Node strips the types from the imported .ts module itself.

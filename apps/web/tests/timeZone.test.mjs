@@ -1,3 +1,4 @@
+// Covers docs/SPEC.md FR-3.11 (an activity's own timezone).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 // Plain .mjs, like rangeShift.test.mjs: Node strips the types from the imported .ts module itself.

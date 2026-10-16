@@ -352,7 +352,7 @@ class StoriesTab(
     }
 
     /** The row's ×: out of the Story at once, with no confirmation — the activity itself stays,
-     *  and Add to story puts it back (`docs/SPEC.md` FR-14.6 item 3). */
+     *  and Add to story puts it back (`docs/SPEC.md` FR-14.6). */
     private fun remove(storyId: String, activityId: String) {
         HoldMyTrackApi.changeStoryActivities(storyId, listOf(activityId), add = false) { result ->
             result.onSuccess { story ->
@@ -514,7 +514,7 @@ class StoriesTab(
             // Tapping the open Story does nothing: there is no way to fold them all.
             toggle.setOnClickListener { if (!item.open) onOpen(story.id, true) }
 
-            // The demo account sees both, disabled, saying why (FR-14.6 item 12), as it does
+            // The demo account sees both, disabled, saying why (FR-14.6), as it does
             // the rows' ×.
             val demo = Session.isDemo
             val editLabel = res.getString(if (demo) R.string.story_demo_edit else R.string.story_edit)

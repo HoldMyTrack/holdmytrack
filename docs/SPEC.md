@@ -2,1603 +2,726 @@
 
 | | |
 | :-- | :-- |
-| **Version** | 1.0 |
-| **Status** | Current — describes Milestone 1 (MVP) functionality as built |
-| **Last updated** | 2026-10-14 |
-| **Related documents** | `VISION.md` (product scope, market rationale, milestones — the authority on *what ships and why*); `ARCHITECTURE.md` (system-level shape, key decisions, the stack); `IMPLEMENTATION.md` (schema, each feature's own implementation — the authority on *how it's built*); `AGENTS.md` (repository orientation) |
+| **Status** | Current: Milestone 1 as built |
+| **Last updated** | 2026-10-16 |
+| **Related documents** | `VISION.md` (what ships and why), `IMPLEMENTATION.md` (how it's built), `services/server/api/` (the JSON contract), `apps/android/docs/SPEC.md` (the Android app) |
 
 ## 1. Introduction
 
 ### 1.1 Purpose
 
-This document specifies HoldMyTrack's functional behavior as currently implemented: what the system does, from the point of view of a user or of another system calling its API — not why it was built that way (`VISION.md`) or how it is implemented internally (`IMPLEMENTATION.md`). Each functional requirement (FR) is written to be independently testable: given the stated preconditions and inputs, the stated behavior and outputs should be observable.
+What HoldMyTrack does, as a user or an API client can rely on it: limits, privacy guarantees, what is kept and deleted, and the rules that cross features. Screen wording and layout live in the UI code, endpoint parameters and status codes in `services/server/api/`, reasons in `VISION.md` and the ADRs, and how each piece is built in `IMPLEMENTATION.md`.
 
 ### 1.2 Scope
 
-**In scope**: every feature currently built and shipped, as of this document's last-updated date — authentication and account management (including account settings — avatar, name, country, and timezone, FR-1.7; email verification, FR-1.8; Sign in with Google and with Facebook on the web and in the Android app, FR-1.9 and FR-1.10), the no-signup demo (now read-only, seeded from a persistent, richly-populated Demo Customer account rather than a fresh per-visitor preset — FR-2.1), activity upload and ingestion (file upload, Android's Health Connect mobile sync — FR-3.6, and Android's in-app GPS recording — FR-3.8), the overlap hint (FR-3.7), map visualization (track rendering, Fog of War, Heatmap, pace-colored segments, high-resolution export), the Activities panel and its filters, track editing (FR-5.14), splitting an activity in two (FR-5.17), Private locations (FR-8.1), the date slider, the per-account activity graph, password recovery, distance/time trends (FR-9 below), the public About, Help, Contacts and Privacy policy pages and the Android test suite page (FR-10), the Donate link out to Open Collective (FR-11), the read-only admin panel (FR-12), the interface language — English or Russian (FR-13), Stories on the web and in the Android app (FR-14), Spots' places on the web and in the Android app (FR-15), and photos on an activity, on the web (FR-16).
-
-**Out of scope**: anything not yet built (`docs/ROADMAP.md` tracks it), and what `VISION.md` §1.1 rules out — performance analysis and any health data (ADR-0017); §20 lists the deliberate limits. This document will be extended with new FR sections as in-scope functionality ships, not rewritten in place of them.
-
-### 1.3 Intended audience
-
-Engineers implementing against or modifying this system, QA deriving test cases, and anyone needing an authoritative answer to "what does the system do in this situation" without reading source code.
+Every built feature of the server and the web app; the Android app's own behavior is in `apps/android/docs/SPEC.md`. What won't be built is in §20; what isn't built yet is in `ROADMAP.md`.
 
 ### 1.4 Definitions
 
 | Term | Meaning |
 | :-- | :-- |
-| **Activity** | One recorded outing (a run, ride, hike, walk, drive, etc.) with a start time, and usually a GPS trajectory with elevation. Never any heart-rate or other health data. |
-| **Track** | An activity's GPS trajectory, as rendered on the map. |
-| **Session** | A signed-in browser's authentication state, held as an opaque cookie. |
-| **Registered user** | An account with a real email and a password, a linked Google or Facebook identity, or any combination — created via sign-up (FR-1.1), Sign in with Google (FR-1.9) or Sign in with Facebook (FR-1.10). |
-| **Demo user** | An ephemeral account created via "Try it now — no signup," functionally identical to a registered user except for its lifetime (FR-2.2 below). |
-| **Fog of War** | A map mode that shows a dark veil over everywhere the signed-in user has *not* recorded an activity, so recorded routes appear as "cleared" ground. |
-| **Heatmap** | A map mode that shades every recorded location by how many times it's been crossed, hottest where crossed most. |
-| **Ingest** | The server-side process of turning an uploaded file into a persisted `Activity` — parsing, clipping against Private locations (FR-8.1), simplification, and storage. |
+| **Activity** | One recorded outing with a start time and usually a GPS track. Never any heart rate or other health data (ADR-0017). |
+| **Original** | The file uploaded or the record synced, kept as it arrived so the activity can be rebuilt from it. |
+| **Registered user** | An account with an email and password, a linked Google or Facebook identity, or both. |
+| **Demo user** | A visitor in a session on the shared, read-only Demo Customer account (FR-2). |
+| **Fog of War** | A map mode that veils everywhere the account has never recorded an activity. |
+| **Heatmap** | A map mode that shades each place by how often the account crossed it in the last 365 days. |
+| **Ingest** | Turning an original into a stored activity: parsing, clipping against Private locations (FR-8.1), simplifying, storing. |
 
 ### 1.5 API errors
 
-Every error the JSON API (`/v1`) and the tiles (`/tiles/v1`) answer with is `application/json` `{"error": code, "message": text}` (ADR-0045). `error` is a stable code: a failure's own (`photo_needs_place`, `demo_read_only`, `account_limit`) or its status's generic one (`invalid_request`, `unauthenticated`, `forbidden`, `not_found`, `conflict`, `gone`, `payload_too_large`, `unsupported_type`, `unprocessable`, `rate_limited`, `unavailable`, `internal`). `message` is text for a person (FR-13.1). Where this document gives a status with a code — `403` `demo_read_only` — the code is the `error` field. The exceptions are the `405` for a known path asked with the wrong method, and `/healthz`, which answers the deployment's health check in plain text.
-
-An Android build older than the deployment's minimum (`MIN_ANDROID_BUILD`, `DEPLOY.md` §4) gets `426` `app_outdated` from every `/v1` request, before anything else about the request is checked, with a message saying to update the app (`apps/android/docs/SPEC.md` FR-1.8). The tiles, the pages and every other client are never refused for their version. With no minimum set, no build is refused.
+Every error from `/v1` and `/tiles/v1` is JSON `{"error": code, "message": text}`: the code is stable and never changes with language, and the message is a sentence in the request's language (FR-13.1); ADR-0045 and `services/server/api/` list the codes and the exceptions. With `MIN_ANDROID_BUILD` set, an older Android build gets `426` `app_outdated` from every `/v1` request before anything else is checked (`apps/android/docs/SPEC.md` FR-1.8); no other client is ever refused for its version.
 
 ## 2. Actors
 
-| Actor | Description |
+| Actor | Can |
 | :-- | :-- |
-| **Anonymous visitor** | Has not signed in and holds no session. Can reach the sign-in/sign-up screen and start a demo. Cannot see any activity data or use the map. |
-| **Demo user** | Holds a session tied to an ephemeral account (FR-2). Full functional access to every feature a registered user has, except the account itself expires after 24 hours unless upgraded (FR-2.3). |
-| **Registered user** | Holds a session tied to a permanent account (email + password, or Google — FR-1.9). Full functional access to every feature in this document. |
-| **Admin** | A registered user whose account has been made an admin from the server's command line (FR-12.1). Everything a registered user has, plus the read-only admin panel (FR-12): every account, and any account's activities. |
+| **Anonymous visitor** | Read the public pages (FR-10), sign up, sign in, start a demo. Sees no activity data. |
+| **Demo user** | Read everything the Demo Customer account holds and change nothing (FR-2.1). |
+| **Registered user** | Everything in this document, for their own account. |
+| **Admin** | A registered user made admin from the command line, who can also read every account (FR-12). |
 
-There is no multi-tenancy beyond per-account data isolation. The admin panel is the one place an account sees another's data (FR-8.2, FR-12).
+The admin panel is the only place an account sees another account's data (FR-8.2).
 
 ## 3. FR-1 — Authentication & Account Management
 
-**On the web, every screen in this section is a server-rendered page** (`IMPLEMENTATION.md` §4.19) with the shared page header (FR-10.4), and every form on them is refused (`403`) unless its `Origin` — or, without one, its `Referer` — is the app's own origin:
-
-| Page | Purpose |
-| :-- | :-- |
-| `GET`/`POST /signin` | Sign in (FR-1.2); links to sign-up and "Forgot password?", "Continue with Google" and "Continue with Facebook" when configured (FR-1.9, FR-1.10), and "Try it now — no signup" (`POST /demo`, FR-2.1). `?error=google` shows FR-1.9's failure message; `?error=facebook`, `facebook_no_email` and `facebook_email_in_use` show FR-1.10's. |
-| `GET`/`POST /signup` | Sign up (FR-1.1, FR-2.3); `noindex`, since `/signin` links to it and is the one that should appear in search results |
-| `GET`/`POST /forgot` | Request a reset link (FR-1.5); answers "Check your email" whatever the address |
-| `GET`/`POST /reset?token=` | Set a new password from the emailed link (FR-1.6) |
-| `GET /verify?token=` | The emailed verification link itself (FR-1.8) |
-| `POST /settings/export` | Request a copy of the account's data (FR-1.12) |
-| `POST /settings/delete` | Delete the account (FR-1.11) |
-| `GET /verify-pending` | A signed-in, unverified account's holding page: resend (`POST /verify-pending/resend`), change the address (`POST /verify-pending/email`), or sign out (FR-1.8) |
-
-The password field on `/signin`, `/signup` and `/reset` has a "Show password" button that switches it between hidden and readable; it starts hidden, goes back to hidden when the form is submitted, and isn't shown without JavaScript. A failed form comes back as the same page, at the failure's status (`400`, `401`, `409`, `429`), with the server's message and the typed email kept. A successful one redirects: to `/verify-pending` for a real account that hasn't verified its email, otherwise to the map (`/`). A visit to `/signin` or `/signup` with a real account already signed in redirects the same way; a demo session can still sign in, or sign up (FR-2.3). The JSON endpoints named below are what the Android app calls and what these pages share their behavior with. Links in emails sent before the pages existed pointed at `/?reset_token=` and `/?verify_token=`, and a failed Google sign-in at `/?auth_error=google`; `/` forwards those to `/reset`, `/verify` and `/signin?error=google`, before any session check.
-
-The JSON endpoints in this section are refused (`403`) the same way when a browser sends them from another site: every `POST`, `PATCH` or `DELETE` under `/v1/` whose `Origin` is not the app's own. A request with no `Origin` — the Android app's — is not refused.
+On the web, sign-in, sign-up, password reset and verification are server-rendered pages sharing the JSON endpoints' behavior. A page form, and any `POST`, `PATCH` or `DELETE` under `/v1/` that carries an `Origin`, is refused unless that `Origin` (for a form without one, its `Referer`) is the app's own. A request with no `Origin`, as the Android app sends, is not refused.
 
 ### FR-1.1 Sign up
 
-**Description**: An anonymous visitor creates a new registered account.
-
-**Preconditions**: No active session, or an active demo session (see note below).
-
-**Inputs**: Email address, password (8 characters to 72 bytes); the browser's own IANA timezone, sent automatically (not user-entered) and optional — see step 3.
-
-**Behavior**:
-1. Client submits email + password + its own detected timezone to `POST /v1/auth/signup` (the web's `/signup` form fills the timezone from the browser with a one-line script; without it the account starts on UTC).
-2. Server validates the email is a syntactically valid address and the password meets the minimum length.
-3. Server hashes the password (bcrypt) and creates a new `users` row — always a fresh row, whether or not the caller's browser holds a live demo session (see FR-2.3, revised). The submitted timezone is validated against the IANA tz database and stored if valid; missing or invalid falls back to UTC rather than rejecting the signup (FR-1.7 covers editing it afterward).
-4. Server creates a session (30-day expiry) and sets it as an `HttpOnly` cookie, and sends a verification email (FR-1.8).
-5. Client is signed in, but held on FR-1.8's "verify your email" screen rather than shown the map, until the account is verified.
-
-**Outputs**: A valid session cookie; the account's email and its (unverified) status are returned to the client.
-
-**Error cases**:
-- Invalid email format → `400 Bad Request`. Only a bare address is accepted: a display name or comment (`Name <a@b.c>`, `a@b.c (x)`) is invalid.
-- Password shorter than 8 characters, or longer than 72 bytes (bcrypt's limit) → `400 Bad Request`.
-- Email already registered to a different, real account → `409 Conflict`.
-- More than 5 accounts created from one address in an hour → `429 Too Many Requests` with a message saying so; a signup that failed doesn't count, and Google and Facebook sign-in (FR-1.9, FR-1.10) aren't counted. The count restarts when the server does.
+- The email must be a bare address: a display name or comment (`Name <a@b.c>`) is refused. An email another real account has is refused.
+- The password is 8 characters to 72 bytes (bcrypt's limit), stored as a bcrypt hash, never stored or logged in plain text.
+- The browser's IANA timezone comes with the form; a missing or invalid one starts the account on UTC and never refuses the signup.
+- At most 5 accounts from one address in an hour. Failed signups and Google or Facebook sign-ins don't count; the count restarts with the server.
+- Signing up always makes a new account, also from a demo session (FR-2.3), starts a 30-day session and sends a verification email (FR-1.8).
 
 ### FR-1.2 Sign in
 
-**Description**: A user with an existing registered account establishes a session.
-
-**Preconditions**: No active session.
-
-**Inputs**: Email address, password.
-
-**Behavior**:
-1. Client submits email + password to `POST /v1/auth/login`.
-2. Server looks up the account by email and compares the submitted password against the stored bcrypt hash.
-3. On match, server creates a session (30-day expiry) and sets it as a cookie.
-
-**Outputs**: A valid session cookie; the account's email is returned to the client.
-
-**Error cases**:
-- Email not found, account with no password set (never claimed, or Google- or Facebook-only — FR-1.9, FR-1.10), or password mismatch → `401 Unauthorized` with a single generic message ("invalid email or password") in every case — the system does not distinguish these to a caller, so it cannot be used to discover which emails are registered.
-- After 10 failed sign-ins for one email, or 50 from one address, within 15 minutes → `429 Too Many Requests`, checked before the password, so even the right one is refused until the window passes.
+- An unknown email, an account with no password and a wrong password get the same error, so sign-in can't reveal which emails have accounts.
+- After 10 failed sign-ins for one email, or 50 from one address, within 15 minutes, sign-in is refused before the password is checked, even the right one, until the window passes.
 
 ### FR-1.3 Sign out
 
-**Description**: A signed-in user ends their session.
-
-**Preconditions**: An active session.
-
-**Behavior**:
-1. Client calls `POST /v1/auth/logout`.
-2. Server deletes the session record server-side (not merely instructing the browser to discard the cookie) and clears the cookie.
-
-**Outputs**: `204 No Content`. Any further request using the same (now-deleted) session cookie is treated as unauthenticated.
+Signing out deletes the session on the server; its cookie or token stops working at once.
 
 ### FR-1.4 Session check / persistence
 
-**Description**: On loading the app, the client determines whether a valid session already exists (e.g., from a previous visit), without requiring the user to sign in again.
-
-**Behavior**:
-1. Client calls `GET /v1/auth/me` with whatever session cookie it currently holds.
-2. If the cookie names a live, unexpired session, the server returns the account's identity (`200 OK`).
-3. Otherwise the server returns `401 Unauthorized`, and the client shows the sign-in screen. On the web the pages check the session themselves: `/profile` and `/settings` redirect a visitor with no session to `/signin` (at `/` they get the front page, FR-10.1), and a signed-in real account whose email isn't verified to `/verify-pending`.
-4. If the check gets no answer at all — the server unreachable, or failing with a `5xx` — the map app says it couldn't load the account, with the reason and Try again, rather than treating the visitor as signed out.
-
-**Notes**: A session's validity is checked in the database on every request (not trusted from the cookie's own stated expiry), so a session ended server-side (FR-1.3, or invalidated by a password reset, FR-1.6) stops working immediately even if the browser still holds the cookie. Sessions last 30 days from creation. The response also reports whether the account's email is verified (always `true` for a demo account) — the client uses this to decide whether to show the map or FR-1.8's verify screen.
+- Every request checks the session in the database, so a session ended on the server (sign-out, password reset, account deletion) stops at once. A session lasts 30 days from creation, a demo session 24 hours.
+- `GET /v1/auth/me` returns the account and whether its email is verified (always true for a demo session).
+- When the check gets no answer (the server unreachable or failing), the map says it couldn't load the account and offers to retry; it doesn't treat the visitor as signed out.
 
 ### FR-1.5 Forgot password
 
-**Description**: A user who cannot sign in requests a password-reset link by email.
-
-**Preconditions**: None (reachable with no session).
-
-**Inputs**: Email address.
-
-**Behavior**:
-1. Client submits an email address to `POST /v1/auth/forgot-password`.
-2. If that email matches a real, claimed account — one with a password, or a Google- or Facebook-only account (FR-1.9, FR-1.10), for which this is how a first password gets set — the server creates a reset token (valid 1 hour, single-use) and emails a link containing it to that address.
-3. The server responds identically (`200 OK`, the same generic confirmation message) whether or not the email matched an account, so the response cannot be used to discover which emails are registered.
-
-**Outputs**: A generic confirmation message. No indication of whether an email was actually sent.
-
-**Rate limiting**: Limited to 5 requests per hour per client IP address; further requests receive `429 Too Many Requests`.
+- A reset link goes to a real, claimed account, including a Google- or Facebook-only one, which is how such an account gets its first password. It is valid for 1 hour and works once.
+- The answer is the same whether or not the email has an account.
+- At most 5 requests an hour from one address.
 
 ### FR-1.6 Reset password
 
-**Description**: A user completes a password reset using the token from FR-1.5's email.
-
-**Preconditions**: A valid, unexpired, unused reset token (normally reached by clicking the emailed link, which the client recognizes independently of whatever session state currently exists — see note).
-
-**Inputs**: Reset token, new password (8 characters to 72 bytes).
-
-**Behavior**:
-1. Client submits the token and new password to `POST /v1/auth/reset-password`.
-2. Server verifies the token exists and has not expired.
-3. Server updates the account's password.
-4. Server invalidates **every** outstanding reset token for that account (not only the one used) and **every** existing session for that account (any device that was previously signed in is signed out).
-5. Server creates one new session for the browser completing the reset and sets it as a cookie.
-
-**Outputs**: A valid session cookie for the account whose password was just reset; the account is now signed in.
-
-**Error cases**:
-- Token missing, already used, or expired → `400 Bad Request` with a generic message (the system does not distinguish "never existed" from "expired" from "already used").
-- Password shorter than 8 characters, or longer than 72 bytes (bcrypt's limit) → `400 Bad Request`.
-
-**Note — reset link takes priority**: if the client detects a reset token in its own URL (the emailed link), it presents the reset screen unconditionally, ahead of whatever session state `GET /v1/auth/me` would otherwise report — including an already-signed-in session. This is the one flow reachable without first checking authentication state.
+- The password rules are FR-1.1's. A missing, used and expired token get the same error.
+- A reset ends every session and every outstanding reset link of the account, then signs in the browser that made it.
+- A reset link opens the reset page whatever session the browser holds.
 
 ### FR-1.7 Account settings
 
-**Description**: A signed-in user (real or demo — FR-2) edits their own profile: Avatar, Name, Country, Timezone, and Language — and, on the same page, this browser's Theme (behavior 8). A page at `/settings`, reached from the header's account menu, separate from the activity graph (FR-7) — and, for a real account that has never saved it, shown automatically in place of the map (behavior 5). Private locations (FR-8.1) aren't edited here; they live on the map's Privacy tab.
-
-**Name** is an optional display label, not an identifier: it isn't unique, two accounts may share one, and nothing signs in with it — the email address identifies an account. Nothing outside this page displays it yet.
-
-**Preconditions**: An active session.
-
-**Inputs**: An image file (PNG, JPEG, or WebP, up to 5 MB) for Avatar; free text for Name (optional); a country chosen from a list of ISO 3166-1 countries by name for Country (required — there is no "not set" choice); an IANA timezone for Timezone, chosen from the zones browsers know under IANA's current names (Kolkata, not Calcutta; Kyiv, not Kiev), grouped by region, sorted within each by its GMT offset today, west to east (then by place), and labelled with that offset first ("(GMT−04:00) - New York"), with UTC and the account's own saved zone always included. Under the field, "Local time: Sep 28, 14:05" shows the current date and time in the selected zone, updating as soon as another zone is picked. Country and Timezone are each a searchable list, like the Edit window's Type (FR-5.14) but closed — no "Add" row: opening one shows the whole list (Timezone under region headings) with a search field on top, and typing narrows it to every entry containing the text, accent- and case-insensitively — "york" finds New York, "-04" every zone four hours behind GMT, and a country's ISO code ("de") puts that country first. Without script they are plain drop-downs. A zone given under a former name — which browsers still report at signup — is stored under its current one. The web page has no Language field: the header's language menu sets the account's language (FR-13.2). The API takes it as `locale` — "" (automatic, the default), `en` or `ru` — which the Android app's Settings screen offers.
-
-**Behavior**:
-1. Avatar uploads and removals take effect immediately — each is its own action (`POST /settings/avatar`, `POST /settings/avatar/remove`; for an API client, `POST`/`DELETE /v1/account/avatar`), not gated behind a separate save step; choosing a file uploads it. The page, header included, shows the new avatar when it reloads after the upload.
-2. Name, Country and Timezone save together as one action (`POST /settings`, which leaves the account's language as it is; for an API client, `PATCH /v1/account/settings`, which also takes Language as `locale`, optional and left unchanged when absent) — editing one and leaving without saving discards all of them, not just the one touched. A successful save reloads the page with "Saved."; a failed one shows the error with the submitted values kept.
-3. **Country decides which unit system the entire app displays distance, pace, and elevation in** — metric (km, min/km, meters) for every country except the United States, Liberia, and Myanmar, which see imperial (mi, min/mi, feet). An account that has never saved a Country (only possible before its first save — behavior 6) displays metric. It applies everywhere one of these values is shown (the Activities panel, the activity graph, Trends, and the map's own distance scale) from the next time that page is opened after saving — Settings is a page of its own, so leaving it is a page load. Save can't be submitted until a Country is chosen.
-4. **Timezone decides what "today" is** — where the date slider's and Trends' default windows end, and the activity graph's current year — and **stands in for an activity's own timezone where that isn't known** (FR-3.11). Every activity is otherwise shown and grouped by day in the timezone it was recorded in, not this one. Auto-resolved from the browser at signup (FR-1.1) and editable here afterward; unlike Country, it has no "unset" state — every account always has one, defaulting to UTC until changed.
-5. **First run.** A real, verified account with no Country — one that has never saved this page, which is every new account right after FR-1.8's verification link — is sent here from the map and Profile (and from sign-in), titled "Welcome — set up your account", with a short explanation of why Country and Timezone matter. There is no way past it: no back link, and the header's links to the map and Profile lead back here. Timezone is prefilled with the one auto-detected at signup, to confirm or change; Country starts on "Choose a country". "Save and continue" can't be submitted until a Country is chosen; saving goes on to the map, and every later visit goes directly to the map. Reloading before saving shows this page again. A demo account never sees it.
-6. **A demo account** sees the page with every field and button disabled and a note that the shared demo account can't be changed, linking to "Create your own account" (FR-2.3); a save or avatar change submitted anyway is refused (`403`).
-7. **A native client** reads the lists this page offers from `GET /v1/account/settings/options` — every Country (code and name in the request's language), every Timezone grouped by region (with the region's name in that language, and the account's own zone always included), and every Language — and saves through the API endpoints above. The Android app's Settings screen is built on it (`apps/android/docs/SPEC.md` FR-1.5).
-8. **Theme** (FR-4.12): below Save, a System / Light / Dark toggle. It belongs to the browser, not the account — not part of Save, not disabled for a demo — and a click applies it at once.
-9. **Account limits** (FR-1.13), **Download your data** (FR-1.12) and **Delete account** (FR-1.11): last on the page, in that order, a real account only.
-
-**Outputs**: The account's current Avatar, Name, Country, Timezone, and Language (`locale` in `GET /v1/auth/me`, `""` for automatic), always reflecting the last successful save (or the account's defaults, if never changed) — reloading the app never reverts to something stale.
-
-**Error cases**:
-- An unsupported image type or a file over 5 MB → `415`/`413`, and the image is not saved.
-- Country missing or outside the supported list, Timezone not a valid IANA zone name, or Language not one FR-13 supports → `400 Bad Request`, and none of the fields in that save are applied (a full-replace save either succeeds as a whole or not at all).
+- **Avatar**: PNG, JPEG or WebP up to 5 MB, applied on upload.
+- **Name**: an optional label; not unique, and nothing signs in with it.
+- **Country** (required in every save) decides the units everywhere: imperial for the United States, Liberia and Myanmar, metric for every other country and for an account that has never saved one.
+- **Timezone** (IANA, UTC until changed, a former name stored under its current one) decides "today": where the date slider's and Trends' default windows end and the activity graph's current year. It stands in for an activity's zone where that isn't known (FR-3.11).
+- **Language**: automatic (the default), English or Russian (FR-13).
+- Name, Country and Timezone (and Language, over the API) save together: one invalid value and nothing is saved.
+- **First run**: a real, verified account that has never saved Country is sent to Settings from the map, Profile and sign-in until it saves Country and Timezone once.
+- A demo account's settings are read-only. The theme belongs to the browser or phone (FR-4.12).
 
 ### FR-1.8 Email verification
 
-**Description**: A real (non-demo) account created by FR-1.1 must confirm its email address before it can use anything beyond this screen — the map and every other authenticated route are gated on it. A demo account (FR-2) is never subject to this gate.
+A real account must confirm its email before using anything else. Why: a mistyped email strands an account's imported data where nobody can get it back.
 
-**Preconditions**: An active session for a real account whose email is not yet verified.
-
-**Behavior**:
-1. On signup (FR-1.1) and on an email change (step 4 below), the server emails a link containing a verification token (valid 24 hours, single-use) to the address it confirms: the address on file, or the new address a change asked for.
-2. The link opens `/verify?token=…`, which verifies the token the same way `POST /v1/auth/verify-email` does. The Android app doesn't call that endpoint: the link is opened in a browser, and the app finds out by asking `GET /v1/auth/me` again (`apps/android/docs/SPEC.md` FR-1.4). A missing, expired, used or malformed token shows "This verification link is invalid or has expired." A link confirms only the address it was sent to. On success, the server makes that address the account's own if it was a pending change (or answers `409 Conflict` if another account has taken it meanwhile), marks the account verified, invalidates every other outstanding verification token for it — and, when the address changed, every outstanding password-reset link — and creates a fresh session for whichever browser opened the link, so the link works from any device — unless that browser is already signed in to a different account, which it stays signed in to.
-3. While waiting, the account holder can request another copy of the link (`POST /v1/auth/resend-verification`) without needing to already know it was lost or expired. It goes to the address the newest outstanding link went to.
-4. The account holder can also change the address (`PATCH /v1/auth/email`) before ever verifying — correcting a typo the original signup made, since a resend alone cannot fix a wrong address. The change is pending until the link sent to the new address is opened: until then the account keeps its address on file and its verified state, the new address stays free for anyone else, and any link sent before the change stops working. `/verify-pending` names the address the newest link went to. Resends and changes together are rate-limited to 5 per hour per account.
-5. Once verified, the account continues to FR-1.7's first-run Settings page, not straight to the map, until Country and Timezone have been saved once.
-6. Until verified, every route other than `GET /v1/auth/me`, `POST /v1/auth/logout`, and the three endpoints above returns `403 Forbidden` with a distinguishable error rather than the normal response.
-
-**Outputs**: `verify-email` and `reset-password` both return a valid session cookie for the account on success. `resend-verification` and `change-email` return a confirmation; `change-email` also returns the account's profile as it stands, still with its address on file.
-
-**Error cases**:
-- Verification token missing, already used, or expired → `400 Bad Request` with a generic message, same non-distinguishing reasoning as FR-1.6's reset token.
-- `change-email`/`resend-verification` attempted by a demo account → `400 Bad Request` (neither concept applies to one).
-- `change-email` to an address another account has → `409 Conflict`.
-- More than 5 resend or change-email requests for the same account within an hour → `429 Too Many Requests`.
-
-**Notes**: This reverses an earlier, deliberately simpler version of FR-1 that had no email verification at all — added once real Health Connect/cloud sync made an unrecoverable, mistyped-email account a real cost (server-side ingest work stranded on an account nobody can get back into), not because the original simplicity was a mistake.
+- Until verified, every route except `GET /v1/auth/me`, sign-out, resend and change of address is refused with a distinguishable error. A demo account is never gated.
+- A link is valid for 24 hours, works once and confirms only the address it was sent to. It works from any device and signs that browser in, unless the browser is signed in to another account.
+- Verifying ends every other verification link, and, when the address changed, every reset link.
+- A change of address before verifying waits for the new address's link: until then the account keeps its address and state, the new address stays free for anyone else, and earlier links stop working. If another account takes the address meanwhile, verifying is refused.
+- A change to an address another account has is refused. A resend goes to the newest link's address. Resends and changes together: at most 5 an hour per account; a demo account can do neither.
 
 ### FR-1.9 Sign in with Google
 
-**Description**: A visitor signs in, or creates an account, with a Google account instead of an email and password, on the web or in the Android app.
-
-**Preconditions**: The deployment has Google OAuth credentials configured. Without them, `GET /v1/auth/providers` reports `{"google": false}`, the client shows no Google button, and the start and callback endpoints below, and Android's `POST /v1/auth/google/token`, return `404 Not Found`. With them, it also reports the web client ID as `google_client_id`, which the Android app needs.
-
-**Inputs**: The Google account the visitor picks on Google's own account chooser; the browser's IANA timezone, sent automatically as with FR-1.1.
-
-**Behavior**:
-1. When the server has Google credentials configured (what `GET /v1/auth/providers` reports as `google: true`), the sign-in and sign-up pages show "Continue with Google" above the email/password form.
-2. Clicking it navigates the whole page to `GET /v1/auth/google/start?tz=<timezone>` (a one-line script adds the browser's timezone; without it a new account starts on UTC). The server sets a short-lived (10-minute) cookie holding a random `state` value and a PKCE verifier, and redirects to Google's consent screen, always showing the account chooser.
-3. Google redirects back to `GET /v1/auth/google/callback`. The server checks `state` against the cookie (and clears the cookie either way), exchanges the authorization code with Google, and reads the Google account's stable id, email and name. A Google account whose email Google itself reports as unverified is refused.
-4. The server picks the account:
-   - An account already linked to this Google account is signed in, even if its HoldMyTrack email has since changed.
-   - Otherwise, a real (non-demo) account with the same email is linked to this Google account and signed in; the email counts as verified from then on (FR-1.8). If that account's email had **not** been verified, its password and any linked Facebook identity (FR-1.10) are also removed and all its sessions and outstanding reset/verification links are ended — whoever chose that password or linked that identity never proved they own the address.
-   - Otherwise, a new account is created: already verified, display name taken from the Google profile, timezone from step 2 (falling back to UTC, as FR-1.1).
-5. The server creates a session (30-day expiry) exactly as FR-1.2 does and redirects to the app's root, where FR-1.4's session check picks it up. A new account then continues to FR-1.7's first-run Settings page.
-
-**Outputs**: A valid session cookie and a redirect to the app.
-
-**Error cases**: Every failure — the visitor cancelled on Google's screen, a missing or mismatched `state`, the code exchange failed, the Google email is unverified, or the matching account is already linked to a *different* Google account — redirects to `/signin?error=google`, which shows a generic "Couldn't sign in with Google. Please try again." message. The cause is logged server-side, not revealed in the URL.
-
-**Notes**: A Google-only account has no password, so FR-1.2 rejects it with the same generic error as any other mismatch; it can set a password at any time through FR-1.5/FR-1.6, after which both ways in work. Changing the account's email (FR-1.8 step 4) leaves the Google link in place.
-
-**On Android** (`IMPLEMENTATION.md` §4.15):
-1. The sign-in screen shows "Continue with Google" when `GET /v1/auth/providers` reports `google: true` with a `google_client_id`.
-2. Tapping it opens the system's Google account picker (Credential Manager), which returns a Google ID token issued for that client ID.
-3. The app posts `{id_token, tz}` to `POST /v1/auth/google/token`, `tz` being the device's IANA timezone. The server checks the token's signature against Google's published keys, then everything in steps 3–4 above applies unchanged: the same claim checks, the same choice of account.
-4. It answers with the same body as `POST /v1/auth/login` (FR-1.2), including `session_token`, and the app opens the map.
-5. Closing the picker does nothing. Any other failure (an invalid token, the email check, the account already linked to a different Google account, or the picker itself failing) shows "Couldn't sign in with Google. Please try again."; the server's answer is a `401` with that text.
+- Offered only where the deployment configures Google; otherwise its endpoints don't exist.
+- A Google account whose email Google reports unverified is refused.
+- The account is, in order: the one linked to this Google account, even if its email changed; else a real account with the same email, which is linked and counts as verified from then on; else a new verified account, named from the Google profile, on the browser's timezone (UTC if none).
+- Linking an unverified account also removes its password and Facebook link and ends its sessions and links: whoever set them never proved they own the address.
+- An account linked to a different Google account isn't relinked; the sign-in fails. Every failure gets one generic message, the cause logged on the server only.
+- Kept from Google: the stable id, email and name. The Android app sends a Google ID token for the same checks.
 
 ### FR-1.10 Sign in with Facebook
 
-**Description**: A visitor signs in, or creates an account, with a Facebook account instead of an email and password, on the web or in the Android app. Unlike FR-1.9, a Facebook identity is never linked to an existing account by email: Facebook doesn't say whether the email it returns has been verified.
+- Offered only where the deployment configures Facebook.
+- Never linked to an existing account by email, because Facebook doesn't say whether the email is verified: an email another account has is refused, pointing to the usual sign-in or a password reset. There is no way to link Facebook to an existing account.
+- A Facebook account that shares no email is refused.
+- An account linked to the Facebook account signs in even if its email changed; otherwise a new, unverified account is made and sent a verification email (FR-1.8).
+- Kept from Facebook: the app-scoped id, email and name. The Android app runs the flow in a browser tab and gets its session with a one-time code valid for 2 minutes and tied to the app's S256 challenge; a wrong verifier uses it up.
 
-**Preconditions**: The deployment has a Facebook app configured. Without it, `GET /v1/auth/providers` reports `{"facebook": false}`, the client shows no Facebook button, and the start and callback endpoints below return `404 Not Found`.
-
-**Inputs**: The Facebook account the visitor is signed in to on Facebook, and the permission to share its email; the browser's IANA timezone, sent automatically as with FR-1.1.
-
-**Behavior**:
-1. When the server has a Facebook app configured (`GET /v1/auth/providers` reports `facebook: true`), the sign-in and sign-up pages show "Continue with Facebook" above the email/password form, below "Continue with Google" when both are configured.
-2. Clicking it navigates the whole page to `GET /v1/auth/facebook/start?tz=<timezone>`. The server sets a short-lived (10-minute) cookie holding a random `state` value, and redirects to Facebook's login dialog asking for the `email` and `public_profile` permissions — again for the email, if the visitor declined it on an earlier attempt.
-3. Facebook redirects back to `GET /v1/auth/facebook/callback`. The server checks `state` against the cookie (and clears the cookie either way), exchanges the authorization code with Facebook, and reads the Facebook account's app-scoped id, name and email.
-4. The server picks the account:
-   - An account already linked to this Facebook account is signed in, even if its HoldMyTrack email has since changed.
-   - Otherwise, if any account already has that email, nothing is linked and the sign-in is refused (below).
-   - Otherwise, a new account is created with that email, **unverified**, display name taken from the Facebook profile, timezone from step 2 (falling back to UTC, as FR-1.1), and a verification email is sent exactly as for a sign-up (FR-1.8).
-5. The server creates a session (30-day expiry) exactly as FR-1.2 does and redirects to the app's root. A new account then waits on `/verify-pending` until its email is verified (FR-1.8), then continues to FR-1.7's first-run Settings page.
-
-**Outputs**: A valid session cookie and a redirect to the app.
-
-**Error cases**:
-- The Facebook account shared no email (it was registered with a phone number, or the visitor declined the permission) → `/signin?error=facebook_no_email`: "Your Facebook account didn't share an email address, and HoldMyTrack needs one. Try again and allow access to your email, or sign up with email and password."
-- An account with that email already exists → `/signin?error=facebook_email_in_use`: "An account with this email already exists. Sign in the way you usually do, or use “Forgot password?” to set a password."
-- Anything else — the visitor cancelled on Facebook's screen, a missing or mismatched `state`, the code exchange or profile request failed → `/signin?error=facebook`: "Couldn't sign in with Facebook. Please try again." The cause is logged server-side, not revealed in the URL.
-
-**Notes**: A Facebook-only account has no password, so FR-1.2 rejects it with the same generic error as any other mismatch; it can set one through FR-1.5/FR-1.6. Changing the account's email (FR-1.8 step 4) leaves the Facebook link in place. An account created here whose email is later claimed through Sign in with Google while still unverified loses its Facebook link (FR-1.9 step 4). There is no way yet to link Facebook to an existing account.
-
-**On Android** (`IMPLEMENTATION.md` §4.22). The app runs the same flow in a browser tab rather than through Meta's SDK:
-1. The sign-in screen shows "Continue with Facebook" when `GET /v1/auth/providers` reports `facebook: true`.
-2. Tapping it makes a random verifier and opens `GET /v1/auth/facebook/start?tz=<timezone>&app_challenge=<S256 hash of the verifier>` in a browser tab. A malformed `app_challenge` → `400 Bad Request`.
-3. Steps 2–4 above happen in the tab, unchanged, including the verification email for a new account.
-4. Instead of step 5, the server stores a one-time code, valid for 2 minutes and tied to the challenge, and redirects the tab to `holdmytrack://oauth?code=<code>`, which closes the tab and returns to the app. The app posts `{code, verifier}` to `POST /v1/auth/handoff` and gets the same body as `POST /v1/auth/login` (FR-1.2), including `session_token`.
-5. A code works once. An unknown, already used or expired code, or a verifier that doesn't match → `401` "This sign-in link has expired or was already used. Please try again.", and the code is used up either way.
-6. The three error cases above redirect to `holdmytrack://oauth?error=<code>` instead, and the app shows the same messages. Closing the tab returns to the sign-in screen with no message.
-
-A new account made this way is unverified, like one made on the web; the Android app shows its own "check your email" screen until it is (`apps/android/docs/SPEC.md` FR-1.4).
+Both providers: a provider-only account has no password and can set one through FR-1.5; changing the email keeps the links; a Facebook-made account still unverified when its email signs in with Google loses its Facebook link.
 
 ### FR-1.11 Delete account
 
-**Description**: A signed-in user deletes their account and everything in it.
-
-**Preconditions**: An active session of a real account, verified or not. A demo session can't (`403`, `demo_read_only`).
-
-**Inputs**: The account's email address, typed as confirmation.
-
-**Behavior**:
-1. `DELETE /v1/account` with `{"email": "<the account's email>"}`. The email is compared ignoring case and surrounding spaces.
-2. On a match the account is closed at once: every session of it ends, on every device, its Google and Facebook links and any unused reset, verification or app sign-in link stop working, and it can no longer be signed in to by any means. The email address is free: a new account can be made with it straight away. The response is `204 No Content` and clears the session cookie.
-3. Within a few minutes, everything the account held is deleted: its activities and their uploaded files, tiles, photos, Stories, Private locations, captures, import history, avatar and settings. A file still being processed for it finishes first.
-4. Backups keep it for up to 8 weeks (FR-10.6).
-5. **In the Android app**, the You tab's Delete account… opens a dialog saying the same (`apps/android/docs/SPEC.md` FR-2.9), which also clears the account's unsynced recordings on that phone.
-6. **On the web**, the Settings page (FR-1.7) ends with a **Delete account** section (`#delete-account`) saying what is deleted, that it can't be undone, and the backups, linking to the privacy policy. **Delete account…** opens a field asking for the account's email, shown beside it, and **Delete my account and data**, which posts `POST /settings/delete` (refused from another origin, like every form). It works without JavaScript. On success it signs out and lands on `/signin?deleted`, which says "Your account was deleted. Everything in it will be gone within a few minutes." A demo session doesn't see the section. An unverified account can't reach Settings (FR-1.8), so on the web it deletes by verifying first, or through Help's email route (FR-10.2).
-
-**Error cases**:
-- The email doesn't match → `400`: "That isn't this account's email address. Type it exactly as you sign in with it." Nothing changes.
-- No session → `401`.
+- A real account, verified or not, confirms by typing its email (case and surrounding spaces ignored). A demo session can't.
+- At once: every session ends, the provider links and every unused reset, verification or app sign-in link stop working, nothing can sign in, and the email is free for a new account.
+- Within minutes: activities and originals, tiles, photos, Stories, Private locations, captures, import history, data downloads, avatar and settings are deleted. A file being processed finishes first.
+- Backups keep the data for up to 8 weeks. Story copies others accepted stay theirs (FR-14.8).
+- The Android app also clears the account's unsynced recordings on that phone. An unverified account deletes on the web by verifying first, or by email (FR-10.2).
 
 ### FR-1.12 Download your data
 
-**Description**: A signed-in user gets a copy of everything their account holds, as zip archives to download.
-
-**Preconditions**: An active session of a real, verified account. A demo session can't ask (`403`, `demo_read_only`).
-
-**Behavior**:
-1. `POST /v1/account/export` asks for a copy and answers `202` with the request's status. While one is being prepared, asking again returns that one rather than starting another. A new request ends the downloads of any earlier one. A copy can be asked for once a week: within 7 days of the last one being ready, a request is refused (`429 Too Many Requests`) with a message giving the day and time, in the account's timezone, from which the next can be asked for, on the Settings page as in the API. A copy that failed to be prepared doesn't count, so asking again after a failure is never refused.
-2. `GET /v1/account/export` answers the latest: `{"state": "none"}`; `"preparing"`; `"failed"`; or `"ready"` with `expires_at`, `total_size` and `parts` — each with its number, size, file name and download URL.
-3. When it's ready, usually within minutes, an email goes to the account's address, in the language the request was made in, saying how many archives and how big, until when, and linking to the Settings page's **Download your data** section (`/settings#download-data`), which needs signing in.
-4. `GET /v1/account/exports/{id}/parts/{n}` downloads one archive (`application/zip`, named `holdmytrack-<date>-<n>-of-<total>.zip`), only for the account that asked, and supports resuming (Range requests). Anything else → `404`.
-5. The copy is split into archives of about 2 GB. Extracted into one folder they make: `README.txt`; `originals/`, every file uploaded or synced exactly as it arrived, before Private locations; `tracks/`, every activity as GPX as the map shows it (Private locations cut away, track edits applied); `photos/`, the stored copy of each photo; and `account.json`, the account and settings, every activity's details and files, Stories, Private locations and captured places.
-6. It can be downloaded for 7 days, then is deleted. Deleting the account deletes it too.
-7. **On the web**, the Settings page (FR-1.7) has a **Download your data** section (`#download-data`), above Delete account: what the copy holds, linking to Help's `#download-data` (FR-10.2), and **Request a download**, which posts `POST /settings/export` and comes back to the section. While it's prepared the section says so and names the address the email goes to; once ready it lists each archive — its file name, a download link, its size — with the total and the last day to download, and offers **Request a new one**; if it failed it says so, with the request button. A demo session doesn't see the section.
+- For a real, verified account. One copy is prepared at a time; a new request ends the earlier one's downloads.
+- Once every 7 days from when the last was ready; a failed copy doesn't count. A refusal says when the next is allowed, in the account's timezone.
+- When ready, an email in the request's language links to Settings, which needs signing in.
+- Archives of about 2 GB, downloadable only by the account, resumable. Together: `README.txt`; `originals/`, every original as it arrived, before Private locations; `tracks/`, every activity as GPX as the map shows it; `photos/`, the stored copies; `account.json`, the account, settings, activity details, Stories, Private locations and captured places.
+- Downloadable for 7 days, then deleted; deleted with the account.
 
 ### FR-1.13 Account limits
 
-**Description**: Every account can keep up to 50,000 activities and 5 GB of original files — the files uploaded or synced, as they arrived. The limits are the same for every account and sit far above what a person records; they stop a runaway import (ADR-0043).
+Every account can keep up to 50,000 activities and 5 GB of originals, the same for everyone, to stop a runaway import (ADR-0043).
 
-**Preconditions**: A real account. The demo account has none, since it can't add anything.
-
-**Behavior**:
-1. An activity counts from the moment it's sent: an import still waiting to be processed counts as if it had landed. An original shared by the pieces of a split activity (FR-5.17) counts once.
-2. At a limit, only adding stops: an upload (FR-3.1), a phone sync (FR-3.6) and accepting a copy of a Story (FR-14.7) are refused with a message naming the limit. Viewing, editing, deleting, Stories, photos and downloading the data (FR-1.12) work as before. Nothing is deleted or hidden to make room; deleting activities frees it.
-3. Requests sent at the same moment are checked each on its own, so together they can go a little over a limit. A Story copy accepted below the limits is made whole, even if that takes the account past them.
-4. The Settings page (FR-1.7) has an **Account limits** section (`#account-limits`), in the Android app's Settings too: how many activities the account holds and how much its original files take up, each of its limit — "1,240 of 50,000 activities · 310 MB of 5 GB of original files" — and a line saying the limits are the same for everyone and that deleting activities makes room.
+- An activity counts from the moment it's sent. An original shared by a split's parts (FR-5.17) counts once.
+- At a limit only adding stops: an upload (FR-3.1), a phone sync (FR-3.6) and accepting a Story copy (FR-14.7) are refused naming the limit. Nothing is deleted or hidden to make room.
+- Simultaneous requests are checked each on its own, so together they can go a little over. A Story copy accepted below the limits is made whole.
+- Settings shows the account's use of both limits.
 
 ## 4. FR-2 — No-Signup Demo
 
 ### FR-2.1 Start a demo
 
-**Description**: An anonymous visitor tries the full application without creating an account.
-
-**Preconditions**: No active session.
-
-**Behavior**:
-1. Client calls `POST /v1/auth/demo` — on the web, the sign-in page's "Try it now — no signup" button submits `POST /demo`, which does the same and redirects to the map. Starts are rate-limited to 5 per hour per address; over the limit the sign-in page shows the error.
-2. Server opens a session against one persistent, shared **Demo Customer** account — not a fresh account created per visitor. That account is pre-seeded, once, out of band (not per request — see FR-2.2), with a history of real activities picked from a live deployment: currently forty-three from January–October 2026, around Cleveland, OH unless noted — a bike ride to Bonnie Park Picnic Area; a Solowheel ride through Cleveland's West Side, with seven photos along it (FR-16); walks at Big Creek Reservation, Andrew's Nature Play Area, Lakefront Reservation, Solon Community Park and Radlick Park; Brecksville Reservation, Clague Park and Preston's H.O.P.E. Playground Park trips (each a drive there, a walk, a drive back — the last with a photo, and two places captured (FR-15.6): the playground and the David Berger National Memorial); three days of Solowheel rides on the Emerald Necklace Trail; a five-day trip to Niagara Falls, NY (a drive there, a drive and a walk on its first day, walks on the next two, a drive back); five days in Rome, Italy (walks around the city, Vatican City and the seafront at Ostia, and two drives); three days of walks in Tallinn, Estonia (Kadriorg to Kalamaja, the Old Town and Toompea, the seafront to Pirita); and five days in Vietnam (two walks at Mui Ne, a sleeper bus to Hanoi, two walks in Hanoi) — these last four trips drawn as routes and given plausible times rather than recorded. The real set is still being added to; it replaced an earlier synthetic history of 611 generated activities. Its Settings profile is preset rather than left at generic column defaults (Name "Demo User," Country United States, Timezone America/New_York), and so are three Private locations (FR-8.1), each a 305 m (1000 ft) circle, where the real history starts and ends: "Home," "Eva's school" and "Sonya's school," in Lakewood/Cleveland, OH.
-3. Server creates a session for this visitor (24-hour expiry) and sets it as a cookie. Any number of visitors can hold their own session against the same shared account at once — they all see identical data.
-4. Client is signed in and shown the map, with the account's full history already visible in every mode (Normal, Fog of War, Heatmap) and every read-only feature (filtering, the activity graph, export) exactly as a registered user has it. **A demo account cannot upload, sync, edit, or delete an activity, or change its avatar/settings** — every such request is rejected regardless of what a client attempts, whether or not its own UI still offers the control. Creating a real account (FR-1.1) is the only way to save one's own data. Both clients also gate this proactively rather than relying on the rejection alone: the web app shows the header's Upload button disabled, its tooltip explaining why (FR-3.4), and the Android app's Sync tab shows a read-only notice in place of the Health Connect card, with nothing to tick and nothing to send (`apps/android/docs/SPEC.md` FR-3.5) — a demo session can still record and manage recordings locally on Android, since nothing about that reaches the server.
-
-**Outputs**: A valid session cookie for the shared Demo Customer account, already showing its full activity history.
-
-**Rate limiting**: Limited to 5 demo session starts per hour per client IP address; further requests receive `429 Too Many Requests`.
+- At most 5 demo starts an hour from one address.
+- Every demo session is on the one persistent Demo Customer account, so every visitor sees the same data. A demo session lasts 24 hours.
+- Every write (upload, sync, edit, delete, settings, avatar, Private locations, Stories, photos, captures, data download, account deletion) is refused with `demo_read_only`, whatever the client sends. On Android a demo session can record on the phone but not sync.
+- It holds a real history from a live deployment: 43 activities from 2026 around Cleveland, OH and on trips to Niagara Falls, Rome, Tallinn and Vietnam, with photos, Stories and captures; a preset profile (Demo User, United States, America/New_York); three 305 m Private locations where the history starts and ends.
 
 ### FR-2.2 Demo account seeding and lifetime
 
-**Description**: The shared Demo Customer account (FR-2.1) and its activity history are not created or deleted per visit — only each visitor's own *session* is temporary.
-
-**Behavior**: The Demo Customer account is seeded once, out of band, via a `seed-demo-customer` CLI subcommand run at deploy time (not from any HTTP request) — re-running it is safe and only fills in anything missing. Because a plain re-run never changes or removes an activity already seeded, `seed-demo-customer --reset` first deletes every activity the account has (and everything derived from them: fog/heatmap tiles, photos, stored files) and then seeds from scratch, so the account ends up matching the shipped history exactly — the step for a deployment whose demo history has changed. The shipped history is a set of activity files committed to the repository; an `export-demo-activities <out-dir> <activity-id>...` subcommand writes chosen activities from a deployment into that set as GPX, one file per activity (named by start date and activity name, with a numeric suffix on a clash), holding exactly the track its owner sees — after their Private locations and track edits, never the original upload — plus its photos (FR-16) as the stored, resized images, and a manifest recording each one's name, activity type, description and photos (each with its place on the track, capture time and caption), which the seed applies; a re-run of the seed updates a photo already seeded rather than adding it again. The manifest also lists the account's Stories (FR-14) — each a name, a description and its activities by file — which the seed creates, each dated the day after its last activity so the account lists them in the order they were visited, and on a re-run holds to the manifest (description and exactly those activities); `--reset` deletes the account's Stories with its activities. The export also records the owner's Spots captures (FR-15.6) made between the first and last exported point, except a place that reaches into one of their Private locations, each by its OpenStreetMap id and capture time; the seed gives the account each one at that time, and skips a place the deployment hasn't loaded. `--reset` deletes the account's captures too. The export only reads the deployment, and keeps the manifest's Stories as they are. The account is recognized by its fixed id, which is what keeps it read-only (FR-2.1); the account and its data are never deleted. Each visitor's own *session* still expires 24 hours after `POST /v1/auth/demo` was called, same as any other session — a visitor who stays past that just calls it again for a fresh session against the same account.
+- Seeded at deploy time by `seed-demo-customer`, never by a request. A re-run fills in what's missing and holds the Stories to the manifest; `--reset` deletes its activities (with tiles, photos and files), Stories and captures and seeds again to match the shipped history exactly.
+- The shipped history is GPX files and a manifest in the repository, written by `export-demo-activities <out-dir> <activity-id>...`: each track as its owner sees it after Private locations and edits, never the original; photos as stored; names, types, descriptions, Stories, and captures between the first and last exported point except places reaching into a Private location.
+- The account is recognized by its fixed id, which keeps it read-only, and is never deleted.
 
 ### FR-2.3 Create a registered account from a demo session
 
-**Description**: A demo user creates a real, permanent account of their own to start saving data. The shared Demo Customer account (FR-2.1) belongs to no one visitor in particular and is never modified by one, so this is an ordinary new signup, not a conversion: nothing from the demo carries over, and nothing the person does in a demo session is "theirs" to keep in the first place.
-
-**Preconditions**: An active demo session.
-
-**Inputs**: Email address, password (8 characters to 72 bytes) — the same inputs as FR-1.1.
-
-**Behavior**:
-1. From the account menu, which shows the demo account's name ("Demo User") where a real account shows its email, the user selects "Create your own account," which opens the same sign-up page a new visitor sees (`/signup`, FR-1.1), with "← Back to the map" in place of the sign-in page's "try demo" option (starting a second demo while already in one would abandon the first).
-2. The user submits an email and password.
-3. The server creates a plain new account (FR-1.1's normal behavior) — the shared Demo Customer account itself is untouched, exactly as every other concurrent demo visitor's session leaves it.
-4. The user is signed in to the new account and sent to FR-1.8's verify-email page (`/verify-pending`), exactly like any other fresh signup.
-
-**Outputs**: A new, unverified registered account — not the demo account, and not carrying any of its activity history.
-
-**Note — cancellation**: selecting "← Back" (or navigating away without submitting) returns to the map with the demo session untouched — nothing is lost, and it remains subject to FR-2.1's 24-hour session expiry (the underlying account itself is unaffected either way, per FR-2.2).
+Signing up from a demo session makes an ordinary new account (FR-1.1). Nothing carries over and the shared account is unchanged. Leaving without signing up keeps the demo session.
 
 ## 5. FR-3 — Activity Upload & Ingestion
 
-All upload functionality requires an active session (demo or registered — FR-1/FR-2); there is no unauthenticated upload path.
+Every ingest path needs a session and goes through one pipeline; a demo session can't add anything. Health measurements in an original are never read (ADR-0017). Only what the user picks comes in, and nothing is changed or hidden on their behalf (ADR-0039).
 
 ### FR-3.1 Upload individual files
 
-**Description**: A signed-in user uploads one or more individual activity files.
-
-**Preconditions**: Active session.
-
-**Inputs**: One or more files, each a `.gpx`, `.fit`, or `.tcx` file no larger than 16 MiB. Up to 20 files per batch (a larger selection is rejected client-side in full, before any upload begins, with a message saying to choose up to 20 at a time). A `.zip` archive isn't imported (ADR-0039): the clients don't send one, and say so naming it.
-
-**Behavior**:
-1. User chooses files from the header's **Upload** menu (FR-3.4), on any page, or drops them on the map. The Android app sends them from its Upload screen (`apps/android/docs/SPEC.md` FR-3.6).
-2. Each file uploads independently, as its own `POST /v1/activities/upload` request (multipart), and is tracked independently — one file failing does not affect the others.
-3. For each file: server validates its extension and size, computes a content hash to check for a duplicate (FR-3.5), persists the raw file, and enqueues a background parsing job.
-4. The Upload menu shows each file's live status (uploading, with a progress percentage; then "Processing…") until the background job finishes; then it leaves the menu for the Sync page (FR-3.9).
-5. Once ingestion completes, the activity appears automatically in the Activities panel, the map, and every summary that reflects the current date range — no page reload is required. Its Fog-of-War/Heatmap coverage follows once the background re-render finishes, also without a reload — usually seconds, longer behind a large import — and the map says so meanwhile (FR-4.2 behavior 6).
-
-**Outputs**: One new `Activity` per successfully ingested file, each with a parsed trajectory, distance, duration, and (where the source file provides it) elevation data. Heart rate and any other health data in the file are ignored — never read out of it (`VISION.md` §1.1).
-
-**Error cases**:
-- Unsupported file extension → `415 Unsupported Media Type`; a `.zip` with a message of its own, to upload the files inside it instead.
-- File too large, or malformed request → `413 Request Entity Too Large`.
-- More than 100 upload requests from one account in an hour (refused and already-imported files count too) → `429 Too Many Requests` before the file is read, with a message naming the limit; the file shows as failed with that message, and later files of the batch fail the same way until the hour is up. The count restarts when the server does.
-- Empty file → `400 Bad Request`.
-- The account is at its activity or storage limit (FR-1.13), counting this file → `409 Conflict` with a message naming the limit; the file shows as failed with it.
-- Unparseable/corrupt file content → the background job fails; the Sync page (FR-3.9) shows it "Failed" with a reason, the header's Sync item carries a red dot until that page has been opened (FR-3.9), and no `Activity` is created.
-- A file whose points carry no timestamps at all (a planned route rather than a recorded activity) → the background job fails the same way, with a reason saying the file has no timestamps. Points without a timestamp inside an otherwise timed track are dropped, not failed on.
+- `.gpx`, `.fit` or `.tcx`, at most 16 MiB. A `.zip` isn't imported: the clients refuse it by name and the server with its own message.
+- The clients send at most 20 files at a time and refuse a larger selection whole.
+- Each file is processed on its own; one failing doesn't affect the others.
+- At most 100 files an hour per account, refused and duplicate ones included, checked before the file is read; the count restarts with the server.
+- An empty file, another type, a file too large or one past the account's limits (FR-1.13) is refused at once.
+- A file that can't be read, has no timestamps (a planned route), has no positioned point or has fewer than 2 points fails in processing, with the reason on the Sync page. Untimed points inside a timed track are dropped.
+- The activity reaches the list, map and totals without a reload; Fog and Heatmap follow once redrawn (FR-4.2).
 
 ### FR-3.4 Import status
 
-**Description**: What's being imported right now is the header's **Upload** menu, on every page; what an import came to once it has finished is the **Sync** page, `/sync` (FR-3.9), the header's next item. Imports from every source show in both: uploaded files alongside activities synced from the Android app (Health Connect and in-app GPS recording — FR-3.6, FR-3.8). The web can't start a phone sync — that sync is phone-triggered, and nothing in the web app can request it; the Android app shows its own history of the same imports on its Sync screen (`apps/android/docs/SPEC.md` FR-4.1).
-
-**Preconditions**: Active session.
-
-**Behavior** — an **Upload** button in the header of every page opens a menu of what is being imported right now:
-1. **Choose files…** opens the file picker (`.gpx`, `.fit`, `.tcx` — FR-3.1); files dropped anywhere on the map, which shows a dashed "Drop to upload" cover while they're dragged over it, go to the same place. Choosing or dropping opens the menu. Under the button, a line says what it takes. A `.zip` chosen or dropped isn't sent: a message names it and says to upload the files inside it instead.
-2. The menu lists every import in progress: files waiting their turn ("Queued"), a file being sent ("Uploading 45%"), then each one the server is processing ("Processing…"), including activities synced from the phone, named after their source. A phone sync of several activities is one row counting them — "Processing 12 of 34". The button shows how many rows there are.
-3. An import leaves the menu as soon as it has finished, whether it succeeded or failed; what it came to is the Sync page's (FR-3.9). The map refreshes itself as each finishes.
-4. Messages about this browser tab's own uploads — a file already uploaded before, a `.zip` not sent, too many files chosen, a file the server refused outright (with the reason) — show in the menu until dismissed, one by one.
-5. The menu closes on a click outside it or Escape. It has nothing about finished imports: those are the header's Sync item's (FR-3.9).
-6. What's in progress is read from the server every 2 seconds while anything is, every 20 otherwise.
-7. A demo session sees the button disabled, its tooltip saying why.
-
-**Outputs**: `GET /v1/uploads/active` returns the imports still in progress — each with a title, its source, how many of its jobs have finished and how many there are, and when it was submitted — and how many failed imports the account hasn't seen yet on the Sync page. `GET /v1/uploads?limit=&offset=&source=` (the Android app's Sync screen) returns one page of every import, the total count (scoped to `source` when given), and how many are still processing; each row carries `source`, when it was submitted and — once finished — when it finished, and, once the job has produced one, the resulting activity's own `id`, start time and `timezone` (FR-3.11).
+- Files, Health Connect sessions and recordings are one history: the web's Upload menu shows what's in progress, the Sync page (FR-3.9) and the Android app's Sync history what finished.
+- A phone sync of several activities is one import. The web can't start a phone sync.
 
 ### FR-3.5 Duplicate detection
 
-**Description**: Re-uploading a file whose content was already ingested does not create a second activity or a second processing job.
-
-**Behavior**: The server checks a content-derived identifier before enqueuing a new job. If that exact content was already ingested for this account, the upload responds immediately with an "already processed" status (`200 OK`) and no new job is created; the client shows a notice that the file was already uploaded rather than silently doing nothing.
-
-**Notes**: This guarantee holds even under concurrent duplicate uploads (e.g., two tabs uploading the same file at once) — at most one `Activity` is ever created for the same content.
+- An original identical to one the account has makes no new activity or job, and the client says so. Two identical uploads at once still make one activity.
+- A split activity's original is still recognized (FR-5.17). A deleted activity's original can be uploaded again.
+- The same outing from two sources is two activities if both are sent (FR-3.7).
 
 ### FR-3.6 Mobile sync (Android / Health Connect)
 
-**Description**: The Android app lists what's on the phone and not yet in the account — Health Connect's exercise sessions and the app's own recordings (FR-3.8) — and sends only what the user ticks: a second ingest path (Path 2) alongside file upload above. Nothing is ticked by default, and nothing unticked ever reaches the server.
+The Android app sends the Health Connect sessions and recordings (FR-3.8) the user ticks: nothing is ticked by default, and nothing unticked reaches the server. The app side is `apps/android/docs/SPEC.md` FR-3.
 
-**Preconditions**: Signed in on the Android app (`apps/android/holdmytrack`). For Health Connect's sessions: Health Connect installed and switched on in the app's Settings › Sync, where it starts off (`apps/android/docs/SPEC.md` FR-3.1), with the Exercise permission granted plus the separately-granted "Access exercise routes" permission — a session with no route geometry can't be placed on the map, so it isn't listed.
-
-**Inputs**: Health Connect exercise sessions with route geometry from the last 3 months, read **foreground-only** — `READ_EXERCISE_ROUTES` returns `ConsentRequired` in the background regardless of what's granted, a platform constraint rather than a client choice. `READ_HEALTH_DATA_HISTORY`, requested separately, lets the read reach past Health Connect's otherwise 30-day window. Only the session and its route (position, time, altitude) are read — never heart rate or any other health measurement; the app doesn't request those permissions at all (`VISION.md` §1.1).
-
-**Behavior**:
-1. The bottom bar's **Sync** opens the Sync sheet over the map (`apps/android/docs/SPEC.md` FR-3.5). It lists every candidate, newest first: each Health Connect session with a route that started in the last 3 months and that the account doesn't already have, and every recording waiting on the phone (FR-3.8), whatever its age — the phone holds a recording's only copy. A session older than 3 months isn't listed; it stays in Health Connect. A session with no route (an indoor workout, or any Samsung Galaxy Watch session — Samsung doesn't expose route geometry via Health Connect at all) isn't listed either.
-2. Health Connect is read only when the user taps **Load**, and once by itself after it's switched on (`apps/android/docs/SPEC.md` FR-3.2 step 1); what a read finds is kept on the phone and listed again each time the sheet opens, until the next one. "Already has" is asked of the server on each read — `POST /v1/sync/known` with the sessions' Health Connect record ids — so a reinstall or a second phone agrees, and nothing on the phone records what was sent. An activity deleted in the account (FR-5.11) is offered again, unticked.
-3. Each row shows the day and time (or a recording's name, with the date beside its distance), the distance, the type and where it is (Health Connect, or recorded on this phone). While the sheet shows, every listed candidate is drawn on the map as a dashed line from the phone's own data, from zoom 4 as tracks are (FR-4.15), and the account's own tracks aren't drawn; tapping a row picks out its line and flies the camera to it, and tapping a line picks out its row. The picked line is drawn as a focused activity is (FR-5.5): wider, over a dark outline, in pace-colored segments (FR-4.8) worked out on the phone from its own points, with no legend.
-4. **Nothing is ticked.** The user ticks rows one by one, or with **Select all** over the rows shown. Type chips narrow the list to the chosen types.
-5. **Sync** sends the ticked rows shown, and only them, to `POST /v1/sync/activities` — Health Connect's in batches under `source = "healthconnect"`, each recording on its own under `source = "recorded"` (FR-3.8). Each is idempotent on its own id (the Health Connect record's, or the recording's UUID) and flows through the exact same ingest pipeline FR-3.1's file upload uses. Activity type is normalized onto HoldMyTrack's existing vocabulary (Health Connect's `biking` becomes `cycling`, etc.), so it doesn't fragment the TYPE filter. A recording the server takes is deleted from the phone. What the server takes stays listed as "Adding to your map…", not tickable, until its ingest has finished — also after a later Load, since the server says which of the known ids are still processing — and then leaves the list as it appears on the map, which reads its activities again without a reload. One whose ingest failed is listed again, a recording back on the phone, with a line saying it couldn't be added.
-6. **Hide**: swiping a row sets it aside on this phone, with Undo. **Show hidden (N)** lists the hidden rows again, marked Hidden and not tickable; swiping one brings it back. Hidden rows are kept per account on the phone and forgotten once the candidate is gone (synced, deleted, or aged out of the window).
-7. A route Health Connect refuses this time (`ConsentRequired`, e.g. the app went to the background) isn't listed, and the sheet says how many were refused.
-
-**Outputs**: One new `Activity` per ticked candidate the server takes; a line on the sheet with how many were added and how many the account already had, and each refusal with its reason; and a persistent history via the same `GET /v1/uploads` FR-3.4 already describes — a Health Connect sync and a file upload are the same kind of ingest job, not two separate histories.
-
-**Error cases**: What doesn't fit under the account's limits (FR-1.13), in the order sent, is rejected one by one with a message naming the limit, and stays on the phone; what fits is taken. More than 60 sync requests from one account in an hour → `429 Too Many Requests` before the request is read, with a message naming the limit, which the run stops on and shows like any other refusal; so is a request whose activities would take the account past 1,000 sent in the hour (every activity sent counts, taken or not, and a refused request counts none). The counts restart when the server does. Server unreachable while sending — the run stops and says so, and whatever wasn't confirmed stays listed and ticked; anything sent before the failure is known to the server at the next Load. Server unreachable while asking what it has — the read keeps what the last one found, with the reason shown. A session kept from an earlier read that's gone from Health Connect by the time it's sent is refused, with the reason.
-
-**Not yet built**: the iOS/HealthKit half of Path 2 — no iOS app exists yet (`apps/ios` is a placeholder). `apps/android/docs/ROADMAP.md` is the authority on Android's own remaining work (the Play release).
+- Only a session with a route is offered (not an indoor workout, nor any Samsung Galaxy Watch session). Routes can only be read in the foreground, a Health Connect constraint. Only the session and its positions, times and altitudes are read; no other health permission is requested.
+- The server says which Health Connect records the account already has (in any state, or queued) and which are still processing. The phone keeps no record of what it sent, so a reinstall or second phone agrees, and a record whose activity was deleted is offered again.
+- Each activity is idempotent on its source and id. Types map onto HoldMyTrack's names (`biking` becomes `cycling`).
+- Per account: at most 60 sync requests and 1,000 activities sent an hour (every activity sent counts, taken or not; a refused request counts none). The counts restart with the server.
+- Activities past the account's limits are refused one by one in the order sent; what fits is taken.
 
 ### FR-3.7 Overlap hint
 
-**Description**: Before something on the phone is brought in, a candidate that covers the same stretch of time as an activity the account already has, or as another candidate waiting beside it, is marked as similar to it, so the user can leave one unticked. Nothing is matched or hidden on ingest: the same ride arriving from two sources is two activities if both are sent (ADR-0039). FR-3.5 still catches identical content uploaded again.
+A candidate on the phone covering the same time as an account activity, or another candidate, is marked so the user can leave one unticked. A hint only: nothing is matched or hidden on ingest (ADR-0039).
 
-**Preconditions**: The Android app's Sync tab lists what's waiting on the phone (FR-3.6).
-
-**Behavior**:
-1. A candidate overlaps an activity, or another candidate, when their time ranges overlap for at least 80% of the longer one's duration. Activity type and distance are not compared, since sources routinely disagree on both for the same activity ("walking" vs "hiking", a few percent of distance). Two that only touch — back-to-back recordings with a few seconds of clock skew — or where one is a small part of the other (a short walk inside a long hike, a day hike inside a multi-day recording) don't overlap. Neither does anything with no duration. An activity is compared by the time it was recorded over, not the stretch the map shows: a walk from home whose first minutes Private locations (FR-8.1) cut away, or that they hide entirely, still overlaps the other source's copy of it. A split piece (FR-5.17) covers only its own stretch.
-2. `POST /v1/activities/overlaps` takes up to 5,000 spans, each a key the client chooses, a start and an end, and answers each span that overlaps one of the account's live activities with the one it overlaps the most: its `id`, `name`, `activity_type`, start time and `timezone` (FR-3.11). A span that overlaps nothing isn't in the answer. Only the account's own activities are compared.
-3. The Android app compares its candidates with each other itself, by the rule in step 1, and asks step 2 about the account's. Its Sync tab gives such a row an ⓘ that lists both — the other candidates, and the activity by its name, or its start where it was recorded when it has none (`apps/android/docs/SPEC.md` FR-3.2). It stays unticked like every row; ticked and sent anyway, each becomes an activity of its own. When the server can't be asked, the rows go without the account's half.
-
-**Outputs**: The hint. No activity is changed.
+- Two overlap when their times overlap for at least 80% of the longer one. Type and distance aren't compared, since sources disagree. Touching, a small part of the other, and no duration don't overlap.
+- An activity is compared by the time it was recorded over, even where Private locations hide its ends or all of it. A split part covers only its own stretch.
+- `POST /v1/activities/overlaps` takes up to 5,000 spans and answers each with the account's own activity it overlaps most.
 
 ### FR-3.8 In-app GPS recording (Android)
 
-**Description**: The Android app records a casual, GPS-only activity itself — a walk, hike, or drive someone would not otherwise bother tracking — started and stopped from one button on the map, asking nothing while recording. Recording and syncing are two separate, explicit steps: Stop only saves a finished recording to the device; nothing reaches the server until the user ticks it on the Sync sheet and sends it — a third way an activity can originate on the Android app, alongside FR-3.6's Health Connect sync and a manual file upload (FR-3.1) done from the phone's browser.
+The Android app records GPS-only activities on the phone; nothing reaches the server until the user ticks a recording and sends it (ADR-0007; app side `apps/android/docs/SPEC.md` FR-5).
 
-**Preconditions**: A session — the Android app shows nothing but its sign-in screen without one — and location permission granted to record. Local recordings are scoped to whichever account is currently signed in — switching accounts on one device never shows one account's recordings under another's.
-
-**Inputs**: The device's own GPS, read while a recording is in progress; a name, an activity type (free text, not a fixed list), and a description, set after the fact from the recording's Edit button on the **Sync** sheet — never while recording.
-
-**Behavior**:
-1. A record button sits at the right of the map, on its own row under the top row's Find my location (the bottom of the screen is the Activities panel's, `apps/android/docs/SPEC.md` FR-2.7). **Tap** starts recording (asking for location and notification permission the first time); **tap** again pauses — with a short "Hold to stop recording" hint — and again resumes; **holding it for two seconds** stops, with a ring filling around the button as the hold counts down (letting go early cancels). Pause/resume is user-initiated only — there is no automatic pause, and nothing is recorded while paused. Recording runs as a foreground service, so it survives the screen turning off and the app being closed.
-2. While recording, the map shows only the recording in progress — its line and current position, with the camera following — and none of the account's other activities or map modes (Normal/Fog/Heatmap). The previous mode returns when recording stops.
-3. A notification is shown for as long as a recording is in progress, saying whether it is recording or paused, with elapsed time, distance, current speed and current altitude, and **Pause**/**Resume** and **Stop** buttons that work like the map button.
-4. **Stop** saves the recording to an on-device store only — no network request happens. It is saved with no name or description and with the activity type most recently set in Edit on this account (`"unknown"` if none ever has been), and a **Save** screen then opens on it — the Edit form below, pre-filled with that type, with **Discard** in place of Download GPX. Leaving it with Back keeps the recording as saved; Discard (after confirmation) deletes it. A recording with under one minute of moving time (pauses excluded), or fewer than 2 points, is not saved at all. If the app is killed mid-recording (the system reclaiming memory, a crash, Force stop), what was recorded up to the last GPS fix is kept on the device, and the next time the map opens under that account a dialog offers **Resume** (back paused, the time the app wasn't running counted as a pause), **Save** (as Stop) or **Discard** (after confirmation) — nothing restarts on its own (`apps/android/docs/SPEC.md` FR-5.1 step 9).
-5. The **Sync** sheet (the bottom bar's Sync, FR-3.6) lists every recording on the device that hasn't synced yet among its candidates. A recording's row looks like any other — its day and time or name, distance, type and "Recorded on this phone", with no preview of its own since its line is on the map — plus Edit and Delete buttons.
-6. A recording goes out only when ticked and sent (FR-3.6 steps 4–5), whatever its type, including the `"unknown"` default — the overlap hint (FR-3.7) compares time only, so an untyped recording is still marked as overlapping the same walk synced typed from Health Connect. One not wanted on the map is deleted, or hidden (FR-3.6 step 6).
-7. **Edit** shows Name, Activity Type, Description, the recording's time and distance, Save and **Download GPX**. Name and Description are plain text; Activity Type is a searchable picker behaving like the web edit dialog's (FR-5.10): the account's existing types, most-used first with how many activities use each, then walk/hike/run/ride/drive if unused, filtered as you type, with an **Add "…"** row that accepts any other text exactly as typed. A saved type also becomes the type later recordings start with (step 4). **Download GPX** saves the track as a GPX 1.1 file (name, description, type, and each point's position, time and elevation where known) wherever the user picks in the system's save screen — a file FR-3.1's upload accepts back.
-8. The same sheet's **Sync** (FR-3.6) submits the ticked recordings — after the ticked Health Connect sessions — each as its own `POST /v1/sync/activities` call under `source = "recorded"` with a client-generated `external_id` (a UUID minted when the recording starts) — the same batched wire shape FR-3.6 uses, reusing its ingest pipeline unchanged (`docs/IMPLEMENTATION.md` §4.0.4, [ADR-0007](adr/0007-in-app-gps-recording-submits-directly.md)). A row that syncs successfully is deleted from the device — from then on it exists on the server, on the map and in the activity list, like any other activity. A row the server rejects, or that fails outright, stays on the device, listed and ticked, to be sent again.
-9. **Delete** asks for confirmation — noting the recording hasn't synced, so this is the only copy — and then removes the row from the device.
-10. **A recording isn't among the map's activities until it has synced** — the map draws only what the server holds (FR-4); while the Sync sheet shows, it's drawn dashed as a candidate (FR-3.6 step 3).
-11. **A demo session** (FR-2.1) can record and manage rows here like any other account, but the sheet hides Sync, with a notice explaining why (FR-2.1).
-
-**Outputs**: One new `Activity` per successfully synced recording, titled and described from the moment it's created if the user set a name or description in Edit — the one ingest path where that's possible (every other path leaves both fields unset at ingest). Reported through the same `GET /v1/uploads` history FR-3.4 already describes.
-
-**Error cases**: A too-long custom activity type (over 50 characters, the column's own bound) is rejected by the sync endpoint with a clear reason rather than failing as a raw database error at insert time. So is an `external_id` that isn't 1–200 letters, digits, `.`, `_` or `-` (not starting with `.`). A row that fails to sync (network error, server rejection) is left on the device, listed and still ticked, to be sent again.
-
-**Not yet built**: a discard confirmation before Stop finalizes a save; the iOS half (`docs/ROADMAP.md`, "After launch").
+- Each recording is sent on its own under source `recorded`, with an id made at recording start: 1–200 letters, digits, `.`, `_` or `-`, not starting with `.`. A type over 50 characters is refused with the reason.
+- It is the only path that sets a name and description at ingest.
+- A recording the server takes is deleted from the phone; a refused one stays. It isn't on the map until synced.
 
 ### FR-3.9 The Sync page
 
-**Description**: **Sync**, an item of its own in the header of every page for a signed-in account (after Upload), opens `/sync`, which lists every import that has finished — uploaded files and activities synced from the phone alike.
-
-**Preconditions**: Signed in; signed out, the page sends you to sign in.
-
-**Behavior**:
-1. Newest first by when each finished, 20 per page. With more than one page, a pager under the list: **← Newer** on the left, "1–20 of 57" (or "21 of 21") between, **Older →** on the right — both always in their places, the one with nowhere to go shown disabled. An import still being processed is not listed: the page shows only finished ones, so it doesn't change while it's open.
-2. Each row has a title — the file's name, or for a phone sync its source ("Health Connect", "GPS Logger") — then how it ended, with when it finished in the account's timezone ("Oct 6, 14:31"): **Ready** with the activity's date where it was recorded (FR-3.11) and distance and a **View on map** link, or **Failed** with the reason in the reader's language (§17's error messages).
-3. **View on map** opens the map on that activity: on the Activities tab, the date range narrowed to its day if it isn't already in view, the date slider's window moved to show that day with both knobs on it (FR-6), the activity selected (FR-5.5) and the camera fitted to it; on a phone the Activities sheet stays collapsed, so the track is visible. The link's parameters leave the address bar once read, so a refresh doesn't do it again.
-4. A failed import the account hasn't seen yet puts a red dot on the header's Sync item, its tooltip saying how many ("Failed imports: 1"); opening the page counts every failure so far as seen and clears it. The item is highlighted while the page is open, and on a phone it's its icon alone.
-5. A demo session sees the Demo Customer's history, with a line saying to create an account to import one's own.
+- `/sync` lists finished imports from every source, newest first, in the account's timezone: ready ones with a link to the activity, failed ones with the reason in the reader's language (FR-13.1). Imports still processing aren't listed.
+- An unseen failed import marks the header's Sync item until the page is opened.
 
 ### FR-3.11 An activity's own timezone
 
-**Description**: Every activity carries the timezone it was recorded in, and its times and dates are the wall clock where it happened: a run at 07:30 on 10 March in Tokyo is "Mar 10, 07:30", on the 10th, whatever the account's timezone (FR-1.7) or the viewer's browser or phone.
+An activity's times and dates are the wall clock where it was recorded, whatever the account's or viewer's zone.
 
-**Preconditions**: An activity is ingested (FR-3.1–FR-3.8), or reprocessed (FR-5.14, FR-5.17, FR-8.1).
-
-**Behavior**:
-1. The timezone is the one the activity's first recorded point lies in, before Private locations (FR-8.1) clip the track, so an activity they hide entirely still has one. A point at sea has the nautical zone it lies in. A piece of a split activity (FR-5.17) takes the zone its own first point lies in.
-2. Where no zone is known for that point, the activity takes the account's timezone at the time it's ingested.
-3. Every date and time of the activity's is shown in that zone, on the web and in the Android app: its row's start where it has no name, the Edit window's, the times of its track's points and of its photos, and its photos' capture times. A browser or phone that doesn't know the zone yet shows its own instead.
-4. Every day an activity is counted on is its local date in that zone: the date slider's days (FR-6), date-range filtering of the Activities panel, its totals and the tracks drawn, the activity graph's grid and stat cards (FR-7), and Trends (FR-9). Two activities started at the same instant on opposite sides of the world can fall on different days.
-5. The offset is the one in force on the activity's date: a zone that has changed its offset or its summer time since shows an older activity at the offset it had then.
-
-**Outputs**: The activity's `timezone` (an IANA name, e.g. `Asia/Tokyo`).
+- The zone is the one the first recorded point lies in, before Private locations clip it; at sea, the nautical zone. A split part takes its own first point's. With no zone known, the account's at ingest.
+- Every time of the activity, its points and photos is shown in that zone, on the web and Android; a browser or phone that doesn't know the zone shows its own.
+- An activity counts on its local date everywhere days are counted: the date slider, date filtering, totals, drawn tracks, the activity graph and Trends.
+- The offset is the one in force on the activity's date.
 
 ## 6. FR-4 — Map Visualization
 
 ### FR-4.1 Track rendering (Normal mode)
 
-**Description**: The map displays a user's uploaded activities as drawn lines over a base map.
-
-**Preconditions**: Active session.
-
-**Behavior**:
-1. The map renders every activity within the currently selected date range (FR-6) that has not been individually hidden (FR-5.8), filtered out by TYPE/DISTANCE (FR-5.2/FR-5.3), or left out while Pending (FR-5.15), as a colored line following its recorded route.
-2. Hovering a track on the map draws it thicker; the corresponding row in the Activities panel is highlighted to match (FR-5.4's reverse direction).
-3. Clicking a track on the map sets it as the row-click focus (FR-5.5) — emphasizes it, flies the camera to fit it, and replaces whichever activity was previously focused. It does not add to or remove from the checkbox group (FR-5.6) in either direction.
-4. Clicking anywhere on the map that is not a track clears the row-click focus, if any — the focused activity loses its focus treatment and returns to Normal. Clicking empty space in the Activities panel's list does the same (FR-5.5). Neither affects the checkbox group.
-5. Tracks are drawn from zoom 4 — a few states on screen — inward. Zoomed out further, Normal mode shows the base map alone; unlike Fog's country/region fallback and Heatmap's circles (FR-4.2, FR-4.3), it has nothing in its place. Fitting the camera to an activity (FR-5.5, FR-5.7) lands at zoom 4 or closer for anything spanning up to about 60° of longitude at desktop width — a US coast-to-coast drive included — and about 25° on a phone; a wider activity is flown to but isn't drawn until the user zooms in.
-6. Every track is always in one of three states — Normal, Hovered, or Focused — each drawn distinctly (*Track states*, below). Checking a row's checkbox (FR-5.6) is not a track state: a checked track draws in whichever of these it's otherwise in, and its row shows only the ticked checkbox.
-7. A track across the 180° meridian (Fiji, Tonga, the western Aleutians, a Pacific crossing) is drawn the short way across it, and clears Fog of War and counts in Heatmap on both sides of it, as any other track does; the countries and regions it passes through are the ones either side.
-
-**Track states**:
-
-| State | Entered by | Track on the map | Also on the map | Its row in the Activities panel | Camera |
-| :-- | :-- | :-- | :-- | :-- | :-- |
-| Normal | default | thin gold line | — | plain | — |
-| Hovered | pointer over the track, or over its row (FR-5.4) | the thickest line, in a darker gold, no outline | — | title underlined | doesn't move |
-| Focused | clicking the track (behavior 3) or its row's text (FR-5.5) | thicker gold line with a dark outline, fully opaque | pace-colored segments over the line (FR-4.8) | tinted background with a gold bar on its left edge; checkbox unchanged | flies to fit that one track |
-
-Only one track is hovered and only one is focused at a time. Hovering the focused track draws the hover line inside its outline, and underlines its row title. A hidden track (FR-5.8) draws nothing in any state, and none of these states exist outside Normal mode (FR-4.2, FR-4.3). An emphasized track is not raised above other tracks where they overlap; its outline is what sets it apart.
+- Normal mode draws every activity in the date range (FR-6) passing the Type and Distance filters that isn't Hidden or Pending (FR-5.15); with a Story open, its activities (FR-14.6).
+- Tracks are drawn from zoom 4 in.
+- The focused activity (FR-5.1) is emphasized, with its pace (FR-4.8).
+- A track across the 180° meridian is drawn the short way and counts in Fog and Heatmap on both sides.
 
 ### FR-4.2 Fog of War mode
 
-**Description**: An alternate map mode showing a veil over everywhere the user has not recorded an activity — true all-time coverage, ignoring every other filter. The veil is the opposite of the basemap under it: dark over the light basemap, a light cream mist over the dark one (FR-4.12).
-
-**Behavior**:
-1. Selecting "Fog" from the map-mode toggle replaces the track lines with a veil: any area a recorded route has ever passed through is rendered clear; everywhere else stays fogged.
-2. Fog ignores the date range and the Type/Distance/hidden-track filters entirely — it always shows every activity the account has ever recorded, not just what Normal mode currently has selected. Entering Fog hides the Activities panel, and with it the date slider (there is nothing for either to filter) and clears any checked or focused activity. The camera is left exactly where it was — switching modes never moves it, since flying to the coverage on entry proved disorienting.
-3. Individual track lines are not drawn in this mode (the veil itself is the information). Map labels (place names, street names, points of interest) stay drawn on top of the veil but are dimmed, so they remain readable without competing with the cleared ground; they return to full strength in Normal and Heatmap. An export (FR-4.10) in Fog mode captures the dimmed labels too.
-4. Below a threshold zoom, the veil switches from per-pixel coverage to a coarser reveal: a country renders fully clear the moment the account has at least one activity anywhere inside it, however small; one zoom step in, the same applies one administrative level down, at state/region granularity. Countries and regions are OpenStreetMap's, on land (ADR-0034): a track along a shore or a border counts in the country it's on, one only out on the water in none; a country with no regions of its own is one region at that level. Zooming back in past the threshold returns to exact per-pixel coverage — the two never blend or overlap, only one is ever shown at a given zoom. The map names the level in view: on switching to Fog, and whenever a zoom ends in another level, a notice under the mode toggle says which — "Country view — a whole country clears once you've been anywhere in it", "Region view — …a whole state or province…", "City view — cleared exactly where you've been" — and fades after about 3 seconds. It sits on a line of its own under the toggles however they wrap, never takes a click, and never shows in Normal mode.
-5. Returning to Normal mode restores the previously checked/focused activities, the date range, and the panel/picker exactly as they were before switching to Fog — without moving the camera, even if the restored activities are off screen.
-6. While the account's coverage is still being worked on — an upload, import, delete, track edit or Private location change not yet fully processed — the map says so under the mode toggle: "Your map is still being updated, so Fog and Heatmap may be incomplete for now. They'll refresh on their own." It shows in Fog and Heatmap modes only, on opening the map as well as after a change made on it, and goes away by itself once the processing is done, at which point the veil updates without a reload. Neither a percentage nor a time estimate is shown. The Android app shows the same notice (`apps/android/docs/SPEC.md` FR-2.2).
-7. The edge of cleared ground is a smooth outline at every zoom — never square pixels or a blur — traced to about 19 m at zoom 14 and twice that every zoom level out, and it stays as sharp zoomed in past 14 as at 14. The veil fades into each cleared corridor over a few screen pixels: about as wide as the corridor itself from a distance, so it doesn't smudge it, to about 14 px close in. A corridor crossing from one map tile into the next shows no seam. The Android app looks the same.
+- Fog is all-time: everywhere any activity went is clear, whatever the date range, filters, hidden set or Stories. Only Pending activities drop out.
+- Zoomed out it clears a whole country once any activity is inside it (zoom 0–2), then a whole state or region (3–6), then exact coverage; the levels never blend. Boundaries are OpenStreetMap's on land (ADR-0034): a track on the water counts in no country, and a country without regions is one region.
+- The edge of cleared ground is a smooth outline, traced to about 19 m at zoom 14 and twice that per zoom out, with no seams between tiles, on the web and Android.
+- While a coverage change is still being worked on, the map says Fog and Heatmap may be incomplete; the veil then updates without a reload.
+- Switching modes never moves the camera; returning to Normal restores the panel's state.
 
 ### FR-4.3 Heatmap mode
 
-**Description**: An alternate map mode shading locations by how often they've been visited recently — a rolling window, not an all-time record, so a route no longer visited can cool off.
-
-**Behavior**:
-1. Selecting "Heatmap" replaces the track lines with the heat: anywhere recorded activity has crossed is plainly visible, green where it was crossed rarely, turning yellow, then orange, then red the more often it was crossed (a daily commute reads hotter than a once-ridden road), and solid red at the account's most-crossed places. Close in, a route shows as a soft line narrower than the band Fog clears; zoomed out, each place the account has been is a soft circle, so across the globe home reads as a hot blob and a one-off trip as a small green dot, and circles close together merge into one shape. Zoomed out to a region or further, a place is as hot as the number of activities that went through it, so a city walked twenty different ways reads hotter than a road driven twice; closer in, a street is as hot as the number of times it was crossed. A route passed once is green at every zoom, and the heat stays sharp however far in the map is zoomed, never square pixels, and runs on across tile edges without a seam. The heat is opaque, so the basemap's own colors (a park's green) never show through it; only its soft outer edge fades out. The basemap is washed lighter beneath it (darker on a dark map), so the heat stands off roads and land. Its colors are the same whether the map is light or dark.
-2. Like Fog of War, Heatmap ignores the date range and the Type/Distance/hidden-track filters, hides the Activities panel and with it the date slider, clears any checked or focused activity, and leaves the camera exactly where it was (see FR-4.2's note on why). Unlike Fog, it only considers activities within a fixed rolling window (the last 365 days, not user-configurable).
-3. Individual track lines are not drawn in this mode.
-4. How much crossing traffic it takes to reach full brightness adapts to the account's own history, recomputed daily — a new account and a long-running one don't saturate at the same point, so each account's own most-used spot is what reads as hottest, not a fixed number of visits everyone shares.
-5. Unlike Fog (FR-4.2 behavior 4), Heatmap has no country or region level: it draws the same way at every zoom. On switching to Heatmap a notice under the mode toggle says "The more often you go somewhere, the hotter it glows"; unlike Fog's it reads the same at every zoom, so zooming doesn't bring it back.
-6. Returning to Normal mode restores the previously checked/focused activities, the date range, and the panel/picker exactly as they were before switching to Heatmap — without moving the camera (FR-4.2 behavior 5).
-7. The same "still being updated" notice as Fog's (FR-4.2 behavior 6) shows while the account's coverage is still being worked on.
+- Heatmap counts the last 365 days, a fixed rolling window, so a route not taken any more cools off. It ignores the filters, hidden set and Stories, like Fog.
+- Out to a region, a place is as hot as the activities through it; closer in, as the times it was crossed. A route passed once is green at every zoom.
+- What reads hottest adapts to the account's own history, recomputed daily. No country or region levels.
 
 ### FR-4.4 Mode is mutually exclusive
 
-**Description**: Normal, Fog, and Heatmap are three views of the same underlying data, not independent toggles — exactly one is active at a time. The toggle separates Normal from the two coverage views with a divider (Normal | Fog, Heatmap), since the choice is two-level: the plain map, or one of the two coverage views; the Android app uses the same divider (`apps/android/docs/SPEC.md` FR-2.2).
+Exactly one of Normal, Fog of War and Heatmap shows at a time.
 
 ### FR-4.5 Base map, theming, and the opening view
 
-**Description**: The map renders a self-hosted vector base map (streets, labels) in a light or dark flavor that follows the page's light/dark theme (FR-4.12), switching live when the theme does. Where the deployment configures imagery, Satellite can be shown under its roads and labels instead (FR-4.14). A URL can pin one of the three other flavors (`&theme=white`, `black` or `grayscale`), kept in the URL until the page's theme next changes, when the map goes back to following it; `&theme=light` and `&theme=dark` pin nothing and are dropped from the URL, since the theme already picks between those two. The current camera position (center, zoom) is reflected in the URL and restored on reload, so a specific view is shareable via link.
-
-**Preconditions**: Active session.
-
-**Behavior**:
-1. If the URL carries a saved or shared position (`#map=<zoom>/<lat>/<lon>`), it wins outright — restored on load, ahead of every fallback below. One with a part missing or out of range (zoom 0–24, latitude ±90, longitude ±180) is ignored, as if there were none.
-2. Otherwise, the account's own most recent activity determines the opening view: the camera flies to fit that single activity, not the full default date-range selection (FR-6.1) — an account with scattered recent history (one activity in another country yesterday, one locally today) would otherwise fly to a near-world view that reads as broken rather than just generic.
-3. An account with no activity history at all falls back to its Country setting (FR-1.7), at that country's own view, if one is set.
-4. If none of the above applies — no saved position, no activity history, no Country set — the camera opens on a fixed, deliberately zoomed-out world view.
-5. Panning or zooming rewrites the URL's saved position continuously, so the current view is always what a copied link restores.
-6. Out to zoom 3 the map is a globe, showing every place once however wide the screen; over the next zoom it turns flat, and from zoom 4 in it is the flat map. It never tilts. An export (FR-4.10) draws the same projection as the map it was framed on. The Android app's map is flat at every zoom (`apps/android/docs/SPEC.md` FR-2.1).
-
-**Notes**: A fresh session (signing out, then signing in or starting a demo session) never inherits a previous session's saved camera position — only an unmodified reload of the same session does. This resolution order never requests the browser's geolocation permission; FR-4.7's "Find my location" is a separate, always-available, user-clicked control, not part of it.
-
-### FR-4.6 Coverage notice
-
-**Description**: The base map covers the whole planet at every zoom level, so there is no out-of-coverage area and no notice for one. Streets and labels are present wherever the user pans.
+- A self-hosted vector base map covering the whole planet at every zoom, light or dark with the theme (FR-4.12). A URL can pin `white`, `black` or `grayscale` until the theme changes.
+- The camera is kept in the URL (`#map=<zoom>/<lat>/<lon>`); an incomplete or out-of-range one is ignored.
+- The opening view: the URL's camera; else the most recent activity; else the account's Country; else a world view. It never asks for the browser's location, and a new session doesn't inherit an earlier one's camera.
+- The web map is a globe out to zoom 3 and flat from 4; Android's is flat.
 
 ### FR-4.7 Find my location
 
-**Description**: A one-shot control moves the camera to the browser's current geolocation (via the browser's geolocation permission). It does not continuously track the device's position, and nothing about the click is recorded or sent to the server.
+A one-shot move to the device's location; nothing about it is recorded or sent to the server.
 
 ### FR-4.8 Pace-colored segments
 
-**Description**: When an activity has row-click focus (FR-5.5), its track is overdrawn with colored segments reflecting its pace along the route, instead of the single flat color Normal mode (FR-4.1) otherwise uses.
-
-**Preconditions**: An activity currently has row-click focus. Not shown in Fog or Heatmap mode, or when nothing is focused. Independent of the checkbox group (FR-5.6) — checking a box, including when it's the only one checked, does not show bands on its own.
-
-**Behavior**:
-1. The track is split into five colored bands (slowest=blue through fastest=red), each band's range computed from that activity's own slowest and fastest speed — not a fixed scale shared across activities.
-2. Pace is the only metric: there is no toggle and no heart-rate alternative (`VISION.md` §1.1).
-3. Focusing a different activity updates the bands to match it; clicking anywhere on the map that isn't a track (FR-4.1) clears focus and removes the bands, the same as clearing focus any other way.
-4. There is no legend and no readout of exact values — the bands show where on the route the activity was faster or slower, relative to itself, and nothing more.
-
-**Notes**: Band boundaries follow the same simplified vertices the track's own line already renders from — a geometrically simple stretch (little directional change) can carry very few of those vertices regardless of how much its speed actually varied there, so the bands can occasionally read coarser than the underlying data on a mostly-straight route. See `IMPLEMENTATION.md` §4.3.1 for the full account.
+- The focused activity's track is drawn in five bands, slowest blue to fastest red, scaled to its own slowest and fastest speed. No legend, no values, no heart-rate alternative (ADR-0017).
+- Bands follow the simplified line, so a straight stretch can read coarser than its data (`IMPLEMENTATION.md` §4.3.1).
+- Not in Fog, Heatmap or an export.
 
 ### FR-4.10 Map image export
 
-**Description**: The map's camera button opens a viewfinder: the map dimmed around a window in its middle, which is the picture. The map moves under the window, and Capture downloads what's in it as a PNG image of a chosen size, however small the screen. The Android app has the same viewfinder (`apps/android/docs/SPEC.md` FR-2.11).
-
-**Preconditions**: Active session; the map has finished its initial load. No activity selection is required — the user frames whatever region of the map they want, independent of any checked/focused activity.
-
-**Behavior**:
-1. Clicking the camera button ("Export map image") in the map's top-right control stack, under zoom and locate, dims the map everywhere but a window as large as the map's area allows, below a toolbar and above the image's pixel size. The map's own controls (the mode toggle, Layers, Satellite, zoom, locate, the camera button itself) are hidden while it shows. Opening it again with the viewfinder shown, Escape, or the toolbar's Close puts it away with nothing captured.
-2. The map pans and zooms inside the window as usual. The dimmed area doesn't respond: a drag, click or scroll there does nothing. A two-finger pinch that starts inside the window keeps zooming when a finger moves onto, or lands on, the dimmed area.
-3. Each corner of the window is a crop handle. Dragging one crops the window, the opposite corner staying put, never past the map's area or below 64 px a side. On release the window settles back to the largest size its new shape fits and the map zooms in to match, so the part that was cropped to fills the window again. A platform preset keeps its shape while cropping; Custom takes any shape.
-4. The toolbar has one menu of shapes and sizes, then Close and Capture. Its list is Custom at three sizes — "Custom · HD (1920 px long side)", "Custom · 2K (2560 px long side)", "Custom · 4K (3840 px long side)" — then every platform preset grouped by platform (Instagram, Facebook, X) with each shape that platform has (Square, Portrait, Landscape, Story; X has no Story or Portrait), as "Instagram · Story". Closed, it shows the entry without the bracket ("Custom · HD"). A Custom size fixes the image's long side and its short side follows the window's shape, so a crop changes only the short side, or swaps which side is long. Custom · HD is chosen first, and a Custom size picked is kept the next time the viewfinder opens in the same visit. A Custom size this browser can't draw in one image is disabled, and a kept one the browser can't draw falls back to the largest it can. Under the window, its pixel size: a preset's own, or Custom's at the chosen size. Choosing another Custom size leaves the window as it is; choosing any other entry fits a window of its shape to the area. The map doesn't move either way.
-5. Capture draws exactly what's inside the window, at the current zoom, rotation, theme and map mode, at that pixel size: the same picture as on screen, sharper, never more of the map. In Normal mode it reflects the current date-range/hidden-track filters; Fog captures its all-time coverage and Heatmap its current rolling window (FR-4.2/FR-4.3), regardless of what Normal mode's filters were set to before switching. The live map is not disturbed by it.
-6. While a capture is generating, Capture shows a busy state and the shape and size can't change. A failure (e.g. a timeout waiting for tiles) is reported under the window in place of its size, and the viewfinder stays as it was. A successful capture puts it away.
-7. A map that changes size (a phone turned, a window resized) refits the window in its own shape.
-
-**Outputs**: On a successful capture, a PNG file download, named `holdmytrack-{date}.png`. OSM/Protomaps attribution is baked into the image's own pixels, in the bottom-right corner over a translucent backing plate — not optional or user-removable, since the basemap is an ODbL "Produced Work" and credit is a license requirement on any distributed export, not a preference (`IMPLEMENTATION.md` §5.6). With Satellite on (FR-4.14), the imagery provider's credit follows OSM's on the same line. A small HoldMyTrack logo and wordmark is always baked into the bottom-left corner — not user-removable either — at 70% opacity with no backing plate, its bottom edge level with the attribution plate's and scaled with it; its text is dark on light themes and light on the dark/black themes and over satellite imagery.
-
-**Notes**: This is one of two things `VISION.md` §4.2 groups under "Export" — animated reveals are not built. Pace-colored segments (FR-4.8) are not reflected in a capture even when currently shown on screen — exporting a single focused activity's bands is a narrower case not covered by this slice. Vector/SVG output is not offered; raster (PNG) only. Platform preset dimensions are curated from Hootsuite's social-media-image-sizes guide; profile-picture/cover-photo sizes are excluded, since this feature frames map content, not an account avatar.
-
-### FR-4.11 Map tile caching
-
-**Description**: The map's own tiles (tracks, Fog and its Country/Region tiers, Heatmap and its circles) are kept by the browser or app that fetched them, so a revisited area or a reload doesn't ask the server again, and never shown after they've gone stale.
-
-**Preconditions**: Active session.
-
-**Behavior**:
-1. Every account has a tile version, which changes whenever anything that could change one of its tiles happens: an upload or sync landing, a delete, an edit (type, name, description, or track), a Private location change, an activity leaving the heatmap window, a heatmap re-scale, or a change of timezone. It never goes back to an earlier value.
-2. The web map and the Android app request every tile with the account's current tile version, which the page carries when it loads and `GET /v1/coverage/status` returns as `tile_version`.
-3. A tile requested with the account's own tile version is sent `Cache-Control: private, max-age=31536000, immutable`. A tile requested without one, or with another account's, is sent `Cache-Control: private, no-cache`. No response lets a shared cache keep a tile.
-4. After a change on the page itself (FR-3, FR-5), the map fetches the affected tiles again without a reload, as before. After a change made elsewhere (another device, a background sync), a reload or the next app launch shows it.
-
-**Outputs**: Tile responses carrying the caching headers above; `tile_version` in `GET /v1/coverage/status`.
-
-**Notes**: Caching is per device, not shared: the app's origin is not behind a CDN, and a tile points at where the account's owner has been. `IMPLEMENTATION.md` §4.2.6 covers how the version is kept.
-
-**Error cases**: More than 1,200 tile requests in a minute from one account, across every tile layer (from one address, for the demo account, which all its visitors share) → `429 Too Many Requests` with `Retry-After: 60`. The map shows that tile as missing and asks again on the next pan; a map export (FR-4.10) that meets one fails. The count restarts when the server does.
+- Any framed view as a PNG, on the web and Android: Custom with a long side of 1920, 2560 or 3840 px, or an Instagram, Facebook or X preset. A size the browser can't draw isn't offered.
+- The image is what's in the frame at the current zoom, theme and mode: Normal's filters or open Story, Fog's all-time coverage, Heatmap's window. Private location circles and pace bands are never drawn.
+- OpenStreetMap's attribution, the imagery credit with Satellite on, and a HoldMyTrack watermark are drawn in and can't be removed: the basemap is an ODbL Produced Work (`IMPLEMENTATION.md` §5.6).
 
 ### FR-4.12 Light and dark theme
 
-**Description**: Every page and the Android app draw in a light or a dark palette. By default they follow the device's own light/dark setting; the user can instead pin this device to Light or Dark.
-
-**Preconditions**: None to follow the device setting; an active session to change it on the web (the control is on the Settings page, FR-1.7).
-
-**Behavior**:
-1. On the web, the Settings page has a Theme control: System (the default), Light, Dark. A choice applies at once, without a reload, and is kept by this browser only — not on the account, and not on the user's other devices; every page opened afterwards, the map included, draws in it.
-2. In the Android app, the You tab has the same three-way Theme control, applied at once and kept on the phone only.
-3. With System chosen, a change of the device's own setting applies while the page or app is open.
-4. The map follows the theme: the light basemap flavor in the light theme, the dark flavor in the dark one (FR-4.5), with Fog of War's veil switching to match (FR-4.2).
-5. A page opened with a saved dark choice draws dark from its first frame, never flashing light first.
-
-**Notes**: A signed-out visitor gets the device setting; the control is only on the signed-in Settings page. `IMPLEMENTATION.md` §4.18 covers the two palettes.
+- Pages and the Android app follow the device's setting, or a Light or Dark choice kept by that browser or phone, never on the account.
+- The base map and Fog's veil follow the theme. A saved dark choice never flashes light first.
 
 ### FR-4.13 Trails and bike paths
 
-**Description**: Cycleways and walking/hiking paths drawn as lines of their own, standing out from the streets, where otherwise they are barely visible hairlines or not drawn at all. Trails and tracks are part of the map itself, drawn once zoomed in to a few neighbourhoods. Bike paths, shared paths and mountain-bike trails are three entries of the Layers menu under Paths — **Bike paths**, **Shared paths** and **Mountain bike trails** — drawn from a whole region out, so a rider can see the bike network at once and pick which way to head. What each of the five kinds is, how it's drawn and from which zoom is in FR-4.15's table.
-
-The first three never overlap: a way tagged as a cycleway or shared path that is rated for mountain bikes or of rough ground is a mountain-bike trail only. A shared path or a mountain-bike trail is also a trail, so from zoom 13 with its entry ticked it is drawn twice, its color over the green. A street with a bike lane painted on it is none of the five, and neither is a way with no surface tag that is singletrack all the same: only its tags say what it is. The three bike colors are dark on the light map, to hold up on Fog's grey veil, and bright on the dark flavors (FR-4.5), to stand out on the dark map; the monochrome flavors draw all five in greys, telling them apart by the dash and width, shared paths and mountain-bike trails dashed there.
-
-**Preconditions**: Active session. The Layers menu is beside the map-mode toggle (FR-4.1–FR-4.3) — in the Android app, a pill under the menu button — and is hidden while the Edit window is open (FR-5.10), like that toggle. The Layers button opens a panel of checkboxes under Paths and Points of interest (FR-15.2). Each path entry ends in a short sample of its line, in the current flavor's color, and under the three a note — "Always shown when zoomed in:" — samples trails and dirt tracks, which have no entry. The button shows how many paths and places are picked; a press on the button again or outside the panel, or Escape (Back on Android), closes it.
-
-**Behavior**:
-1. Bike paths, Shared paths and Mountain bike trails are off by default. Each entry draws what FR-4.15 gives, from zoom 9, on its own. Trails and tracks are always drawn, from the zooms the table gives, with no entry to turn them off. Every line widens as the map zooms in, and the three bike kinds are drawn bolder than trails and tracks.
-2. The choice is kept by this browser (or, in the Android app, this phone) only, not on the account, and applies again on the next visit. A browser that had the former single web toggle on, or a phone that had the former Trails & bike paths toggle on, starts with Bike paths on, and one whose saved choice predates Shared paths or Mountain bike trails starts with that entry off.
-3. It is independent of the map mode: it works over Normal, Fog and Heatmap alike, and survives a theme change (FR-4.12). Every path, trails and tracks included, is drawn over Fog's veil and Heatmap's heat at full strength, so a path not yet ridden shows through the veil, and under the activity tracks.
-4. An export (FR-4.10) draws trails and tracks always, and each bike kind when the map shows it.
-5. A checkbox on the Layers button, before its label (in the Android app, before its icon), shows or hides every picked path and place (FR-15.2) at once and keeps the picks. Off, the map draws none of them, the button looks unselected and its count is greyed; on again, they are back as they were. It is on until turned off, and kept by this browser (or phone) like the picks. Picking a path or place in the menu while it's off turns it back on; unpicking one leaves it as it is. With nothing picked it can't be changed, and its tooltip says to pick paths or places first.
-
-**Notes**: Trails and tracks show what OpenStreetMap tags as a path and is already in the base map, nothing more; the base map has tracks from zoom 12 and trails only from 13, which is why the two start apart. The three bike kinds come from an OpenStreetMap import of their own (FR-4.16), which is what lets them start at zoom 9. Sidewalks, crossings, steps and pedestrian areas keep the base map's own faint styling, since in a city they would bury the real paths. Named routes such as long-distance cycle or hiking networks are not shown.
+- Trails and dirt tracks come from the base map and are always drawn, dirt tracks from zoom 12, trails from 13.
+- Bike paths, shared paths and mountain-bike trails come from an OSM import of their own (FR-4.16), are off until ticked in Layers, drawn from zoom 9; the choice is kept by the browser or phone.
+- From OSM tags, the first that fits: **mountain-bike trail**, a cycleway, path, footway or bridleway with `mtb:scale`, or a cycleway or shared path of rough ground (`surface=ground`, `dirt`, `earth`, `mud`, `sand`, `grass`, `rock`, `woodchips`, `unpaved`); **bike path**, `highway=cycleway`; **shared path**, `highway=path`, `footway` or `bridleway` with `bicycle=designated`. Separately, **trail**: `highway=path`, `footway` or `bridleway`; **dirt track**: `highway=track`.
+- A street's painted bike lane and untagged singletrack are none of these. Sidewalks, crossings, steps and named route networks aren't drawn.
+- Paths draw over Fog and Heatmap at full strength, under the tracks, in every mode and in exports. One switch hides every ticked path and place (FR-15.2) and keeps the picks.
 
 ### FR-4.14 Satellite mode
 
-**Description**: Satellite imagery as a second base map, with the vector base map's roads, boundaries and labels drawn over it. It is the **Satellite** button beside the Layers menu (FR-4.13) — in the Android app, an icon under it — pressed while the imagery shows.
-
-**Preconditions**: Active session. The deployment configures imagery (`IMPLEMENTATION.md` §4.26); without it there is no Satellite button, and a saved Satellite choice shows the vector map.
-
-**Behavior**:
-1. Map by default. Choosing Satellite shows the imagery in place of the base map's background, land, water, landuse and building fills; roads stay on top at 40% opacity, so the ground shows through them; boundaries and place labels stay as they are, and so do tracks, Fog, Heatmap, trails and bike paths (FR-4.13) and Spots (FR-15). In Fog and Heatmap the roads go altogether — the lines, rail, street names and route shields — so the picture is the ground and what the account covered of it; switching back to Normal brings them back. Choosing Map puts the fills back.
-2. Switching doesn't reload the map: camera, mode and overlays stay as they were.
-3. It is independent of the map mode and survives a theme change (FR-4.12). Over imagery, Fog uses the cream veil the dark theme's base map has, whatever the theme.
-4. The choice is kept by this browser (or, in the Android app, this phone) only, not on the account, and applies again on the next visit. The Layers button's count (FR-4.13) doesn't include it.
-5. The imagery provider's credit appears in the map's attribution while the imagery is on.
-6. An export (FR-4.10) with Satellite on draws the imagery, with the provider's credit baked in after OSM's and the watermark in its light colors.
-
-**Notes**: The imagery is fetched from a metered provider (`IMPLEMENTATION.md` §4.26). On a quota-capped plan such as MapTiler's Free plan, the imagery stops loading once the month's quota is used up and returns the next month; the roads and labels still draw.
+- Only where the deployment configures imagery (`IMPLEMENTATION.md` §4.26); otherwise no option, and a saved choice shows the map. The choice is kept by the browser or phone.
+- Roads stay over the imagery at 40% opacity, and go altogether in Fog and Heatmap. Over imagery Fog uses the light veil.
+- The provider's credit shows while it's on and is drawn into exports.
+- On a quota-capped plan such as MapTiler's Free plan, imagery stops for the rest of the month once the quota is used; roads and labels still draw.
 
 ### FR-4.15 What the map draws
 
-**Description**: Everything the map draws over its base map, in one place: what each thing is, how it's drawn, when it shows and from which zoom, what draws over what, and what each zoom level shows. Each thing's behavior — what a click on it does, what changes it — stays in the requirement its row names. The Android app draws the same (`apps/android/docs/SPEC.md` FR-2); the rows marked Android are the app's alone.
+| Zoom | Tracks | Fog | Heatmap | Bike kinds | Trails, dirt tracks | Spots | Photos |
+| :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- |
+| 0–2 | — | Countries | Circles | — | — | — | — |
+| 3 | — | Regions | Circles | — | — | — | — |
+| 4–6 | Drawn | Regions | Circles | — | — | — | Small |
+| 7–8 | Drawn | Exact | Lines | — | — | — | Small |
+| 9 | Drawn | Exact | Lines | Drawn | — | — | Small |
+| 10–11 | Drawn | Exact | Lines | Drawn | — | On request | Drawn |
+| 12 | Drawn | Exact | Lines | Drawn | Dirt tracks | On request | Drawn |
+| 13+ | Drawn | Exact | Lines | Drawn | Drawn | Drawn | Drawn |
 
-| Thing | What it is | Drawn as | Shown | From zoom | Behavior |
-| :-- | :-- | :-- | :-- | :-- | :-- |
-| **Tracks** | An activity's route | A thin gold line; hovered, the thickest, in a darker gold; focused, thicker, with a dark outline (FR-4.1's *Track states*) | Normal mode: the activities in the date range and filters (FR-5), or the open Story's (FR-14.6), except Hidden and Pending ones (FR-5.15) | 4 | FR-4.1 |
-| **Pace-colored segments** | The focused activity's pace along its route | Five bands over its track, slowest blue to fastest red | Normal mode, an activity focused | 4 | FR-4.8 |
-| **Fog of War** | Everywhere the account has never been | A veil: dark over the light map, a cream mist over the dark one; whole countries, then states and regions, zoomed out | Fog mode | 0 | FR-4.2 |
-| **Heatmap** | How often each place was crossed in the last 365 days | Green, turning yellow, orange and then red the more often; the map washed lighter (darker on a dark map) beneath; a soft line close in, soft circles zoomed out | Heatmap mode | 0 | FR-4.3 |
-| **Bike paths** | `highway=cycleway`: a path built for bikes, separate from the road, paved or of gravel or crushed stone | Solid blue | When ticked in Layers | 9 | FR-4.13 |
-| **Shared paths** | `highway=path`, `footway` or `bridleway` with `bicycle=designated`: a multi-use trail or greenway bikes share with people on foot | Solid teal | When ticked in Layers | 9 | FR-4.13 |
-| **Mountain bike trails** | A cycleway, path, footway or bridleway with a mountain-bike rating (`mtb:scale`), or a cycleway or shared path of rough ground (`surface=ground`, `dirt`, `earth`, `mud`, `sand`, `grass`, `rock`, `woodchips` or `unpaved`): singletrack, narrow, rough, rideable on a mountain bike and hardly on anything else | Solid purple | When ticked in Layers | 9 | FR-4.13 |
-| **Trails** | `highway=path`, `footway` or `bridleway`: a walking, hiking or horse path, any surface | Dashed green | Always | 13 | FR-4.13 |
-| **Dirt tracks** | `highway=track`: a dirt, farm or forest road, unpaved and wide enough for a vehicle | Longer-dashed, wider brown, under the trails | Always | 12 | FR-4.13 |
-| **Spot badges** | A place of a ticked category: a playground, dog park, monument, mesmerizing view or historic site (FR-15.1) | A round badge, its category's icon in ink on white, ringed in gold; captured, its icon in white on gold, ringed darker | When its category is ticked in Layers; not during an Edit track session; a retired place only for an account that captured it | 13; 10–12 on request (**Show in this area**, badges only) | FR-15.2, FR-15.3, FR-15.5 |
-| **Spot areas** | A place's OpenStreetMap outline, or the 30 m circle of a place mapped as a point | Shaded faintly in gold, edged with a solid line (dashed for a circle) | With its badge | 13 | FR-15.2 |
-| **Photo markers** | The photos of the selected activity, of the one the Edit window is open on, or of every activity of the open Story | A photo's thumbnail in a round white frame, smaller below zoom 10; photos that would overlap, one marker: the first photo, stacked, with their count; the one open or in hand, larger, ringed in the accent | Normal mode; not for a hidden activity or while the Edit window's Track tab has the map | 4 | FR-16.7 |
-| **Private locations** | The account's Private locations | Each a circle around a fixed-size center dot | Only while the Privacy tab is showing | 4 | FR-8.1 |
-| **The track being edited** | The activity's full-resolution recorded points | Every point visible; the part outside the slider's knobs dashed and faded; every other track hidden | The Edit window's Track tab | Any | FR-5.14 |
-| **Sync candidates** (Android) | What's on the phone, waiting to be sent | A dashed line per candidate | While the Sync sheet shows | 4 | `apps/android/docs/SPEC.md` FR-3.5 |
-| **The recording in progress** (Android) | The GPS track being recorded | Its line in the track colour and a dot at the latest fix, alone on the map | While recording | Any | `apps/android/docs/SPEC.md` FR-5.1 |
-| **Your position** (Android) | Where the phone is | A position dot | After Find my location | Any | `apps/android/docs/SPEC.md` FR-2.5 |
-
-**Drawn over**: from the bottom up — the base map's fills and roads (or satellite imagery under the roads, which Fog and Heatmap leave out over imagery, FR-4.14); Fog's veil or Heatmap's heat; the paths, dirt tracks under trails under the three bike kinds; the tracks, then the pace-colored segments; the base map's labels (dimmed in Fog); Spot areas and badges, which Fog doesn't dim; and photo markers, over everything else on the map.
-
-**Zoom levels**: what the map draws at each zoom. Bike and shared paths and points of interest show only for what is ticked in the Layers menu; with nothing ticked they draw at no zoom. Trails and dirt tracks are always drawn.
-
-| Zoom | A 1280 px-wide view spans | Tracks (Normal) | Fog | Heatmap | Bike paths, shared paths and mountain-bike trails (ticked) | Trails and dirt tracks | Points of interest (ticked) | Photo markers (an activity or Story open) |
-| :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- |
-| 0–2 | Most of the world or more (~25,000 km and more) | — | Whole countries | Circles | — | — | — | — |
-| 3 | A continent (~12,000 km) | — | States and regions | Circles | — | — | — | — |
-| 4–6 | Several countries to a country (~6,000–1,600 km) | Drawn | States and regions | Circles | — | — | — | Small |
-| 7–8 | A state (~800–400 km) | Drawn | Street level | Lines | — | — | — | Small |
-| 9 | A region (~200 km) | Drawn | Street level | Lines | Drawn | — | — | Small |
-| 10–11 | A metro area (~100–50 km) | Drawn | Street level | Lines | Drawn | — | On request: **Show in this area** | Drawn |
-| 12 | A city (~25 km) | Drawn | Street level | Lines | Drawn | Dirt tracks | On request: **Show in this area** | Drawn |
-| 13 and up | A few neighbourhoods or less (~12 km and less) | Drawn | Street level | Lines | Drawn | Drawn | Drawn, loaded as the map moves | Drawn |
-
-**Behavior**:
-1. Each band starts at its first zoom and runs up to, not including, the next band's: zoom 6.9 is still States and regions, and zoom 12.9 still offers Show in this area.
-2. Zoomed in far enough, the map runs out of stored detail and enlarges the most detailed level it has instead: tracks, Fog, the three bike kinds and points of interest past zoom 14, Heatmap and the base map past zoom 15, and satellite imagery (FR-4.14) past the deployment's deepest level (zoom 18 on holdmytrack.com). Lines, labels and badges — the base map, tracks, paths and points of interest — stay sharp when enlarged, though a track's shape gets no more detailed; so does Heatmap's heat, though no finer than its ~19 m cells; Fog and satellite imagery are pictures and grow softer.
-3. The Android app follows the same bands for tracks, Fog, Heatmap, paths, points of interest and photo markers.
-
-**Notes**: The widths are at the equator; further from it the same zoom spans less ground (at Ohio's latitude, about a quarter less).
+- Each band runs up to the next band's first zoom. The Android app follows the same bands.
+- Bottom to top: base map or imagery, Fog or Heatmap, paths, tracks and pace bands, labels, Spots, photos.
+- Past the deepest stored level the map enlarges it: tracks, Fog, bike kinds and Spots past zoom 14, Heatmap and the base map past 15, imagery past the deployment's deepest level (18 on holdmytrack.com).
+- At most 1,200 tile requests a minute per account across every layer (per address for the demo account); past that a tile is refused for the minute and an export that meets one fails. The count restarts with the server. Caching is `IMPLEMENTATION.md` §4.2.6.
 
 ### FR-4.16 Bike-path tiles
 
-**Inputs**: `z`, `x`, `y`; `cv`, the tile version (FR-4.11).
-
-**Outputs**: A vector tile with one layer, `bike_paths`: each cycleway, shared path or mountain-bike trail that reaches into the tile, clipped to it, with `kind` (`cycleway`, `shared` or `mtb`) and `name`, absent when it has none. Below zoom 9, an empty tile. Below zoom 13, a path shorter than a pixel at that zoom is left out.
-
-**Behavior**:
-1. The same paths for every account, behind the session like every other map tile, and cached like them (FR-4.11). A load that changes the paths moves every account's tile version.
-2. A way is a mountain-bike trail, a cycleway or a shared path as FR-4.15's table gives, the first of the three that fits: a cycleway rated for mountain bikes, or of rough ground, is a mountain-bike trail. A street with a bike lane is none of them, and neither is a rated forest road (`highway=track`).
-
-**Error cases**:
-- No session → `401`. A demo session sees the paths too.
-- Non-numeric coordinates → `400`.
+The same paths for every account, behind the session and cached like every map tile; a load that changes them moves every account's tile version. Empty below zoom 9; below 13 a path shorter than a pixel is left out.
 
 ## 7. FR-5 — Activities Panel
 
 ### FR-5.1 Activity list
 
-**Description**: A permanent sidebar lists every activity within the currently selected date range (FR-6), narrowed by the TYPE and DISTANCE filters below.
-
-**Behavior**: Each row's primary line is the activity's own name if one has been set (FR-5.10), or its start date/time otherwise — an activity has a name only once a person has typed one in via FR-5.10's edit dialog, never from parsing a source file. A row whose primary line is a name still shows its date/time as part of the row's secondary line, alongside distance, duration, and type — a row's only other elements are its checkbox and this text; there is no separate per-row column or icon of any kind, and no per-row action controls (edit/delete/hide are reached via FR-5.6's checkbox plus the header toolbar, not from the row itself). Regardless of what a row displays, **the list itself is always ordered by start date/time, newest first** — a name never affects sort order. The list is not paginated — every matching activity is shown at once. The panel also shows a running count of matching activities and total distance for the range (independent of the TYPE/DISTANCE filters, which narrow the visible rows without changing this total).
-
-**Story badge**: A row whose activity is in a Story (FR-14) carries a badge beside the Pending and Hidden ones (FR-5.15), in the accent color: "Story" for one, "2 stories" for more, its tooltip naming them — "In a story: Brecksville Reservation". Under the open Story on the Stories tab (FR-14.6) that Story doesn't count, since every row there is in it: a row there is badged only for its other Stories ("Also in: …"). Clicking the badge opens the Story on the Stories tab (FR-14.6) — its tooltip then says so, "Open “Brecksville Reservation”" — or, for more than one, opens a small menu of their names under it, and picking one opens that Story; Escape or a click outside closes the menu. On a phone the expanded sheet collapses as the Story opens, so its tracks can be seen. `GET /v1/activities` carries each row's Stories, newest first, as `stories` (`[{id, name}]`, empty for none).
-
-**Private badge**: A row whose activity lies entirely inside the account's Private locations (FR-8.1 behavior 3) has no track, so its secondary line leaves out distance and duration — a "0.0 mi · 0m" would read as broken data — and it carries a neutral "Private" badge with a lock, beside the Pending and Hidden ones (FR-5.15). The badge's tooltip, and the row's, say why: it's inside one of the user's private locations, isn't on the map and has no distance, and moving or removing that location brings it back. The Edit window's Track and Photos tabs are disabled for it with the same explanation. `GET /v1/activities` carries `private` per row.
+- Lists every activity in the date range (FR-6) passing the Type and Distance filters, always newest first by start time, not paginated. Count and total distance cover the whole range.
+- A row shows the activity's name, which exists only once a person types one (FR-5.10), else its local start time.
+- Badges: Pending and Hidden (FR-5.15); Story, naming its Stories; Private, for an activity entirely inside Private locations (FR-8.1), which has no track, distance or duration and can't have its track or photos edited.
+- One activity is focused at a time, by clicking its row or track; any number can be checked. The toolbar's actions act on the checked activities when any are, else on the focused one, never both. Checking never moves the camera, and camera fits skip Hidden activities.
 
 ### FR-5.2 TYPE filter
 
-**Description**: The user can narrow the visible activities to one or more activity types (e.g., "Run," "Ride"), via a Type dropdown on the panel's filter row, beside the Distance slider (FR-5.3).
-
-**Behavior**: Clicking "Type" — at the left of the filter row, the Distance slider (FR-5.3) taking the rest of that row, between the date slider (FR-6) and the header toolbar — opens a dropdown listing every distinct type present in the current date range (not a fixed, predefined list) as a checkbox — checked means shown, unchecked means excluded. The list scrolls rather than collapsing behind a "show more" control once it's long enough to need one. Filtering is purely client-side over the already-fetched list; it narrows the Activities panel, the map's drawn tracks, and the header's activity count. The dropdown closes on an outside click, Escape, or clicking its own trigger again.
+Lists the types present in the date range; types are free text, not a fixed vocabulary. It filters in the client and narrows the list, the tracks and the count.
 
 ### FR-5.3 DISTANCE filter
 
-**Description**: The user can narrow the visible activities to a minimum/maximum distance range via a slider, bounded by the shortest and longest activity in the current date range. Same scope as FR-5.2 (client-side, narrows the same things). Standalone and always visible, between the date slider and the header toolbar — not folded into the Type dropdown or hidden behind any toggle.
-
-**Behavior**: Each knob reaches the exact shortest and longest distance at its end of the track, so the activities at either end are inside the filter there. With both knobs back at their ends there is no distance filter: the readout says "any distance" and nothing is filtered out by distance. The slider isn't shown while the date range's activities don't span a range of distances (none, or all the same length); a distance filter set before they stopped doing so — activities deleted down to one, say — is cleared, rather than left filtering with no slider or Reset to clear it. A Private activity (FR-5.1) has no distance: it doesn't set a bound, and like a row with no recorded distance it's left out once a distance filter is on.
-
-### FR-5.4 Row hover preview
-
-**Description**: Hovering a row (anywhere on it) previews that activity's track on the map — drawn thicker, FR-4.1's Hovered state — with no camera movement. The preview clears the instant the pointer leaves the row. This works in both directions: hovering an activity's track directly on the map previews it the same way, and additionally underlines that row's title in the Activities panel — so either surface can be used to identify which row an unlabeled track on the map belongs to, not only the reverse.
-
-### FR-5.5 Row click — focus and fly
-
-**Description**: Clicking a row's text — or clicking that activity's track directly on the map (FR-4.1) — sets it as the single row-click *focus*: highlights it and flies the camera to fit it, so the activity spans 75% of the map along whichever axis is tighter (capped at zoom 18 for a very short track). Whichever activity was previously focused this way loses its highlight (only ever one activity is "just clicked" at a time, regardless of which surface the click came from). This is independent of FR-5.6: neither a row-text click nor a map click ever checks or unchecks any checkbox, in either direction. Clicking empty space in the Activities panel's list — below the last row, or on its "no activities" note — clears the focus, the same as clicking the map away from every track (FR-4.1 behavior 4); the checked group is untouched. While nothing is checked, the focused activity is what the header toolbar acts on (FR-5.7).
-
-**Notes**: If the clicked activity has no recorded track (e.g., a source with no GPS), no fly occurs, since there is nothing to fit the camera to. The pace-colored segments (FR-4.8) shown for a single focused activity are driven by this mechanism specifically, not by FR-5.6.
-
-### FR-5.6 Checkbox — build a group
-
-**Description**: Each row also has a checkbox that adds or removes it from the current checked group without replacing the rest of it, for building a multi-activity group for the header toolbar to act on (FR-5.7). Checking a second row never unchecks the first. A checkbox click changes only the checkbox: it doesn't emphasize the track on the map or highlight the row (FR-4.1's track states), and it never moves the camera — Focus on map (FR-5.7) flies to the group when wanted. This is independent of FR-5.5 in both directions: checking a box never sets or clears the row-click focus.
-
-**Notes**: A hidden activity (FR-5.8) can still be focused (FR-5.5) or checked; the system excludes hidden activities from the fly-to bounds specifically so the camera never flies to an area with nothing drawn on it.
-
-### FR-5.7 Select all / Clear / Invert selection / Focus on map
-
-**Description**: A master checkbox in the header toolbar selects or clears every currently listed activity at once, a ▾ beside it opens a menu of **All**, **None** and **Invert**, and a separate toolbar icon flies to fit the toolbar's target on demand.
-
-**Toolbar target**: The header toolbar's actions — Show/hide (FR-5.12), Edit (FR-5.10), Add to story (FR-5.16), Delete (FR-5.11) and Focus on map — act on its *target*: the listed activities in the checked group (FR-5.6) whenever at least one is checked, otherwise the row-click focus (FR-5.5) alone. With neither, they're disabled. Checked wins rather than the two combining: a focused row is never swept into an action on a checked group, and focusing a row never takes the toolbar away from a group already checked. Each action's tooltip names its target — "3 checked activities", or the focused activity's own name (or date/time) — and the footer's "N selected · X km" summary describes the same target.
-
-**Behavior**: The header checkbox reflects the checked group's state against the currently listed (TYPE/DISTANCE-filtered) rows — checked once every listed row is checked, unchecked once none are, and indeterminate for a partial selection. Clicking it when unchecked or indeterminate checks every listed row; clicking it when fully checked empties the checked group. The ▾ beside it, disabled when no activity is listed, opens a menu under the checkbox: **All** checks every listed row (disabled when every one already is), **None** empties the checked group (disabled when it's empty), and **Invert** checks every listed row that wasn't checked and unchecks every one that was — a checked activity that isn't currently listed (excluded by TYPE/DISTANCE) ends up unchecked. Picking one closes the menu, and so do a click outside it and Escape. None of these moves the camera, the same as a single checkbox (FR-5.6). The toolbar's accent-tinted **Focus on map** icon, disabled when there is no target, flies to fit the target without changing it — the one way to fly to a checked group, and a way back to the focused activity after panning away from it.
-
-**Notes**: None of these controls affects the row-click focus (FR-5.5) — a focused row keeps its own highlight regardless of the header checkbox, its menu, or Focus on map.
+- Bounded by the range's shortest and longest activity; both knobs at the ends means no filter.
+- Not offered while the range's activities don't span distances, and a filter set before is cleared.
+- A Private activity sets no bound and is left out once a filter is on.
 
 ### FR-5.8 Hide/show a track
 
-**Description**: The header toolbar's Show/hide icon (FR-5.12) hides or shows the tracks of the toolbar's target (FR-5.7) — the checked group, else the focused activity. There is no per-row hide/show control — hiding or showing a single activity means focusing it (FR-5.5) or checking just its own box, the same as any other single-item action. A hidden activity's track is not drawn in Normal mode until shown again — Fog of War and Heatmap ignore the hidden set (FR-4.2, FR-4.3); its row dims in place and carries a "Hidden" badge so its hidden state is still visible at a glance. Hiding/showing is purely client-side and does not refetch data. See FR-5.12 for the exact toggle rule.
-
-### FR-5.9 Resizable panel
-
-**Description**: The Activities panel can be resized by dragging its right edge, between 260 and 560 pixels wide (default 380). Not persisted across reloads.
+- Hiding is per browser tab, never stored, and only affects Normal mode's tracks.
+- Over several activities, show/hide shows them all if any is hidden, else hides them all.
+- A new date range clears it (FR-6.6).
 
 ### FR-5.10 Edit activity type, name, and description
 
-**Description**: A signed-in user renames an activity's type, gives it a name, and/or attaches a free-text description to it — for example, re-labeling an activity a fitness tracker logged under the wrong category, naming a road trip so it's identifiable in the Activities panel at a glance, or describing a non-sport GPS trace in more detail than a name allows.
-
-**Preconditions**: Active session; the caller owns the activity.
-
-**Inputs**: The Edit window's **Activity** tab, reached via the header toolbar's Edit icon over its target (FR-5.7) — the checked group, else the focused activity — there is no per-row edit control. The same window's **Track** tab is FR-5.14. Editing exactly one activity accepts a new type (required, 1–50 characters), a name (optional, up to 200 characters), and a description (optional, up to 2000 characters). Editing more than one activity at once accepts only a new type — the Name and Description fields are disabled, since there is nothing consistent to set across several different activities' names/descriptions in one request.
-
-**Behavior**:
-1. Clicking the toolbar's Edit icon opens the Edit window over its target over the top-left of the map, on its Activity tab; the map doesn't move. It has two tabs, **Activity** and **Track** (FR-5.14), and one **Save** and one **Cancel** shared by both: switching tabs keeps whatever is unsaved in either. While it's open the Activities panel (its date slider included) and the map-mode toggle are inert, and clicking a track on the map does nothing. With exactly one activity in the target, it is pre-filled with that activity's current type, name, and description, all three editable. With more than one, only the type field is editable, seeded from the first of them; the Name and Description fields render disabled with an explanation of why.
-2. The type field is plain free text — the same "whatever the source reports, not a controlled vocabulary" rule FR-5.2's TYPE filter already follows (`IMPLEMENTATION.md` §4.7.2) applies equally to a manual rename. The field is a searchable picker, like Settings' Country and Timezone (FR-1.7): opening it shows this account's existing types, each with how many activities use it, and typing filters that list. It is only a convenience — nothing is enforced against it: whenever the typed text doesn't exactly match an existing type (ignoring case), the list also offers an "Add" row for that text, and picking it saves the value exactly as typed, even one nobody has used before. The name field is always plain free text, with no source to ever populate it automatically — an activity has a name only once a person types one in here (`IMPLEMENTATION.md` §4.7).
-3. Save commits the fields in one request per activity — only when at least one of them differs from what's saved. For a single activity, all three fields commit together. For a group, the Type field starts on the type its activities share, or empty with "Mixed types — pick one to set it for all" when they don't; left empty, Save keeps each activity's own type. Once a type is set, each activity's own request carries it alongside that activity's own existing name and description unchanged — a group edit never touches Name or Description, even though the underlying request is a full replace. Save then applies the Track tab's edit if there is one (FR-5.14 behavior 5) and closes the window. If a write fails partway — one activity of a group, or the track edit after the fields — the window stays open showing the error, and saving again writes only what isn't written yet, including any field changed since; whatever was written stays written, and the list shows it, even if the window is then cancelled. Cancel discards every unsaved change on every tab and closes the window. Escape does the same, but asks first while there is any unsaved change — a field, the track, a photo ("Discard changes?" — Discard or Keep editing; Escape in the question keeps editing) — and closes at once when there is none.
-4. Once saved: each affected row's displayed type updates immediately; the new/renamed type becomes (or remains) a real entry in FR-5.2's TYPE filter with a live count; a single-activity edit's row shows the name in place of its start date/time if one is set, or the start date/time as before if the name is cleared (FR-5.1); and its description becomes visible as a hover tooltip on the row — not a second visible line. **The Activities panel's sort order never changes**: rows stay ordered by start date/time (FR-5.1) regardless of what a row displays or whether it has a name at all.
-
-**Outputs**: Each edited activity's `activity_type` is updated (plus `name`/`description` for a single-activity edit); every other computed value for that activity (distance, duration, its Fog-of-War/Heatmap coverage, its inclusion in FR-9's performance-analysis aggregates) is unaffected, since none of those are keyed on type, name, or description.
-
-**Error cases**:
-- Empty or over-length type, an over-length name, or an over-length description → `400 Bad Request`, no change applied for that activity.
-- An activity does not exist or belongs to another account → `404 Not Found`, indistinguishable from each other.
+- Type is required, 1–50 characters; name up to 200; description up to 2,000. Type is free text; the picker's list is only a convenience.
+- Editing several activities sets only their type, never their names or descriptions.
+- An edit doesn't change distance, coverage, Trends or the list's order.
+- When a save over several fails partway, what was written stays written.
+- Another account's activity can't be told apart from a missing one.
 
 ### FR-5.11 Delete an activity
 
-**Description**: A signed-in user permanently deletes one or more of their own activities — a full purge, not a soft delete or an archive: each activity itself, its track, and its contribution to Fog-of-War/Heatmap coverage are all removed. There is no undo. Deleting a single activity and deleting a group are the same mechanism (FR-5.13) — there is no separate per-row delete control; deleting one activity means focusing it (FR-5.5) or checking just its own box.
-
-**Preconditions**: Active session; the caller owns every activity in the toolbar's target.
-
-**Inputs**: The toolbar's target (FR-5.7) — the checked group (FR-5.6), else the focused activity (FR-5.5) — reached via the header toolbar's Delete icon.
-
-**Behavior**:
-1. Clicking the toolbar's Delete icon opens a confirmation dialog naming its target — how many activities are checked, or the focused activity's own name or date/time — and their combined distance, stating plainly that this can't be undone; nothing is deleted until the user confirms.
-2. Confirming removes every activity in the target and everything derived from each one: its rendered coverage masks and its photos (FR-16).
-3. The Fog-of-War/Heatmap view updates to reflect the deletion — coverage a deleted activity was the only source for reverts to unrevealed, not left showing stale coverage for data that no longer exists. An open page picks this up on its own once the background re-render finishes, without a reload.
-4. Canceling the confirmation, or dismissing it, leaves every activity untouched. While the deletes run, the confirmation can't be dismissed. If one fails, the confirmation stays open with the error; the activities already deleted leave the list and the target, and confirming again deletes the rest.
-
-**Outputs**: Every deleted activity, and everything derived from it, no longer exists; every list, filter, total, and aggregate that previously included it reflects the removal, in one combined refresh rather than once per deleted activity.
-
-**Error cases**:
-- An activity in the target does not exist or belongs to another account → `404 Not Found`, indistinguishable from each other.
-
-### FR-5.12 Group visible
-
-**Description**: An icon-only header toolbar button toggles whether every activity in the toolbar's target (FR-5.7) is drawn on the map, in bulk — this is FR-5.8's entire hide/show mechanism, applied to the target, one activity or many.
-
-**Preconditions**: The toolbar has a target — at least one listed activity is checked, or one is focused; the button is disabled otherwise.
-
-**Behavior**: If any activity in the target is currently hidden, clicking shows all of them (removes them from the hidden set). If every one is already visible, clicking hides them all instead.
-
-**Outputs**: The hidden-activity set updates; the map's drawn tracks reflect it immediately (Fog-of-War/Heatmap coverage doesn't change — FR-5.8).
-
-### FR-5.13 Delete group
-
-**Description**: The header toolbar's Delete icon — see FR-5.11, which this number and FR-5.11 both describe: deleting one activity and deleting several are the same mechanism, not two.
+- A full purge with no undo: the activity, track, coverage, photos (FR-16.5), and its original once no other activity (a split part, a Story copy) shares it. It leaves every Story; copies others accepted stay theirs (FR-14.8).
+- Fog and Heatmap revert where it was the only source, without a reload once redrawn.
+- When one of several deletes fails, the others stay deleted.
 
 ### FR-5.14 Edit track
 
-**Description**: A signed-in user removes unwanted recorded points from one of their activities — typically the stretch recorded after forgetting to stop a GPS recorder (wandering a mall, sitting at home), which inflates distance and duration and draws noise onto the map and into Fog-of-War/Heatmap coverage — or puts a stray point back where it belongs, typically an outlier in a sparse track, so the track can still be used, in a Story say. Four edits are offered: Chop (keep only the part between two points), Cut (remove the part between two points and join them), Delete point (remove single points), and Move point (drag single points elsewhere). The original recording is never modified, so an edit can always be reset.
+Chop (keep the part between two points), Cut (remove it and join the ends), Delete point and Move point. The original is never changed, so Reset always returns the track as recorded.
 
-**Preconditions**: Active session, not a demo account; exactly one activity is checked (FR-5.6); that activity has a recorded track and isn't already Pending (behavior 7 below). The Edit window's Track tab is disabled otherwise, with a tooltip saying why.
-
-**Inputs**: The **Track** tab of the Edit window (FR-5.10), opened with the toolbar's Edit icon over a single activity (FR-5.7's target: one checked activity, or the focused one when nothing is checked); then, inside the tab, a two-knob range slider, the Chop/Cut/Split/Move point/Delete point/Undo/Reset buttons (Split is FR-5.17), clicks and drags on points on the map, and the window's shared Save and Cancel.
-
-**Behavior**:
-1. Opening the Track tab for the first time flies the map to the activity (the same fit as FR-5.5's row click), hides every other activity's track, and draws this one from its full-resolution recorded points — every point visible — rather than the simplified display track. The points are the ones the activity is processed from: already clipped against the account's current Private locations (FR-8.1), so the hidden ends are never sent to the client. An activity entirely inside Private locations has no points to show and can't be edited. The other tracks stay hidden, and the edits made so far stay in place, until the window closes — switching back to the Activity tab keeps them. Delete point and Move point modes turn off on leaving the tab, and Cmd/Ctrl+Z undoes a track step only while the Track tab is showing.
-2. The slider's two knobs start at the track's ends and are positioned along the track in recording order (point by point, not by distance — a stationary stretch is many points over almost no distance). The readout shows each knob's distance from the start and its clock time. Moving the knobs only previews: the part outside the knobs is drawn dashed and faded, and hovering Cut switches the preview to the part between them, with the two knob points joined straight across.
-3. **Chop** keeps only the points from one knob to the other, inclusive. **Cut** removes the points strictly between the knobs, keeping both knob points and joining them. **Delete point** toggles a mode in which clicking a point on the map removes it. **Move point** toggles a mode in which pressing a point on the map and dragging it moves it, the line through it following, without panning the map; letting go is one step, and letting go without moving changes nothing. A moved point keeps its recording time and elevation, and a point moved again ends where it was last let go. Only one of the two modes is on at a time. Each is one step; after Chop or Cut the knobs return to the new track's ends. None of them can leave fewer than two points — the buttons are disabled, and a point click is ignored, when it would.
-4. **Undo** reverts exactly one step, and can be repeated back through every step of the session to the track as it was when the editor opened (also Cmd/Ctrl+Z). **Reset** (shown whenever the track currently has any edit, including one saved in an earlier session) returns to the track as originally recorded, as one more undoable step. The window's **Cancel** discards every step of the session, along with any unsaved Activity tab change, restores the map, and closes the window; nothing is saved.
-5. The window's **Save** sends the session's net result as one edit, if there is at least one step, after saving the Activity tab's fields (FR-5.10 behavior 3), and closes the window; with no step, the track is left as it is. The server stores it and reprocesses the activity in the background from its original recording: distance, duration, moving time, elevation gain, start time (a Chop can move it), the display track, its Fog-of-War/Heatmap coverage (FR-4.2/FR-4.3), and its country/region matches (FR-4.2's zoomed-out tiers) are all recomputed. A Cut's joining segment counts toward distance; the time gap it spans counts toward elapsed duration but not moving time. The edited track's ends are clipped against Private locations again (FR-8.1 behavior 1): an edit that removes the last point outside one at either end — a stray GPS fix beside home, or a Chop — leaves the points still inside it hidden, the track starting or ending past that circle's edge as a fresh clip would cut it. The editor's preview doesn't show this re-clip; the saved track does.
-7. Until reprocessing finishes the activity is **Pending** (FR-5.15): its row shows a Pending badge with its pre-edit numbers, its text and checkbox are disabled, and the Edit window's Track tab and Delete are unavailable for it; its track isn't drawn, and it drops out of Fog of War and Heatmap at every zoom. The Activities panel re-reads the list every few seconds while any row is Pending. When it clears, the row, the totals, the date slider's days and the drawn track update, and the Fog-of-War/Heatmap layers (at every zoom tier) follow once their re-render lands — all without a page reload, and without moving the camera. If reprocessing fails, the activity simply stops being Pending and keeps its previous track and numbers.
-8. An edit is stored as ranges and points identified by recording time, not by position in the point list, so it keeps meaning the same points if a Private location later changes. A track whose timestamps are missing or run backwards can't be edited.
-
-**Outputs**: The activity's stored edit (none, after a Reset) and every value derived from its points, as listed in behavior 5.
-
-**Error cases**:
-- The activity doesn't exist, belongs to another account or already has an edit Pending → `409 Conflict` on Apply, indistinguishable from each other; opening the editor on an activity that doesn't exist or belongs to another account → `404 Not Found`.
-- The activity has no stored original recording, or its timestamps are missing or run backwards → `409 Conflict` when opening the editor, shown in the editor window.
-- A range whose start is after its end, or a point moved off the map → `400 Bad Request`.
-- An edit that would leave fewer than two points (possible only through the API directly) → accepted, then fails during reprocessing; the activity is left as it was.
-- Opening the editor more than 120 times in an hour from one account → `429 Too Many Requests` with a message naming the limit, shown in the editor window; the count restarts when the server does.
+- Needs a real account and one non-Pending activity with a stored original and a track whose timestamps exist and run forward.
+- The editor gets the points already clipped against Private locations, so hidden ends never reach the client; an activity entirely inside them can't be edited.
+- A moved point keeps its time and elevation. No edit can leave fewer than two points.
+- Saving reprocesses the activity from its original: distance, duration, moving time, elevation gain, start time, track, coverage, country and region matches. A Cut's join counts toward distance, and its time toward elapsed but not moving time.
+- The result is clipped against Private locations again, so an edit can't uncover an end inside one; the editor's preview doesn't show that clip.
+- Pending until reprocessed; on failure it keeps its previous track and numbers.
+- An edit is stored by recording time, so it keeps meaning the same points when a Private location changes.
+- At most 120 editor openings an hour per account; the count restarts with the server.
 
 ### FR-5.15 Activity states
 
-**Description**: Every activity listed in the Activities panel is in exactly one of three states. They describe whether and how it takes part in the map, separately from the per-track display states (Hovered, Focused — FR-4.1's *Track states*), which apply only to a Normal activity.
+```mermaid
+stateDiagram-v2
+    [*] --> Normal: ingested
+    Normal --> Pending: track edit, split, merge, privacy change
+    Pending --> Normal: reprocess done or failed
+    Normal --> Deleted: delete, or merged away
+    Deleted --> [*]
+    state "Visibility, this tab only" as Visibility {
+        Shown --> Hidden: hide
+        Hidden --> Shown: show, or new range
+    }
+```
 
-| State | Entered by | Left by | Track on the map | Fog of War / Heatmap | Its row | Camera | Kept across reloads |
-| :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- |
-| Normal | default | — | drawn (FR-4.1) | counted | plain | flies to it on the user's own actions (FR-5.5–FR-5.7) | — |
-| Pending | a track edit saved from the Edit window (FR-5.14), or a Private location change that could clip it (FR-8.1) | its reprocess finishing, or failing | not drawn | not counted, at any zoom tier | Pending badge, pre-reprocess numbers, disabled | never flies to it, and doesn't move when it enters or leaves Pending | yes — it's the server's state |
-| Hidden | Visibility off (FR-5.8, FR-5.12) | Visibility on, or a new date range (FR-6.6) | not drawn | counted — Fog and Heatmap ignore the hidden set (FR-4.2, FR-4.3) | dimmed, "Hidden" badge | excluded from every fly-to fit | no — this tab only |
+| State | Track | Fog and Heatmap | Row | Survives reload |
+| :-- | :-- | :-- | :-- | :-- |
+| Normal | Drawn | Counted | Plain | Yes |
+| Pending | Not drawn | Not counted, at any zoom | Badge, old numbers; can't be focused, checked, edited or deleted | Yes |
+| Hidden | Not drawn | Counted | Dimmed, badge | No |
 
-**Behavior**:
-1. Pending takes precedence: an activity hidden before it went Pending is simply not drawn either way, and is still Hidden once Pending clears — reprocessing never changes the user's own Visibility choice.
-2. A Pending activity's row can't be focused onto the map or checked (a row already checked stays checked); its absence is what the map, Fog of War and Heatmap all show until its reprocess lands.
-3. Leaving Pending brings the activity back everywhere — its track at once, Fog of War and Heatmap once their re-render lands (FR-5.14 behavior 7) — without moving the camera.
-
-**Notes**: An activity entirely inside Private locations (FR-8.1 behavior 3) is Normal with no geometry — nothing to draw or count — rather than a fourth state.
-
-### FR-5.16 Add to story
-
-**Description**: A book-with-a-plus icon in the Activities panel's header toolbar, between Edit and Delete, puts the toolbar's target (FR-5.7) — the checked activities, else the selected one — into a Story (FR-14): a new one, or one that already exists. This is where activities go into Stories; they come out on the Stories tab (FR-14.6).
-
-**Preconditions**: A real account (a demo session sees the icon disabled, its tooltip saying the demo can't make stories); a target. With no target the icon is disabled, its tooltip saying to select or check activities first, like the toolbar's other actions; with one, the tooltip names it — "Add 3 checked activities to a story".
-
-**Behavior**:
-1. The icon opens a menu under the toolbar: **New story…** first, then every Story of the account, newest first, each with how many activities it holds. The Stories are read each time the menu opens. A Story that already holds all of the target is ticked and can't be picked.
-2. Picking a Story adds the target to it in one request (FR-14.3) — any of them already there stay — and closes the menu. The list stays as it is; the rows' Story badges (FR-5.1) follow.
-3. **New story…** opens a Create story dialog over the map naming what it's made of — "A story of 3 checked activities (58 km). Only you can see it." — with Name (required, up to 200 characters) and Description (optional, up to 2000). "Create story" stays disabled until Name has something besides spaces; Enter in Name does the same as clicking it. Cancel, Escape or a click outside closes the dialog with nothing made.
-4. Creating makes the Story with the target's activities in one step (FR-14.2) and opens it on the Stories tab (FR-14.6).
-5. The menu closes on Escape, a click outside it, or its icon clicked again, and whenever the target changes.
-
-**Error cases**: A failed add keeps the menu open with the server's message at its foot. A failed create keeps the dialog open with the server's message under the fields, the fields as typed.
+- Pending wins over Hidden, and reprocessing never changes visibility: a hidden activity stays hidden after Pending clears.
+- Entering or leaving Pending never moves the camera; leaving it brings the track back at once and Fog and Heatmap once redrawn.
+- An activity entirely inside Private locations is Normal with no geometry.
 
 ### FR-5.17 Split an activity
 
-**Description**: A signed-in user splits one recorded activity into two at a point on its track — typically a recording left running across two different things, a ride and then a walk — and the parts can be merged back into the one activity. Each part is a full activity of its own: its own row, numbers, track, coverage, type, name and description. The original recording is never modified.
+An activity is split in two at a point on its track; the parts can be merged back. Each part is a full activity, and the original is never changed.
 
-**Preconditions**: Splitting: the same as Edit track (FR-5.14) — one activity, with a recorded track, not Pending. Merging: a real account, and two or more parts of one split activity that meet end to end, none of them Pending.
-
-**Inputs**: Splitting: the **Split** button on the Edit window's Track tab (FR-5.14), and its two-knob slider. Merging: `POST /v1/activities/track-merge` with the parts' ids — the API only; neither the web nor the Android app has a control for it. The Android app's Split is `apps/android/docs/SPEC.md` FR-2.7 item 12.
-
-**Behavior**:
-1. Split splits at the one slider knob moved off its end; it's disabled while both knobs are at the ends, or both have moved. Hovering it previews the result: the part before the knob drawn in the editor's color, the part after it in blue, joined at the knob. The point at the knob belongs to both parts, so nothing between them goes missing. Each part needs at least two points; the button is disabled when one wouldn't have them.
-2. Split is one step of the Edit track session (FR-5.14 behavior 4): Undo takes it back. Only one split per session; once one is made, Chop, Cut, Split, Move point, Delete point and Reset are disabled until it's undone, and a note under the buttons says where the activity will split and that the new part takes the same type, name and description.
-3. Save sends the split together with the session's edit, if any (FR-5.14 behavior 5); the edit applies to both parts. The activity keeps the part before the split point. A new activity is made for the part after it, with the same type, name, description and track edit. It goes into every Story the original is in (FR-14). The photos placed after the split point move to it (FR-16), and the rest stay. Both parts are Pending (FR-5.15) until their tracks, numbers and coverage have been worked out from the original recording, exactly as an edited track is (FR-5.14 behaviors 5–7). A part's start time is its first point's. A split point inside a Private location leaves both parts ending outside that circle, cut as FR-8.1 behavior 1 cuts any end.
-4. A part is edited like any activity, including splitting it again. Its Edit track shows its own points only, and Reset returns it to its own stretch of the original recording, not the whole of it.
-5. Merging keeps the earliest part and deletes the others. Their photos and their Stories move to the kept part. The kept part covers the joined stretch, and its track edit is the parts' edits combined, so it shows exactly the points the parts showed. It's Pending until reprocessed, like an edited track. Merging every part of a split gives back an ordinary, unsplit activity.
-6. Re-importing the original file or record is still recognized as already imported (FR-3.5); a split doesn't bring the whole activity back as a new one.
-7. A split that leaves one part entirely inside Private locations asks first, since that part will be kept with no track — nothing on the map, listed with a Private badge (FR-5.1) — like any activity entirely inside them (FR-8.1 behavior 3), until the location moves or goes. Save shows "Split into a private location?" with that explanation; **Split anyway** saves the split, and Cancel returns to the Edit window with nothing about the track saved. The editor can offer such a point because its preview doesn't apply the second Private location clip (FR-5.14 behavior 5): a walk ending at home with a stray fix just outside the circle, that fix deleted, still shows the points inside the circle there.
-
-**Outputs**: Split: two activities where there was one. Merge: one activity where there were several, and the ids of the parts that no longer exist.
-
-**Error cases**:
-- A split leaving either part fewer than two points (possible only through the API directly) → `400 Bad Request`; the activity is left as it was.
-- A split point outside the activity's own stretch, or any FR-5.14 Apply conflict → `409 Conflict`.
-- Merging fewer than two parts, parts of different splits, parts that don't meet, a Pending part, or another account's activity → `409 Conflict`; nothing changes.
+- A split needs what Edit track needs (FR-5.14). The split point belongs to both parts, each needing at least two points. One split per edit session, whose edit applies to both.
+- The activity keeps the part before the point. A new activity gets the rest with the same type, name, description and edit, joins the original's Stories, and takes the photos after the point.
+- Both parts are Pending until reprocessed; each starts at its first point.
+- A split point inside a Private location leaves both parts ending outside it. A split leaving a part entirely inside Private locations is refused unless the client confirms; that part is then kept with no track (FR-8.1).
+- A part is edited like any activity, split again included; Reset returns its own stretch.
+- Merging (API only) takes two or more parts of one split that meet end to end, none Pending: the earliest is kept, the others deleted, their photos, Stories and edits combined into it. Merging every part gives back an unsplit activity.
+- The original is still recognized on re-import (FR-3.5) and counts once against the limits.
 
 ## 8. FR-6 — Date Range Slider
 
-The date range is picked with a two-knob slider at the top of the Activities tab (FR-5), above the Type and Distance filters, in one row with two pairs of buttons either side, « ‹ track › »: the outer pair is Earlier/Later (FR-6.4), the inner pair shifts the range (FR-6.7). The selected start and end dates sit under the track. It exists on that tab alone: the Stories and Privacy tabs (FR-14.6, FR-8.1) are not filtered by a date range, and neither are Fog of War and Heatmap (FR-4.2, FR-4.3). Switching to another tab and back keeps the range as it was. On a phone it sits at the bottom of the screen instead (§19 item 2).
-
-The slider counts only days with at least one activity, each activity on its local date where it was recorded (FR-3.11); days without one take no room on the track. The track shows a window of 15 activity days, which on load is the 15 most recent. Every day boundary on the track has a tick: a taller one where the month changes, and a doubled one where the two neighbouring activity days aren't consecutive calendar days. Ticks inside the selection are in the accent colour. A selection is applied when a knob or a held button is released, not while it moves.
+The date range filters the Activities tab only, not Stories, the Privacy tab, Fog or Heatmap. The slider counts only days with an activity, by local date (FR-3.11), in a window of 15 such days, the most recent on load.
 
 ### FR-6.1 Default selection
 
-**Description**: On first reaching the map with no prior selection, the range defaults to the 5 most recent days that have at least one activity (not the account's entire history) — what opening the map is usually about, with both knobs inside the slider's window. An account with no activity history at all defaults to "today" only, and the default is recalculated automatically as new activities arrive until the user makes their own explicit choice (moving a knob, or paging with one pulled along). While the Edit window (FR-5) is open the default holds still, so activities still arriving from a large upload never move the activity being edited out of the range and close the window; it catches up once the window closes.
-
-### FR-6.2 Move a knob
-
-**Description**: The knobs mark day boundaries: the start knob where the first selected day begins, the end knob where the last one ends — so a one-day selection has its knobs one activity day apart, and the knobs can never be dragged closer than that. Pressing the track moves whichever knob is nearer to the pressed day boundary, and dragging carries it, always within the window. Each knob is also keyboard-operable: arrow keys move it one activity day, Page Up/Down five, Home/End to the window's edges.
-
-### FR-6.4 Page through history
-
-**Description**: Earlier and Later move the window 5 activity days per press, repeating while held, and stop at the account's first and most recent activity day. A knob sitting on the edge the window moves toward is pulled along with it, extending the selection by up to 5 activity days per step — so a selection longer than the window is made by parking a knob on an edge and pressing or holding that edge's button. Otherwise paging never changes what is selected: a knob that scrolls out of view is simply not drawn until it comes back, and its date stays in the label under the track.
+The 5 most recent days with an activity (today for an account with none), recalculated as activities arrive until the user picks a range, and held still while the Edit window is open.
 
 ### FR-6.6 Changing the selection resets dependent state
 
-**Description**: Committing a new date range (via FR-6.2, FR-6.4 or FR-6.7) clears both the row-click focus (FR-5.5) and the checked group (FR-5.6) independently, the hidden-activity set (FR-5.8), and both the TYPE and DISTANCE filters (FR-5.2/FR-5.3) together — all of these could otherwise silently describe activities the new range no longer lists. The camera flies to fit the new range's drawn activities once, when its list arrives. Only a range the user picked moves it: an upload or sync landing never does — not when it refreshes the same range, and not when it shifts the automatic default range (FR-6.1) — and neither does a Pending activity (FR-5.15) finishing or a Private location change.
-
-### FR-6.7 Shift the range
-
-**Description**: Earlier and Later move the scale. The inner pair of buttons, ‹ and ›, between Earlier/Later and the track, move the selection itself, by its own length in activity days. The new range starts right after the old one ends, or ends right before it begins. A 2-day selection of Sep 8–9 moves to the two activity days before Sep 8: Sep 6–7 if both have activities, otherwise the nearest two earlier days that do. Near the account's first or most recent activity day the range stops at that day and keeps its length, overlapping the old range. A button is disabled once the selection already reaches that end; a selection running to today with nothing recorded today counts as reaching the newest end. A selection containing no activity day moves to the nearest activity day on that side. The window moves as little as needed to show the new range; a range longer than the window shows its end on the side it moved toward. A press commits the new range at once; holding the button repeats the shift and commits on release, as Earlier and Later do.
+- A new range clears the focus, checked activities, hidden set and Type and Distance filters.
+- The camera fits the new range once. Only a range the user picked moves it, never an upload landing, a Pending activity clearing or a Private location change.
 
 ## 9. FR-7 — Activity Graph (Profile)
 
 ### FR-7.1 Contribution grid
 
-**Description**: A private, per-account page at `/profile` (reached from the header's account menu) showing a GitHub-style daily contribution grid — one cell per calendar day, each activity on its local date where it was recorded (FR-3.11), one block per calendar year (most recent first, back to the account's first-ever activity).
-
-**Behavior**: Each day's cell is shaded by intensity, toggle-able between two measures (the "Shade by" switch — `/profile?shade=distance` for Distance, the plain `/profile` for Count):
-- **Count**: number of activities that day (empty / one / two / three-or-more).
-- **Distance**: quantile-based thresholds computed over that account's own active days for that year (so "a busy day" is relative to this account's own typical distances, not a fixed absolute number).
-
-Hovering a day shows its date, activity count and distance; so does tapping or clicking it, under its year, with the day ringed — one day at a time, and tapping it again hides it. A year wider than the screen scrolls sideways, and this year's opens scrolled to today. The page needs a session like the map does: no session goes to `/signin`, an unverified account to `/verify-pending`, and an account that has never saved Settings to `/settings` (FR-1.7).
+A private page, `/profile`: one cell per calendar day by local date, one block per year back to the first activity, shaded by count (none, one, two, three or more) or by distance in quantiles of the account's own active days that year.
 
 ### FR-7.2 All-time and per-year stat cards
 
-**Description**: Four statistics — Activities, Distance, Active Days, and Longest Streak (the longest run of consecutive calendar days with at least one activity) — shown once for the account's entire history, and again as a subtotal under each year's own grid.
+Activities, Distance, Active Days and Longest Streak (consecutive days with an activity), all-time and per year.
 
 ## 10. FR-8 — Privacy Controls
 
 ### FR-8.1 Private locations
 
-**Description**: A user marks places they don't want their tracks to reveal — home, work — as Private locations: circles on the map, each a center and a radius (50–2000 meters, 200 by default), with an optional name. The part of an activity that starts or ends inside one is hidden everywhere, the user's own map included. Nothing else is trimmed: an activity outside every Private location keeps its full recorded geometry, so consecutive days of a multi-day trail join up with no gap at each day's start and end.
+Circles a user marks so tracks don't reveal where they start and end. The part of an activity that starts or ends inside one is hidden everywhere, the user's own map included. A track that only passes through one is shown whole, since that reveals neither end.
 
-**Preconditions**: An active session. Creating, moving, resizing, renaming, and deleting need a real account (FR-2's demo can see its own, read-only).
-
-**Inputs**: The Activities panel's **Privacy** tab, shown in Normal map mode only (the panel isn't shown in Fog or Heatmap), and also reached by `/?private-locations`, which opens the map on that tab (the parameter is then removed from the URL, so a refresh doesn't reopen it). The tab lists the account's Private locations (name and radius), each row with a Delete button (confirmed first), and a **Create** button that puts a new 200 m circle in the middle of the map (zoomed out past street level, it flies in to that spot first — a circle there would be under a pixel). Clicking a row — or, while the tab is showing, a saved circle or its center dot on the map (every saved location shows a fixed-size center dot at any zoom) — opens that location's editor: a window over the map, like Edit track's (FR-5.14), below the map-mode toggle, where the circle's center drags, a slider sets its radius, and Save or Cancel closes it; on a phone, opening it collapses the Activities sheet. Picking another location while the open one has unsaved changes asks first ("Discard changes?" — Discard or Keep editing), and does nothing while a Save is in flight; switching tabs, or away from Normal, drops an unsaved edit. For the demo account the list is read-only: no Create or Delete, and a row only shows its circle. Saved through `GET`/`POST /v1/private-locations` and `PATCH`/`DELETE /v1/private-locations/{id}`; at most 20 per account.
-
-**Behavior**:
-1. Applied at ingest, server-side, before anything is stored: the leading points inside any Private location are dropped, and so is a further stretch of the track past the circle's edge, between 0 and the circle's radius long, measured along the track. The track starts at the first recorded point that stretch reaches — or the one before it, when that lies more than a radius past the edge; only a recording with no point in that first radius is cut at the drawn distance itself. The trailing points likewise. The stretch's length is drawn at random for each end but stays the same every time that activity is processed, so the ends of many tracks scatter over a band outside the circle instead of outlining it, and a reprocess doesn't move them. An end the stretch carries back inside a Private location is cut again where the track next leaves it, and a track the stretch leaves with fewer than two points is hidden entirely (behavior 3). The same clip runs again on a track edit's result (FR-5.14 behavior 5), so an edit can't uncover an end inside one. A track that only passes *through* a Private location mid-way is shown whole, by design: what a Private location protects is where a track starts and ends, and passing through one reveals neither.
-2. An activity's distance, duration, elevation gain, pace, fog, heatmap, and Country/Region matches all come from the visible part only.
-3. An activity entirely inside Private locations is still kept, with no geometry: zero distance, nothing on the map, no fog. Its row shows a Private badge in place of distance and duration (FR-5.1). Deleting or shrinking the location brings it back.
-4. Every change to a Private location is retroactive. The activities the old or new circle could clip — those whose track comes within twice its radius of the center — are marked Pending (FR-5.15, the same badge FR-5.14's reprocessing shows) and reprocessed in the background from their original recorded points; while Pending they are neither drawn nor counted in fog or heatmap. The badges clear once each activity's track and stats are current, and the map refreshes itself — fog and heatmap a moment later, once re-rendered — without moving the camera.
-5. The circles are drawn only while the Privacy tab is showing, never in the normal view and never in an Export (FR-4.10), and from zoom 4, where tracks start (FR-4.15): zoomed out further, none.
-6. Activities ingested before Private locations existed kept the fixed endpoint trim they were processed with (100 m by default). There's no backfill: one gets its full ends back only when something reprocesses it — an Edit track (FR-5.14), or a Private location change that includes it.
-
-**Outputs**: The account's Private locations; every activity's stored geometry and stats clipped against them.
-
-**Error cases**:
-- Radius outside 50–2000 meters, a coordinate out of range, or a name over 100 characters → `400 Bad Request`.
-- A 21st Private location → `409 Conflict`.
-- An id that isn't one of the caller's own Private locations → `404 Not Found`.
-- Any change from the demo account → `403 Forbidden`.
+- A center, a radius of 50–2,000 m (200 by default) and an optional name up to 100 characters; at most 20 per account. The demo account's are read-only.
+- Applied at ingest, before anything is stored: the leading points inside any Private location are dropped, and so is a further stretch past the edge, between 0 and the radius long along the track. The track starts at the first point that stretch reaches, or the one before when that lies more than a radius past the edge; only a recording with no point in that first radius is cut at the stretch's end itself. The trailing points likewise.
+- Each end's stretch is random but fixed per activity, so the ends of many tracks scatter over a band outside the circle instead of outlining it, and reprocessing doesn't move them.
+- An end the stretch carries back inside a Private location is cut again where the track next leaves it. The same clip runs on an edited track (FR-5.14).
+- Distance, duration, elevation gain, pace, coverage and country and region matches come from the visible part.
+- An activity left with fewer than two points is kept with no geometry and a Private badge (FR-5.1); moving or deleting the location brings it back.
+- Every change is retroactive: activities whose track comes within twice the radius of the old or new center go Pending and are reprocessed from their originals.
+- Circles are drawn only on the Privacy tab, from zoom 4, and never in an export.
+- Originals stay unclipped and are in the data download (FR-1.12). A Story copy carries the sender's clipped track (FR-14.8).
+- An activity ingested before Private locations existed keeps its fixed 100 m endpoint trim until reprocessed.
 
 ### FR-8.2 Data isolation
 
-**Description**: An account can only ever see its own activities, uploads, and profile data. Every data-returning endpoint derives the account from the caller's session; no endpoint accepts a user or account identifier as a request parameter that could be substituted for another account's. The one exception is the admin panel (FR-12), whose pages take an account id in the path and are shown only to an admin.
+An account only sees its own data. Every endpoint takes the account from the session, and none accepts an account id that could stand for another's, except the admin panel (FR-12), shown only to an admin.
 
 ## 11. FR-9 — Trends
 
 ### FR-9.1 Trends
 
-**Description**: A signed-in account's own activity history, aggregated into weekly or monthly totals, viewable on the Profile page below the activity grid — how much ground was covered over recent weeks or months.
+- Weekly (Monday to Sunday) or monthly totals of count, distance, moving time and elevation gain by local date (FR-3.11), for a window defaulting to the trailing 12 months, every bucket returned, empty ones as zeroes.
+- An activity with no moving time counts its elapsed time. Shown on the Profile page. Best efforts and personal bests are out of scope (§20).
 
-**Preconditions**: The caller has a valid session (real or demo user).
+## 12. FR-10 — Public pages: About, Help, Contacts, privacy policy, Android test suite
 
-**Inputs**: `bucket` — `week` or `month`; `from`/`to` (`YYYY-MM-DD`, both optional, default to the trailing 12 months).
-
-**Behavior**:
-1. Every activity in the window is grouped into the requested bucket by its `started_at` date, in the timezone it was recorded in (FR-3.11), one bucket per calendar week (Monday to Sunday) or month. Every bucket the window touches is returned, the first holding `from` and the last holding `to`, and one with nothing recorded comes back as zeroes, so a window with no activities still lists its buckets.
-2. Each bucket reports: activity count, total distance, total moving time, and total elevation gain.
-3. The Profile page renders the trailing 12 months as one bar per bucket, empty ones included, height scaled (logarithmically) to the window's busiest bucket by distance and never under 2px, the first and last bucket under the chart with its year ("Oct 6, 2025" and "Oct 5, 2026" by week, "Oct 2025" and "Oct 2026" by month), or "Nothing recorded in this window yet." when no bucket has an activity; with a Week/Month switch (`?bucket=month`; the Distance/Count grid setting is kept). Hovering a bar shows that bucket's full breakdown (distance, activity count, moving time, elevation gain); tapping or clicking one shows it in a line under the chart, and tapping it again hides it.
-
-**Outputs**: `{bucket, from, to, periods: [{period_start, count, distance_meters, moving_seconds, elevation_gain_m}, ...]}`.
-
-**Notes**: "Moving time" falls back to elapsed time for any activity without a moving-time figure of its own, so this bucket-level total uses whichever one each activity actually has, rather than a bucket going silently short. Best-effort curves and personal bests are deliberately out of scope (§1.2, §20).
-
-## 12. FR-10 — Public pages: About, Help, Contacts, export guides, privacy policy, Android test suite
-
-These are server-rendered pages (`IMPLEMENTATION.md` §4.19): each is a plain HTML page that needs no JavaScript and makes no API calls from the browser, with the page header every page shares (FR-10.4).
+Server-rendered pages that need no JavaScript, with the shared header (FR-10.4).
 
 ### FR-10.1 About page
 
-**Description**: A public page at `/about` that explains what HoldMyTrack is, who it is for, what it deliberately is not, and how it is funded. A visitor or a search engine can read it without an account.
-
-**Preconditions**: None — no session is needed; having one changes only the header (FR-10.4).
-
-**Behavior**:
-1. `GET /about` returns the page. It is also the site's front page: a visit to `/` without a session gets the same page (titled "HoldMyTrack — Every journey, mapped."), and both carry a canonical link to `/`, so search engines index the one URL. With a session, `/` is the map (FR-4).
-2. It has sections for: what HoldMyTrack is and what it is for, how it works (three numbered steps: bring what you already recorded, see it on one map, go somewhere new), why someone might want it, what it isn't, how it is funded (section id `funding`), and a pointer to Contacts (FR-10.3).
-3. "Try the demo — no signup" links to `/signin`, where the demo starts from its own button (FR-2.1). The page never starts a demo session itself. The Android app's About has no such button (FR-10.8).
-4. About, Help, Contacts and the privacy policy are reachable from every page's header and footer (FR-10.4) — the map and the sign-in pages included.
-5. `/robots.txt` allows crawling except for `/v1/` and `/tiles/`, and points to `/sitemap.xml`, which lists `/`, `/help`, `/contacts` and `/privacy` (`/about` is the same page as `/`).
-6. The front page carries structured data (a schema.org `WebApplication`, as JSON-LD) naming the site, its URL, description and share image, and that it's free.
+- `/about` says what HoldMyTrack is, isn't and how it's funded. Without a session `/` is the same page, with `/` as canonical; with one, `/` is the map. It never starts a demo itself.
+- `/robots.txt` disallows `/v1/` and `/tiles/`; `/sitemap.xml` lists `/`, `/help`, `/contacts` and `/privacy`.
 
 ### FR-10.2 Help page
 
-**Description**: A public page at `/help` that explains how HoldMyTrack works, in ten sections reachable from jump links under its title: the map (the opening view, the Normal / Fog of War / Heatmap modes, how Fog and Heatmap switch to whole states or regions, then whole countries, as the map zooms out, and the Layers menu's base map and paths — FR-4, FR-4.13, FR-4.14), the date slider (what its slots are, moving a knob, and paging back through history with a knob pulled along — FR-6), editing and deleting activities (anchor `#edit`: the Edit window's Activity and Track tabs, Hide, Delete, and splitting an activity in two — FR-5.10–FR-5.14, FR-5.17), Stories (making one, adding and removing activities, the Stories tab, renaming and deleting, sending a copy and accepting one, the tab's count of copies waiting, the badge — FR-14, FR-5.16), photos (anchor `#photos`: adding them in the Edit window, how each is placed on the route, moving and captioning one, looking at them, and the resized copy kept and the 2,000-photo limit — FR-16), points of interest (anchor `#places`: turning categories on in Layers, where badges and areas show and Show in this area, the popup, capturing a place in the Android app, and that the places come from OpenStreetMap — FR-15), getting activities in (files, up to 20 at a time, and that a `.zip` isn't imported, the Android app with a link to download it and that it uploads files too, and what happens on a repeated import or the same activity from two sources — FR-3), exporting a map image (FR-4.10), the Profile page (anchor `#profile`: the activity grid, its totals, and Trends — FR-7, FR-9), and settings and privacy (Country, Timezone, Language, Theme, Private locations — FR-1.7, FR-4.12, FR-13, FR-8.1 — what HoldMyTrack stores and doesn't: no health data, only the route, and the original upload kept only to rebuild it (`VISION.md` §1.1; anchor `#what-we-store`), with a link to the privacy policy (FR-10.6) — how to download a copy of everything (anchor `#download-data`: requesting it in Settings, the email, the 7 days, once a week, the 2 GB archives and what each folder holds — FR-1.12), and how to delete an account — in Settings on the web or in the Android app (FR-1.11), or by email to the Contacts address for someone who can no longer sign in — and how to revoke Google's or Facebook's access on their side; its `#delete-account` anchor is the deployment's data-deletion instructions URL for Facebook, FR-1.10).
-
-**Preconditions**: None.
-
-**Behavior**:
-1. `GET /help` returns the page. It is indexable and listed in `/sitemap.xml`.
-2. Its facts are the behavior this document specifies; a change to one of those FRs that the page describes (a limit, a mode's window, a zoom tier) is a change to the page too.
+- `/help` explains every feature. Its facts are this document's: changing a limit, a mode's window or a zoom tier it describes changes Help too.
+- It tells someone who can't sign in how to have their account deleted by email, and how to revoke Google's or Facebook's access. Its `#delete-account` anchor is the deployment's data-deletion instructions URL for Facebook (FR-1.10).
 
 ### FR-10.3 Contacts page
 
-**Description**: A public page at `/contacts` with how to reach the project.
-
-**Preconditions**: None.
-
-**Behavior**:
-1. `GET /contacts` returns the page, listing the email address `hello@holdmytrack.com` and the GitHub repository `https://github.com/HoldMyTrack/platform` for code and issues.
+`/contacts` gives `hello@holdmytrack.com` and `https://github.com/HoldMyTrack/platform`.
 
 ### FR-10.4 Page header and footer
 
-**Description**: Every page shares one header — the map and Profile included — and every page other than those two shares one footer.
-
-**Behavior**:
-1. The header shows the logo, wordmark and tagline (the brand links to `/`), then Donate (FR-11.1), the language menu (FR-13.2), an "Info" menu listing About, Help, Contacts and Privacy with the current page marked, and the account area.
-2. Signed out, the account area is a "Sign in" link to `/signin`. With a session (real or demo), it is an account menu showing the account's avatar (or a generic icon) that opens to the account's email (a demo session shows its display name instead, followed by "Create your own account", FR-2.3), then "Profile" (`/profile`), "Settings" (`/settings`), "Admin" (`/admin`, an admin only — FR-12.1) and "Sign out".
-3. The menus open and close without JavaScript.
-4. "Sign out" submits `POST /logout`, which ends the session the same way `POST /v1/auth/logout` does and redirects to `/`. The request is refused (`403`) unless its `Origin` header — or, without one, its `Referer` — is the app's own origin.
-5. On a desktop the header's controls are sized to it (about 36px tall, 14px text), and each is an icon with its label — Donate a heart, Upload an arrow, Sync two arrows, the language menu a globe beside the page's language code ("EN"), Info an "i" in a circle; none has a caret, though Upload, the language menu, Info and the account menu open menus. It gives way in steps as the window narrows: at 1180px and below the tagline is hidden; at 960px and below Upload, Sync and Info show their icons alone. On a phone-width screen (≤768px) the controls turn compact, Donate shows its heart alone too, and the language menu its code alone; every control stays. Narrower than 360px, the wordmark is hidden too, leaving the logo. Nothing in the header runs past the screen's edge at any width, in either language.
-6. The footer links to the map (`/`), About, Help, Contacts, Privacy and the GitHub repository.
-7. With a session, pages are sent with `Cache-Control: no-store`, since the header names the signed-in account. Without one, the front page, About, Help, Contacts and the privacy policy are the same for every visitor and are sent `Cache-Control: public, max-age=300` with `Vary: Cookie`, so a copy cached before signing in is never reused after.
-8. An address no page answers gets a "Page not found" page (`404`) with the same header; under `/v1/` and `/tiles/` it's a plain `404`, not a page.
-9. Every indexable page carries link-preview tags (Open Graph and a large-image Twitter card), with a 1200×630 share image: a Fog of War map with the HoldMyTrack logo, tagline and a one-line pitch.
+- One header on every page, one footer on every page but the map and Profile; menus work without JavaScript.
+- With a session pages are `Cache-Control: no-store`, since the header names the account; without, public pages are `public, max-age=300` with `Vary: Cookie`, so a copy cached signed out is never reused signed in.
+- An unknown address gets a "Page not found" page, or a JSON error under `/v1/` and `/tiles/` (§1.5).
+- Indexable pages carry Open Graph and Twitter card tags with a 1200×630 share image.
 
 ### FR-10.6 Privacy policy
 
-**Description**: A public page at `/privacy`, the privacy policy: what HoldMyTrack keeps and why, the Android app's Health Connect and location use, the processors, cookies, retention and the user's rights. It is the policy the Play Store listing and the Android app's Health Connect rationale (`apps/android/docs/SPEC.md` FR-3.1) point to.
-
-**Preconditions**: None.
-
-**Behavior**:
-1. `GET /privacy` returns the page, in English or Russian like Help, with a "Last updated" date under its title and jump links to its sections. It is indexable and listed in `/sitemap.xml`.
-2. It names the HoldMyTrack project as the controller, with `hello@holdmytrack.com` as the contact.
-3. It lists what is kept — the account (email, a password hash, a Google or Facebook account's id, email and name, the settings), activities and their original files, Private locations, Stories, photos (a resized copy without its metadata), captures and the import history — and that all of it is visible only to the account. It says that a copy of a Story sent by email address (FR-14.7) becomes part of the recipient's account once they accept it, made from the activities as the sender sees them with the sender's Private locations cut off, and stays theirs whatever the sender deletes; and that a copy sent to the account is added only once it's accepted. It says what isn't: no health data (`VISION.md` §1.1), no live location from the map's location button, no analytics, advertising or tracking, and that user data is never sold (ADR-0031).
-4. It says what the Android app reads — exercise sessions and their routes from Health Connect, only while the Sync screen is open, never writing back — and when it uses the phone's location: recording, Find my location and capturing, a capture sending only the place and the time.
-5. Its legal bases are the GDPR's contract (the service), consent (Health Connect and location) and legitimate interest (logs, backups, sign-in limits). Email is only about the account: confirming the address, a password reset, a download being ready, and a copy of a Story someone sent (FR-14.7).
-6. It names the processors — DigitalOcean (the server, US), Cloudflare R2 (files, photos, tiles and backups), Grafana Labs (logs and metrics, US, 14 days, with no tracks, names, email or IP addresses — `DEPLOY.md` §13) and an unnamed email delivery provider — and what the browser or phone loads from others: Google Fonts, MapTiler's satellite imagery when chosen, and Google or Facebook sign-in. It says the data is stored in the US.
-7. It lists the cookies (`holdmytrack_session`, 30 days or 24 hours for the demo, `hmt_lang`, and `hmt_app`, set only inside the Android app — FR-10.8) and the `hmt_theme` local-storage key, and why there is no cookie banner.
-8. Retention: an account until it's deleted; deleting an activity deletes its route, file and photos, but not a copy of it someone else accepted; sign-ins last 30 days; a requested download of the account's data, 7 days (FR-1.12); logs are rotated on the server and kept 14 days with Grafana Labs; deleted data stays in backups for up to 8 weeks (`DEPLOY.md` §11).
-9. Rights: a copy of the data (the original files included), correction, a copy of the data — in Settings (FR-1.12) — deletion — in Settings (FR-1.11, pointing to Help's `#delete-account`, FR-10.2), or by email for someone who can't sign in — and objection, answered within a month, and a complaint to a data protection authority. The service isn't meant for children under 16.
+`/privacy`, in English and Russian, is the policy the Play Store listing and the Android app's Health Connect rationale point to. Its text is the page itself (`services/server/internal/web/templates/pages/privacy.html`, `privacy.ru.html`), which must agree with `DPIA.md` and this document: a change to what is kept, who processes it or for how long changes all three.
 
 ### FR-10.7 Android test suite
 
-**Description**: A public page at `/testing` for the Android app's closed testers (`apps/android/docs/ROADMAP.md`): step-by-step tests of everything the app does, each with an ID, its steps and the expected result, and the sample files to use. It is English only.
-
-**Preconditions**: None.
-
-**Behavior**:
-1. `GET /testing` returns the page. It is marked `noindex`, carries no canonical link, isn't in `/sitemap.xml`, and nothing on the site or in the app links to it; testers get its URL with their invitation.
-2. Setup comes first: install the app, create an account, set it up (FR-1.7), and upload the 20 files in `holdmytrack-sample.zip`, extracted on the phone — 20 of the Demo Customer's activities, in Vietnam, Estonia, Italy and Cleveland (FR-2.1). The tests after it assume that account: uploads (FR-3, including each failure reason, a file uploaded twice, a `.zip` refused, more than 20 files at once and the same activity from another source), the map's modes and layers (FR-4), the date slider, the Activities panel, editing and splitting (FR-5), Private locations (FR-8.1), Stories (FR-14), photos (FR-16), points of interest (FR-15), and the Android-only Health Connect sync, recording, You tab and Settings, account and demo screens (`apps/android/docs/SPEC.md`). It ends with how to report a problem, by email to the Contacts address (FR-10.3).
-3. Its expected results quote the app's own text, so a change to what the Android app shows or says, or to a server message it shows, is a change to this page too.
-4. Each sample file is a link under `/static/testing/` that downloads under its own name: the zip of Setup's 20 files, single GPX, TCX and FIT activities, a TCX duplicating one of Setup's activities, a file for each import failure (unreadable, no timestamps, no GPS points, one point, empty, an unsupported type), and photos whose capture time places them on one of the activities, or on none.
+- `/testing`: the Android closed test's steps and expected results, with sample files under `/static/testing/`. English only, `noindex`, not in the sitemap, linked from nowhere.
+- Its expected results quote the app, so a change to what the Android app shows or says, or to a server message it shows, changes this page too.
 
 ### FR-10.8 Pages inside the Android app
 
-**Description**: The Android app shows four of the site's pages on screens of its own — Settings (FR-1.7), Profile (FR-7, FR-9), the Sync page (FR-3.9) and About (FR-10.1) — rather than native screens of the same thing (`apps/android/docs/SPEC.md` FR-1.5, FR-1.6, FR-4.1, FR-2.9). A request carrying the `hmt_app` cookie, which the app sets, gets the page for an app.
-
-**Behavior**:
-1. A page for an app has no header (FR-10.4), no footer and no "Back to map": the app's own screen has its title and Back. So Settings has no title of its own, and the Sync page no "Sync history" heading.
-2. Settings for an app leaves out the Theme control (FR-1.7 behavior 8), Download your data (FR-1.12) and Delete account (FR-1.11): the app's own Theme decides, and it keeps the other two on screens of its own.
-3. The Sync page for an app says what it lists without pointing to the Upload menu, which an app doesn't have, and About for an app has no "Try the demo" button (FR-10.1), since the app is signed in.
-4. Everything else is as in a browser: the page's content, its forms and what they save, the session it needs and where it sends a visitor without one, and its language (FR-13.1).
-5. Without a session, About for an app is cached apart from About for a browser, so neither is ever sent in place of the other (FR-10.4 item 7).
+- The Android app shows Settings, Profile, the Sync page and About as web pages; the `hmt_app` cookie drops their header and footer.
+- For the app, Settings leaves out Theme, Download your data and Delete account, which the app has natively, and About has no demo link. Signed out, the app's About is cached apart from the browser's.
 
 ## 13. FR-11 — Donations
 
 ### FR-11.1 Donate
 
-**Description**: The header's Donate button (FR-10.4) is how a visitor reaches HoldMyTrack's funding — recurring community donations with a public ledger on Open Collective (`VISION.md` §6.1). HoldMyTrack itself takes no payment and stores nothing about a donation.
-
-**Preconditions**: None.
-
-**Behavior**:
-1. The button shows a heart icon followed by "Donate"; on a phone-width screen (≤768px) it shows the heart alone.
-2. While no Open Collective is configured (the slug is empty), Donate links to About's funding section (`/about#funding`), which says donations aren't open yet.
-3. Once one is configured, Donate is a link to `https://opencollective.com/<slug>/donate`, opened in a new tab so the map is kept; choosing an amount, one-off or monthly, and paying all happen on Open Collective.
+Donate opens the configured Open Collective's donation page in a new tab (`VISION.md` §6.1), or About's funding section when none is configured. HoldMyTrack takes no payment and stores nothing about a donation.
 
 ## 14. FR-12 — Admin panel
 
-A read-only view of every account and every account's activities, for the people operating HoldMyTrack. Server-rendered pages (`IMPLEMENTATION.md` §4.20) with the shared page header (FR-10.4), `noindex`:
-
-| Page | Purpose |
-| :-- | :-- |
-| `GET /admin` | Every account (FR-12.2) |
-| `GET /admin/users/{id}` | One account and its activities (FR-12.3) |
+A read-only view of every account and its activities for the operators, at `/admin` and `/admin/users/{id}`, `noindex`.
 
 ### FR-12.1 Access
 
-**Description**: Only an admin can open the admin panel; to anyone else it doesn't exist.
-
-**Behavior**:
-1. An account is made an admin, or stops being one, only from the server's command line: `holdmytrack set-admin <email> true|false`. It fails for an email no account has, and for the demo account. Nothing on the web can make an account an admin.
-2. An admin's account menu (FR-10.4) has an "Admin" item, after "Settings", linking to `/admin`. No one else's does.
-3. Signed out, signed in as a non-admin, or in a demo session, both admin pages answer with the ordinary "Page not found" page (`404`), exactly like a URL that doesn't exist.
-4. An admin whose own account isn't past email verification or first-run Settings is sent there first (FR-1.8, FR-1.7), as on every other signed-in page.
-5. Revoking takes effect on the admin's next page load; their session is not ended.
+- Admin is granted or revoked only from the command line: `holdmytrack set-admin <email> true|false`, which fails for an unknown email or the demo account.
+- To anyone else, signed out or in a demo session, both pages answer the ordinary "Page not found".
+- An admin still goes through verification and first-run Settings. Revoking applies on the next page load without ending the session.
 
 ### FR-12.2 Accounts
 
-**Description**: `/admin` lists every account, demo accounts included, newest signup first.
-
-**Behavior**: Each row shows the email (a link to FR-12.3's page), the display name when set, badges for admin, demo and unverified email, the signup date, country, timezone, the number of activities, the first and last activity's dates, and their total distance. The signup date is in that account's timezone, each activity date in the timezone it was recorded in (FR-3.11), distance in the admin's own units (FR-1.7).
+`/admin` lists every account, demo included, newest first: email, name, admin, demo and unverified badges, signup date, country, timezone, activity count, first and last activity dates and total distance.
 
 ### FR-12.3 An account's activities
 
-**Description**: `/admin/users/{id}` shows one account and every activity it has stored, with each activity's id.
-
-**Behavior**:
-1. The header repeats FR-12.2's row, plus the account id.
-2. Activities are listed newest first, 100 per page, with "← Newer" and "Older →" links (`?page=`) and a "1–100 of 250" count.
-3. Each row shows the full activity id (selected whole with one click), the start date and time where it was recorded, followed by that timezone's name (FR-3.11), type, name, distance, duration (hours:minutes), source (`upload`, `healthconnect`, `recorded`, `takeout` and `timeline` on older activities, …), and the countries and regions it passes through (FR-4.2's boundary tiers).
-4. Unlike every other list in the product, activities entirely inside a Private location are included, badged "hidden"; an activity with a track edit (FR-5.14) is badged "edited".
-5. An id that isn't a UUID, or no account's, is `404`. A page past the last shows no rows and a link back to the first.
-6. The pages only read. Nothing on them changes an account or an activity.
+- `/admin/users/{id}` lists the account's activities, newest first, 100 per page: id, local start time and zone, type, name, distance, duration, source, countries and regions.
+- Activities entirely inside a Private location are included and badged; edited tracks are badged. Nothing on either page changes anything.
 
 ## 15. FR-13 — Language
 
 ### FR-13.1 Which language a person gets
 
-**Description**: HoldMyTrack's interface is in English or Russian. Every page, the map, the emails, and the error messages the web and Android apps show come in one language per request.
+Pages, the map, emails and error messages come in English or Russian, one language per request.
 
-**Behavior**:
-1. The language is, in order: the account's Language setting (FR-1.7) when it is English or Русский; otherwise the language last chosen on this browser with the header's language menu (FR-13.2); otherwise the language the browser or app asks for (`Accept-Language`, its most preferred supported language, matching `ru-RU` as Russian); otherwise English. URLs don't change with language.
-2. The whole page is in that language: the shared header and footer (FR-10.4), every page including About and Help, the map app, `<html lang>`, the page title and description. The map app always shows the language the page around it is in.
-3. Numbers and dates follow the language: `1,234.5 km` and `Sep 8` in English, `1 234,5 км` and `8 сент.` in Russian. Units are unchanged by language — they follow Country (FR-1.7).
-4. Counts take the language's plural forms (`1 занятие`, `2 занятия`, `5 занятий`).
-5. The verification and password-reset emails (FR-1.8, FR-1.5) are in the account's language, or when it has none set, the language of the request that sent them.
-6. Error messages a person can see (a wrong password, a taken email, a rejected upload or track edit) are full sentences in the request's language, in page forms and in the JSON API's error `message`s alike (§1.5). Their codes (`email_not_verified`, `demo_read_only`) never change with language. An import's failure reason, in the upload history, and the Android app's per-activity sync rejections are in the language of the request reading them, however long ago the import failed.
-7. A language chosen in the header's menu (FR-13.2) takes effect from that choice's own reload onward; other open pages change on their next load. Saved from the Android app, it applies to the web from each page's next load.
-8. The map's place labels (countries, cities, streets), on the web and in the Android app, are in that language where OpenStreetMap has the place's name in it, else in English, with the place's own name beneath when that is written in another script (`Париж` over `Paris`); a place with neither shows its own name. An export (FR-4.10) carries the labels as the map shows them.
-9. The Android app follows its own per-app language (Android's Settings → Apps → HoldMyTrack → Language), else the phone's. Its Language, on Settings or the You tab, sets that per-app language and the account's setting together, and signing in applies the account's language when it is English or Русский (`apps/android/docs/SPEC.md` FR-1.5). It sends its language as `Accept-Language`, so the server's messages match it.
+```mermaid
+flowchart TD
+    A{"Account Language<br/>set?"} -->|en or ru| R1[That language]
+    A -->|no, or signed out| B{"Chosen in this<br/>browser's menu?"}
+    B -->|yes| R2[That language]
+    B -->|no| C{"Accept-Language<br/>has en or ru?"}
+    C -->|yes| R3[The most preferred]
+    C -->|no| R4[English]
+```
 
-**Not translated**: activity names and descriptions people type, place names OpenStreetMap has in neither the language nor English, and activity types outside the common set (shown as recorded).
+- `ru-RU` and the like count as Russian. URLs don't change with language.
+- Numbers, dates and plurals follow the language; units follow Country (FR-1.7).
+- Verification and reset emails use the account's language, else the request's; a Story copy's email the recipient's, else English.
+- Error codes never change; messages follow the request reading them, so an old import failure reads in today's language.
+- Map labels use the language where OpenStreetMap has it, else English, with the local name beneath when it's in another script.
+- The Android app follows its per-app language, else the phone's; its Language setting sets that and the account's together, signing in applies the account's, and it sends `Accept-Language`.
+- Not translated: names and descriptions people type, place names OSM lacks in either language, uncommon activity types.
 
 ### FR-13.2 The language menu
 
-**Description**: Anyone can choose the language, signed in or not, from the shared header (`IMPLEMENTATION.md` §4.21).
-
-**Inputs**: The header's language menu (FR-10.4), on every page, signed in or not, and the web's only language control: it shows the page's language code and opens to each language named in itself (English, Русский), the current one bold, then, under a rule, "Automatic (browser)" in the page's language. Choosing one submits `POST /language` with `lang`: `en`, `ru`, or empty for Automatic; it works without JavaScript.
-
-**Behavior**:
-1. The browser remembers the choice for a year (cookie `hmt_lang`), and every later page and request from it is in that language, unless a signed-in account's own Language setting says otherwise (FR-13.1).
-2. Signed in to a real account, the choice is also saved as the account's Language setting (FR-1.7), on every device. A demo account's choice is remembered on the browser only.
-3. Automatic forgets the browser's choice and, signed in to a real account, sets the account's Language setting back to automatic, so the browser's own language decides again (FR-13.1).
-4. The browser goes back to the page it was on, query string included, now in the chosen language.
-
-**Errors**:
-- A language other than `en`, `ru` or empty → `400`.
-- A POST from another site (no matching `Origin` or `Referer`) → `403`, like every page form.
+- On every page, signed in or not; the browser keeps the choice for a year (`hmt_lang`).
+- For a real account it is also saved as the account's Language, on every device; a demo session's stays in the browser.
+- Automatic forgets the browser's choice and sets the account back to automatic.
+- It applies from that page's reload; other open pages change on their next load.
 
 ## 16. FR-14 — Stories
 
-A Story is a hand-picked, private set of the account's activities — a hike, a holiday, a race weekend — with a name, an optional description and joint statistics (`VISION.md` §4.2). An activity can be in any number of Stories. This section covers the API and the Activities panel's Stories tab (FR-14.6), where a Story is opened on the map; a Story is made, and activities go into Stories, with the Activities toolbar's Add to story (FR-5.16); activities come out of a Story from its rows on the Stories tab; and a row's Story badge is FR-5.1.
-
-| Endpoint | Purpose |
-| :-- | :-- |
-| `GET /v1/stories` | Every Story of the account, newest first |
-| `POST /v1/stories` | Create one, optionally with its first activities |
-| `GET /v1/stories/{id}` | One Story |
-| `PATCH /v1/stories/{id}` | Rename it, or change its description |
-| `DELETE /v1/stories/{id}` | Delete it |
-| `POST /v1/stories/{id}/activities` | Add activities, `{activity_ids}` |
-| `DELETE /v1/stories/{id}/activities` | Remove activities, `{activity_ids}` |
-| `POST /v1/stories/{id}/send` | Send a copy of it to an email address, `{email}` (FR-14.7) |
-| `GET /v1/story-sends` | The copies others sent the account, waiting to be accepted |
-| `POST /v1/story-sends/{id}/accept` | Accept one: the Story is copied into the account (FR-14.8) |
-| `DELETE /v1/story-sends/{id}` | Decline one |
+A Story is a hand-picked, private set of the account's activities with a name, an optional description and joint totals (`VISION.md` §4.2). An activity can be in any number. Activities go in with the Activities toolbar's Add to story, into a new or existing Story, and come out on the Stories tab.
 
 ### FR-14.1 A Story
 
-**Description**: What every Story endpoint but `DELETE /v1/stories/{id}` answers with — the list as `{stories: [...]}`.
-
-**Outputs**: `id`, `name`, `description` (`null` when none), `created_at`, `updated_at`, `from` (for a Story that came from a copy someone sent, FR-14.8, their name or email address while the Story it was copied from still exists; otherwise `null`), `activity_ids` (every member, earliest activity first) and `stats`: `count`, `distance_meters`, `moving_seconds` and `elapsed_seconds` over the Story's activities, with no date bound, and the same four per activity type in `by_type`, the most frequent type first. An activity with no moving time of its own counts its elapsed time as moving, as in Trends (FR-9.1).
+- Totals (count, distance, moving and elapsed time, and per activity type) cover all its activities with no date bound; an activity with no moving time counts its elapsed time.
+- A Story copied from someone else's (FR-14.8) names them while the original Story exists.
 
 ### FR-14.2 Create, rename and delete
 
-**Behavior**:
-1. `POST /v1/stories` takes `name`, `description` and, optionally, `activity_ids` — the Story's first activities, added in the same request — and answers `201` with the new Story.
-2. `PATCH /v1/stories/{id}` takes `name` and `description`, both sent every time: an empty description clears it.
-3. Name and description are trimmed. The name is required, up to 200 characters; the description up to 2000.
-4. `DELETE /v1/stories/{id}` answers `204`. The Story's activities stay.
-5. Renaming, a new description, and a change to the Story's activities (FR-14.3) move `updated_at`.
-
-**Error cases**:
-- A blank name, or a name or description over its limit → `400` with a message in the request's language (FR-13.1).
-- `activity_ids` naming an activity that isn't the account's own → `404`, and nothing is created.
+- Name required, up to 200 characters; description up to 2,000; both trimmed.
+- A Story can be created with its first activities; if any isn't the account's own, nothing is created.
+- Deleting a Story keeps its activities.
 
 ### FR-14.3 Add and remove activities
 
-**Behavior**:
-1. `POST /v1/stories/{id}/activities` with `{activity_ids}` adds them; one already in the Story stays as it is. It answers with the updated Story.
-2. `DELETE /v1/stories/{id}/activities` with `{activity_ids}` removes them; an id not in the Story is ignored. The activities themselves stay. It answers with the updated Story.
-3. Deleting an activity (FR-5.11) takes it out of every Story holding it. A Story left with no activities stays, with zero statistics.
-4. An activity joins a Story only when added: one uploaded later from the trip's dates isn't in it until the user adds it.
-
-**Error cases**:
-- `activity_ids` empty, over 10,000 ids, or holding an id that isn't a UUID → `400`.
-- Adding an activity that isn't the account's own → `404`, and none of the request's activities are added.
+- Adding a member, or removing a non-member, changes nothing. At most 10,000 ids per request; if any isn't the account's own, none is added.
+- Removing an activity from a Story keeps the activity. Deleting an activity removes it from every Story; an emptied Story stays.
+- An activity is in a Story only once added, never by its dates.
 
 ### FR-14.4 The `story` filter
 
-**Description**: One Story's activities, through the endpoints that already draw and count the account's history.
-
-**Behavior**:
-1. `story=<id>` narrows the activity list (`GET /v1/activities`), its summary (`GET /v1/activities/summary`) and the tracks tiles (`GET /tiles/v1/tracks/{z}/{x}/{y}.mvt`) to the Story's activities, combined with the `from`/`to` and `types` they already take.
-2. It narrows the activity-day histogram (`GET /v1/activities/histogram`, both its `days` and its `from`/`to` mode) the same way, and `earliest` becomes the Story's first activity day. The histogram otherwise ignores the list's filters (FR-6); inside a Story, the Story is all there is.
-3. Another account's Story, or an empty one, matches nothing: an empty list, zero totals, no days, no tracks.
-4. Adding or removing a Story's activities, creating a Story with activities and deleting one that has any all change the account's tile version, so no tile cached before the change is reused for the Story. Renaming doesn't.
-
-**Error cases**:
-- `story` that isn't a UUID → `400`.
+- The activity list, its totals, the day histogram and the tracks tiles take `story`, narrowing them to its activities; inside a Story the histogram counts only its days.
+- Another account's Story, or an empty one, matches nothing.
+- A change to a Story's activities moves the tile version; renaming doesn't.
 
 ### FR-14.5 Privacy and the demo
 
-**Behavior**:
-1. A Story is visible only to its own account. Another account's Story, a Story that doesn't exist and an id that isn't a UUID are all `404` on every endpoint, indistinguishable from each other; the list holds only the account's own Stories.
-2. A demo session reads the Demo Customer's Stories like any other account, and every write — create, rename, delete, add, remove — is refused with `403` `demo_read_only`, as for every other write (FR-2.1).
+- A Story is visible only to its account; another account's can't be told apart from a missing one.
+- A demo session reads the Demo Customer's Stories; every write is refused.
 
 ### FR-14.6 The Stories tab
 
-**Description**: The Activities panel's second tab, after Activities (FR-5), lists the account's Stories and shows one of them on the map at a time.
-
-**Preconditions**: Signed in, on the map in Normal mode (FR-4.1).
-
-**Behavior**:
-1. Every Story is a folder row: a triangle, then its name. The triangle points right while the Story is folded and turns to point down when it's open. Stories are ordered by when they were made, newest first. The tab has no Type or Distance filters, no checkboxes and no toolbar.
-2. Exactly one Story is open at a time. Opening the tab opens the newest. Clicking another Story opens it and folds the one that was open. Clicking the open Story does nothing, so there is no way to fold them all.
-3. The open Story shows its description, when there is one, and then its activities as rows, newest first, like the Activities tab's rows (FR-5.1) but without checkboxes. Hovering a row previews its track (FR-5.4) and clicking one focuses it (FR-5.5). Each row has an × at its end, shown while the pointer is over the row or it has keyboard focus, and always on a phone: it takes that activity out of the Story (FR-14.3) with no confirmation — the activity itself stays, and Add to story (FR-5.16) puts it back. The row leaves the list, its track leaves the map and the footer's statistics follow; if it was focused, the focus clears. A removal that fails shows the server's message above the rows.
-4. While a Story is open, the drawn tracks, the listed rows and an exported image (FR-4.10) are all of that Story's activities, whatever date range the Activities tab has; the tab has no date slider (FR-6).
-5. The footer at the bottom of the panel shows the open Story's statistics: its activity count, distance and moving time (FR-14.1), then the same per activity type, the most frequent first, each type by its display name. A Story with no activities says so instead.
-6. Opening a Story fits the camera to its drawn tracks. Opened by URL, a camera in the URL wins; without one the camera fits the Story. On a phone, opening a Story collapses the panel's sheet so the tracks can be seen.
-7. Each folder row has a pencil and a bin, shown while the pointer is over the row or it has keyboard focus, and always on a phone. The pencil opens Edit story, Add to story's Create story dialog (FR-5.16) with Name and Description filled in and Save (FR-14.2). The bin asks "Delete “<name>”? Its activities stay." with a "Delete story" button, then deletes the Story (FR-14.2). Deleting the open Story opens the next newest one.
-8. Leaving the tab closes the open Story: the map goes back to the Activities tab's date range, which opening a Story never changes — or the usual default range (FR-6.1) for a page that opened straight into a Story. The camera stays. Coming back to the tab opens the newest Story again.
-9. The URL carries the open Story, `/?story=<id>`: a refresh or a shared link opens the Stories tab with that Story open, and Back and Forward move between Stories and to and from the tab. A new Story from Add to story (FR-5.16) opens the same way.
-10. Normal mode only: Fog of War and Heatmap stay all-time (FR-4.2, FR-4.3), and returning to Normal shows the open Story again.
-11. With no Stories, the tab says how to make one: select or check activities on the Activities tab, then choose Add to story. The map stays as on the Activities tab.
-12. A demo session sees the Demo Customer's Stories the same way, with the pencil, the send button, the bin and the rows' × disabled.
-13. Copies of Stories others sent (FR-14.7) wait at the top of the tab, above the Stories, each as "<from> sent you a copy of “<story>” · <n> activities" with Accept and Decline. Accepting turns it into "Copying “<story>” from <from>…" until the copy has arrived (FR-14.8); then the new Story is in the list, and the account's activities, Fog of War and Heatmap are refreshed. While copies wait, the tab's name carries how many, in a filled accent badge that stays bright when the tab isn't the open one — "2 copies of stories waiting for you" to a screen reader. The inbox is read once as the map opens, for that count, then each time the tab opens, after every answer, and every few seconds while a copy is arriving. An answer that fails shows the server's message there.
-14. Each folder row has a send button between the pencil and the bin, shown the same way. It opens Send a copy: the Story's name, a note that the person gets their own copy once they accept it, that later changes don't reach it and that sending again adds only what they don't have, and their email address. Send keeps the dialog open with "Sent to <address>. If that address has a HoldMyTrack account, they'll find the copy in their Stories tab." — the same whether or not it has one — and the field cleared for another address.
-15. An open Story that came from a copy says "From <from>" above its description.
-16. `/?tab=stories` opens the map on the Stories tab, as the copy email's link does.
-
-**Error cases**:
-- A `?story=` for a Story that doesn't exist or isn't the account's shows "This story doesn't exist, or isn't yours." at the top of the tab, with no Story open and no activities; clicking a Story opens it.
-- A rename or delete that fails keeps its dialog open with the server's message.
+- One Story is open at a time. While open, the tracks, rows, photos and exports are its activities, whatever the date range. Normal mode only: Fog and Heatmap stay all-time.
+- The URL carries it (`/?story=<id>`); `/?tab=stories` opens the tab. Leaving the tab restores the Activities tab's range.
 
 ### FR-14.7 Send a copy
 
-**Description**: A Story's owner sends a copy of it to someone else's account by email address; the recipient accepts or declines it (ADR-0036). Accepting copies the Story into their account (FR-14.8).
+A Story's owner sends a copy to another account by email address; the recipient accepts or declines (ADR-0036).
 
-**Behavior**:
-1. `POST /v1/stories/{id}/send` with `{email}` answers `204` whether or not the address belongs to an account. Only a verified, real account other than the sender's own, and not being deleted (FR-1.11), receives the copy; for any other address nothing is stored. The address is trimmed and compared without case.
-2. Any Story the account owns can be sent, a Story it received as a copy included.
-3. A copy waits in the recipient's inbox, `GET /v1/story-sends`, as `{sends: [...], copying: [...]}`. `sends` are the copies waiting to be answered, newest first, each with `id`, `story_name`, `from` (the sender's name, or their email address when they've set none), `sent_at` and `activity_count` (the Story's activities, counted as FR-14.1 counts them).
-4. Sending the same Story to the same person again while a copy still waits refreshes its `sent_at` rather than adding a second.
-5. Each send that reaches an account emails it, in its own language (FR-13.1), English when it has chosen none: "<from> sent you a copy of “<story>”", with how many activities the Story has, that accepting makes the Story and its activities theirs, and a link to the Stories tab (`/?tab=stories`) to accept or decline it. An address that receives nothing gets no email.
-6. `POST /v1/story-sends/{id}/accept` takes the copy out of the inbox and answers `202`; the Story arrives in the account once it has been copied (FR-14.8), and until then `copying` lists it with `story_name` and `from`. `DELETE /v1/story-sends/{id}` declines it: it leaves the inbox, nothing is copied, and the sender isn't told.
-7. Deleting the Story withdraws its copies still waiting. A copy from an account being deleted leaves the inbox.
-8. A demo session's inbox is empty; sending, accepting and declining are refused with `403` `demo_read_only` (FR-2.1).
-
-**Error cases**:
-- A Story that doesn't exist or isn't the account's → `404`.
-- An `email` that isn't a bare address → `400` with a message in the request's language (FR-13.1).
-- More than 30 sends in an hour from one account → `429` with a message in the request's language.
-- Accepting or declining a copy that isn't waiting for the account → `404`.
-- Accepting while the account is at its activity or storage limit (FR-1.13) → `409` with a message naming the limit; the copy stays in the inbox.
+- The answer is the same whether or not the address has an account. Only a verified real account, not the sender's and not being deleted, receives it; otherwise nothing is stored. The address is trimmed and compared without case.
+- Any owned Story can be sent, a received copy included. Sending again while one waits refreshes it.
+- The recipient is emailed in their language (English if none); an address that receives nothing gets no email.
+- Declining copies nothing, and the sender isn't told. Deleting the Story withdraws waiting copies; copies from an account being deleted leave the inbox.
+- At most 30 sends an hour per account. Accepting at the account's limits (FR-1.13) is refused and the copy keeps waiting.
+- A demo session's inbox is empty, and it can't send, accept or decline.
 
 ### FR-14.8 The copy
 
-**Description**: What accepting a copy (FR-14.7) puts in the recipient's account: a Story and activities of their own, independent of the sender's from then on (ADR-0036).
+Accepting puts a Story and activities in the recipient's account that are theirs from then on (ADR-0036).
 
-**Behavior**:
-1. The Story is copied as it is when the copy is made, not when it was sent.
-2. The first accepted copy of a Story makes a new Story in the recipient's account with its name and description. A later accepted copy of the same Story adds to that Story; if the recipient has deleted it, a new one is made with only what they haven't received before.
-3. Each of the Story's activities becomes an activity of the recipient's, made from its track as the sender sees it — the sender's Private locations (FR-8.1) and track edits (FR-5.14) already applied — and then treated as an upload of the recipient's: their own Private locations apply on top, it counts in their Fog of War, Heatmap, totals, countries and regions and Trends. Its type, name and description come with it, and its photos (FR-16) as photos of the recipient's.
-4. An account receives each original activity once, ever: an activity the recipient has already received from anyone, recorded themselves, or holds a copy of is left out — so a copy the recipient deleted doesn't come back, and a copy sent back to the person who recorded it adds nothing. With nothing to add, no Story is made, unless the Story being copied has no activities at all.
-5. An activity whose track the sender's Private locations hide entirely, or that has no track, isn't copied.
-6. An activity whose owner has a track edit or Private location change still being applied is copied once that finishes.
-7. A copy is the recipient's: they can edit, delete, add to and send it on like their own. The sender's later changes, deletions and account deletion don't reach it, and nothing the recipient does reaches the sender.
-8. A copy of a Story deleted before the copy is made, or whose owner is being deleted, adds nothing.
+- The Story is copied as it is when the copy is made, not when sent.
+- The first accepted copy makes a new Story with its name and description; a later one adds to it, or, if the recipient deleted it, makes a new one with only what they haven't received.
+- Each activity is made from its track as the sender sees it, with the sender's Private locations and edits applied, then treated as the recipient's upload: their Private locations apply too, and it counts in their Fog, Heatmap, totals, regions and Trends. Type, name, description and photos come with it.
+- An account receives each original activity once, ever: one it already received, recorded or holds is left out, so a deleted copy doesn't return and a copy sent back to its recorder adds nothing. With nothing to add, no Story is made unless the Story is empty.
+- An activity with no track, or hidden entirely by the sender's Private locations, isn't copied; one being reprocessed is copied once that finishes.
+- Neither side's later changes, deletions or account deletion reach the other.
+- A Story deleted, or whose owner is being deleted, before the copy is made adds nothing.
 
 ## 17. FR-15 — Spots
 
-Outdoor places from OpenStreetMap on the map, in five categories, with what OSM says about each (`VISION.md` §4.2, ADR-0021). Built on the web and in the Android app (`apps/android/docs/SPEC.md` FR-2.8); the places are loaded by the operator (FR-15.1), not by users. A place's only mark is a capture (FR-15.6).
-
-| Endpoint | Purpose |
-| :-- | :-- |
-| `GET /tiles/v1/spots/{z}/{x}/{y}.mvt` | The places in one tile, and their areas |
-| `GET /v1/spots` | The places in a box — "Show in this area" (FR-15.5) |
-| `GET /v1/spots/{id}` | One place with its whole area, and when the caller captured it (FR-15.6) |
-| `GET /v1/spots/captures` | The places the caller has captured (FR-15.6) |
-| `POST /v1/spots/{id}/captures` | Capture a place (FR-15.6) |
+Outdoor places from OpenStreetMap in five categories, with what OSM says about each (`VISION.md` §4.2, ADR-0021), on the web and Android (`apps/android/docs/SPEC.md` FR-2.8). The operator loads them; a place's only mark is a capture.
 
 ### FR-15.1 Places
 
-**Description**: What a place is, and where it comes from.
-
-**Behavior**:
-1. A place is an OpenStreetMap feature in one of five categories: **Playground** (`leisure=playground`), **Dog park** (`leisure=dog_park`), **Monument** (`historic=monument` or `memorial`), **Mesmerizing view** (`tourism=viewpoint`) and **History** (`historic=castle`, `ruins`, `fort` or `archaeological_site`). A feature tagged for two is the first of History, Monument, Mesmerizing view, Dog park, Playground.
-2. A place has, each only when OSM has it: a name; an address built from its `addr:*` tags — `addr:full`, or a house number, street (or `addr:place`), city and postcode — when it has at least a street or place; a description; an inscription; a memorial type (a statue, a plaque, a war memorial…); a start date as OSM writes it (a year, a date, "~1850"); and a Wikipedia article, from a `wikipedia` tag in OSM's "language:Title" form (any other form is left out).
-3. A place's area is its OSM outline, or a 30 m circle around a place mapped as a single point.
-4. The operator loads the places with `holdmytrack import-spots [--planet] <file>`, from an extract made off the server (`docs/DEPLOY.md` §6), and refreshes them the same way. Loading the same place again updates it rather than adding a second one.
-5. A place is never deleted. With `--planet`, a place missing from the file is **retired**: from then on it is shown only to the accounts that captured it (FR-15.4–FR-15.6), and no one can capture it. A place that comes back to OSM is live again at the next load. A load without `--planet` retires nothing. A `--planet` load that would retire more than 1% of the live places stops with an error and retires none of them; the places it read are still updated.
-6. A load moves every account's tile version (FR-4.11) only if it added, changed, brought back or retired a place.
+- **History** (`historic=castle`, `ruins`, `fort`, `archaeological_site`), **Monument** (`historic=monument`, `memorial`), **Mesmerizing view** (`tourism=viewpoint`), **Dog park** (`leisure=dog_park`), **Playground** (`leisure=playground`); a feature tagged for two takes the first.
+- A place keeps what OSM has of its name, address, description, inscription, memorial type, start date and Wikipedia article (`language:Title` only). Its area is its outline, or a 30 m circle for a point.
+- The operator loads places with `holdmytrack import-spots [--planet] <file>` (`DEPLOY.md` §6); loading again updates.
+- A place is never deleted. A `--planet` load retires places missing from the file: only accounts that captured one still see it, and nobody can capture it. A later load that has it brings it back. A `--planet` load that would retire over 1% of live places retires none and stops with an error, after updating what it read.
+- A load moves every account's tile version only if a place changed.
 
 ### FR-15.2 Points of interest
 
-**Description**: The places on the map, one Layers entry per category.
-
-**Behavior**:
-1. The Layers menu's Points of interest group (FR-4.13 describes the menu) has one checkbox per category — Playgrounds, Dog parks, Monuments, Mesmerizing views, Historic sites. Each works the same over Normal, Fog and Heatmap, and shows only while the Layers checkbox (FR-4.13) is on. All start off; each browser (or, in the Android app, each phone) remembers its choice, and a browser that had the former Show POI toggle on starts with every category on.
-2. From zoom 13 up — where trails (FR-4.13) start too — each place in a ticked category is a round badge — its category's icon in ink on white, ringed in gold — at a point on its area, loaded as the map moves. Between zoom 10 and 13 places show only on request (FR-15.5); below zoom 10, none. Every place is drawn, however close to others. Playground's icon is a seesaw. A place the account has captured (FR-15.6) has a filled badge instead — its icon in white on gold, ringed darker — on the web and in the Android app alike; the web reads the account's captures again whenever the page comes back into view or its window gets focus.
-3. From zoom 13 up, under each badge its area is shaded faintly in gold: the place's outline from OpenStreetMap, edged with a solid line, or — for a place mapped only as a point — its 30 m circle, edged with a dashed line. Clicking an area does nothing, and a track under it can still be clicked.
-4. Badges and areas are drawn over everything else, the Fog veil and map labels included, and Fog doesn't dim them.
-5. They hide during an Edit track session (FR-5.14) and come back after it.
-6. A retired place (FR-15.1) — its badge and its area — is drawn only for an account that captured it, with the captured badge; everyone else's map leaves it out, at every zoom and in Show in this area (FR-15.5), on the web and in the Android app alike.
+- One Layers toggle per category, off by default, kept by the browser or phone.
+- From zoom 13 ticked places show as badges with their areas; from 10 to 13 only on request (FR-15.5); below 10 none. A captured place's badge is filled.
+- Drawn over Fog and labels, undimmed; hidden during Edit track. A retired place shows only to an account that captured it.
 
 ### FR-15.3 The popup
 
-**Behavior**:
-1. Clicking a badge opens a popup at the place: its name (or its category, when OSM has no name), then — each only when the place has it — its category (when the name is the title), its memorial type, "Since" its start date, its description, its inscription (quoted, keeping its line breaks), its address, and "Captured" with the date for a place the account has captured (FR-15.6). A long description or inscription scrolls within the popup. Only one popup is open at a time.
-2. **Copy address** copies the address; for a place with none it reads **Copy location** and copies its coordinates as `latitude, longitude`. Either shows **Copied** for a moment.
-3. **Wikipedia**, shown only for a place with an article, opens that article on that language's Wikipedia in a new tab.
-4. Clicking a badge doesn't select or unfocus a track under it (FR-4.1). The popup closes with its × button, a click elsewhere on the map, or unticking its category.
+Shows what OSM has about the place, a way to copy its address or coordinates, its Wikipedia link, and when the account captured it.
 
 ### FR-15.5 Show in this area
 
-**Description**: Between zoom 10 (a metro area in view) and zoom 13 a view holds too many places to load on every pan, so they load when asked, for the visible map.
-
-**Behavior**:
-1. With at least one category ticked and the map between zoom 10 and 13, a **Show in this area** button shows over the map, under the toggles (in the Android app, between the Layers and Record buttons). Outside that range, or with no category ticked, it doesn't.
-2. Pressing it loads the ticked categories' places inside the visible map and draws their badges (no areas). They stay drawn until the next press; unticking a category hides its places at once.
-3. Until the map moves or another category is ticked, a line replaces the button: how many places the area has ("912 places in this area"), "No places in this area", or, when there were more than 2,000, "Showing 2,000 of N places — zoom in for the rest". The 2,000 are the named places first, spread evenly over the area. After a move or a newly ticked category, the button comes back.
-4. A badge from it opens the same popup (FR-15.3). From zoom 13 up the tiles' badges take over and these aren't drawn.
-5. If the request fails, the button reads "Couldn't load places — try again".
-
-**Inputs** (`GET /v1/spots`): `bbox` — `west,south,east,north` in degrees, south below north (clamped to the world). A view across the antimeridian is taken either way round: east past 180 (`170,…,190,…`) or west past east (`170,…,−170,…`), both the places from 170° to 180° and from −180° to −170°; `categories` — one or more of `playground`, `dog_park`, `monument`, `viewpoint`, `history`, comma-separated.
-
-**Outputs**: `{spots, total}`: `spots`, up to 2,000 places whose anchor is inside the box — a retired one (FR-15.1) only for an account that captured it — each with `id`, `category`, `lon`, `lat` and the text fields of FR-15.4's `spots` layer (absent when none); `total`, how many of those the box holds in those categories.
-
-**Error cases**:
-- A missing or malformed `bbox`, a box with no width or south at or past north, or a missing or unknown category → `400`.
-- No session → `401`.
+From zoom 10 to 13, the ticked categories' places in the visible map load when asked: at most 2,000, named first, spread evenly, with the area's total. A view across the antimeridian works either way round.
 
 ### FR-15.4 The tiles
 
-**Inputs**: `z`, `x`, `y`; `cv`, the tile version (FR-4.11).
-
-**Outputs**: A vector tile with two layers. `spots`: a point per place whose anchor falls in the tile, with `id`, `category` (`playground`, `dog_park`, `monument`, `viewpoint` or `history`), `lon`, `lat`, `retired` (`true` for a retired place, FR-15.1), and `name`, `address`, `description`, `inscription`, `memorial`, `start_date` and `wikipedia`, each absent when the place has none. `spot_areas`: each place's area that reaches into the tile, clipped to it, with `id`, `category`, `circle` (`true` for the 30 m circle of a place mapped as a point) and `retired`. Below zoom 13, an empty tile.
-
-**Behavior**:
-1. The same places for every account, behind the session like every other map tile, and cached like them (FR-4.11) — retired ones included, flagged, for the map to hide unless the account captured them (FR-15.2). A load that changes the places moves every account's tile version (FR-15.1).
-
-**Error cases**:
-- No session → `401`. A demo session sees the places too.
-- Non-numeric coordinates → `400`.
+The same places for every account, behind the session and cached like every map tile, retired ones flagged for the map to hide. Empty below zoom 13.
 
 ### FR-15.6 Captures
 
-**Description**: A place an account has captured by staying inside it for 30 seconds with the Android app's capture mode on (`apps/android/docs/SPEC.md` FR-2.8). Only the app captures; the web and the app both show what's captured (FR-15.2, FR-15.3).
+A place is captured by staying inside it for 30 seconds with the Android app's capture mode on (`apps/android/docs/SPEC.md` FR-2.8). Only the app captures; both clients show captures.
 
-**Behavior**:
-1. `GET /v1/spots/{id}` answers one place: the fields of FR-15.5's places, `area` — its whole area as a GeoJSON MultiPolygon — and `captured_at` when the caller has captured it (absent otherwise). A retired place (FR-15.1) is answered only to an account that captured it.
-2. `GET /v1/spots/captures` answers `{captures}`: the caller's captured places as `{spot_id, captured_at}`, newest first; an empty list when there are none. With `since` (an RFC 3339 time), only those captured at or after it; a `since` that isn't one → `400 Bad Request`. A capture is never changed or removed, so the web map and the Android app read the whole list once and afterwards only `since` the newest they have.
-3. `POST /v1/spots/{id}/captures` takes `{lat, lon}`, the position the phone last measured inside the place. The position must be inside the place's area, or within 10 m of it. The first capture of a place is kept: a new one answers `201`, a repeat `200` with the first one's `captured_at`, both as `{spot_id, captured_at}`.
-4. A capture belongs to its account and is deleted with it. A retired place keeps its captures (FR-15.1).
-
-**Error cases**:
-- An unknown place, or an `id` that isn't a positive number → `404`. So is a retired place, from `GET /v1/spots/{id}`, for an account that hasn't captured it.
-- A body without numeric `lat` and `lon`, or outside ±90/±180 → `400`.
-- Capturing a retired place → `410`, for every account, captured or not.
-- A position farther than 10 m outside the place → `422`.
-- No session → `401`. A demo session can read but not capture → `403` (`demo_read_only`).
+- The position sent must be inside the area or within 10 m of it. It is checked and not stored: a capture is the place and the time.
+- The first capture is kept and never changed or removed, except with the account.
+- A retired place keeps its captures, answers its details only to them, and can't be captured.
+- A demo session can read captures but not capture.
 
 ## 18. Non-Functional Requirements (summary)
 
-This section summarizes cross-cutting behavior specified elsewhere in this document, for convenience — it does not introduce new requirements.
-
 | Concern | Behavior |
 | :-- | :-- |
-| **Password storage** | bcrypt-hashed; plaintext is never stored or logged (FR-1.1). |
-| **Session security** | Server-side, revocable sessions (not client-decodable tokens); expiry enforced server-side on every request, not trusted from the cookie alone (FR-1.4). |
-| **Rate limiting** | Per-IP limits on the two endpoints reachable with no credentials at all: demo creation (FR-2.1) and password-reset requests (FR-1.5), 5/hour each. |
-| **Non-blocking uploads** | No modal or locked UI during upload or processing (FR-3.1); the user can keep using the app while files process. |
-| **No reload required** | Every list/summary this document describes updates itself automatically as background processing completes (FR-3.1, FR-3.4) — a manual page reload is never required to see current data. |
-| **Idempotency** | Re-submitting the same activity content (FR-3.5) or the same password-reset token (FR-1.6) never has an effect beyond the first time. |
+| **Password storage** | bcrypt; plain text never stored or logged (FR-1.1). |
+| **Sessions** | Server-side, revocable, checked on every request (FR-1.4). |
+| **Rate limits** | Per address: signup, sign-in, password reset, demo (FR-1.1, FR-1.2, FR-1.5, FR-2.1). Per account: uploads, syncs, track editor, tiles, Story sends (FR-3.1, FR-3.6, FR-5.14, FR-4.15, FR-14.7). Counts restart with the server. |
+| **Non-blocking uploads** | The app stays usable while files are processed (FR-3.1). |
+| **No reload required** | Lists, totals and the map update as processing finishes. |
+| **Idempotency** | The same original (FR-3.5), sync record (FR-3.6) or reset token (FR-1.6) has no effect beyond the first. |
 
 ## 19. Mobile Browser Support
 
-**Description**: The application is usable in a phone-sized mobile browser, not just at desktop widths. This is a cross-cutting behavior, not a separate feature — it modifies how several of the FRs above render and are interacted with, rather than adding new ones.
-
-**Behavior**:
-1. Below approximately 768px viewport width, the Activities panel (FR-5.1) is a collapsible bottom sheet instead of a permanent sidebar — on the Activities tab sitting directly above the date slider (item 2 below), on the other tabs on the bottom edge of the screen — collapsed by default to a slim strip that is the panel's tab row (Activities, Stories, Privacy) with an expand chevron at its end — with the map fully interactive above it; tapping the chevron, or any tab, expands it upward, onto that tab, over the map to show the tab's description, full list, filters, and footer actions (FR-5.2–FR-5.7), exactly as they behave at desktop width. Expanding or collapsing the sheet never changes the checked group (FR-5.6) or the row-click focus (FR-5.5). While the Edit window (FR-5.10) is open the sheet is shown collapsed, whatever its state, so the window and the track stay visible; closing it returns the sheet to the state it was in.
-2. The date slider (FR-6) leaves the sheet for the very bottom of the screen, where it stays visible in either sheet state, so the range can be changed with the sheet collapsed and the map in view. As on a desktop it shows only while the Activities tab is showing.
-3. Trends (FR-9.1) — a hover-tooltip chart at desktop width — also responds to a tap: tapping a bar shows the same tooltip a hover would, tapping it again (or tapping empty chart space) hides it. A tap and a mouse hover never conflict with each other on the same chart. The activity grid's days do the same (FR-7.1).
-4. The page fills the visible area as the browser's own toolbar slides in and out: the date slider stays at the bottom edge of what's visible, never under the toolbar, and dragging the page's own controls never scrolls, rubber-bands or pull-to-refreshes the page. Focusing a text field (a name, a search, a sign-in field) never zooms the page in.
-5. Tapping within about 14px of a track focuses it, as a click does within about 4px (FR-4.1) — a fingertip lands less precisely than a pointer.
-6. Focusing an activity by tapping its track leaves the collapsed sheet as it was: its strip stays visible and tappable, and the focused row is scrolled into view within the list when the sheet is expanded.
-7. Every other behavior in this document (upload, all three map modes, filtering, account settings) works the same way at mobile widths as at desktop widths.
-
-**Explicitly not built** (hover-only, no touch equivalent, unlike Trends above — a continuous position read with no discrete point to tap, not a per-bar value): the two-way map-track-hover ↔ Activities-row-underline highlight (FR-4.1, FR-5.4). It remains mouse-only; a touchscreen user can still focus/select a track by tapping it.
+The web app works in a phone browser. Below about 768 px the Activities panel is a bottom sheet over the map, collapsed to its tab row, and the date slider sits at the bottom of the screen. Taps stand in for hover on Trends and the activity grid, and a tap within about 14 px of a track focuses it. Hovering a track to underline its row stays mouse-only. Everything else works as on a desktop.
 
 ## 20. Deliberate limits
 
 Not built by design, and not planned:
 
-- Performance analysis — best-effort curves, personal bests, power curves, training load — and recovery data (sleep, HRV, readiness): `VISION.md` §1.1 rules HoldMyTrack out as a health or fitness advisor. Pace stays per-activity route context (FR-4.8), and heart rate and every other health measurement are never read, stored or shown (ADR-0017).
-- Explorer-tile scoring — Fog of War is the exploration mechanic (`VISION.md` §3.3).
-- Splitting a track that passes through a Private location mid-way — FR-8.1 hides only the leading and trailing portions.
+- Performance analysis (best-effort curves, personal bests, power curves, training load) and recovery data (sleep, HRV, readiness): `VISION.md` §1.1. Pace stays per-activity route context (FR-4.8), and health measurements are never read, stored or shown (ADR-0017).
+- Explorer-tile scoring: Fog of War is the exploration mechanic (`VISION.md` §3.3).
+- Splitting a track that passes through a Private location mid-way: FR-8.1 hides only the ends.
 
-What is planned but not yet built is in `docs/ROADMAP.md`.
+What is planned is in `docs/ROADMAP.md`.
 
 ## 21. FR-16 — Activity photos
 
-**Description**: The user's own photos added to an activity, each placed at the point of its route where it was taken, so an activity — and a Story — shows its pictures on the map (`VISION.md` §4.2, ADR-0024). Stored as a resized copy and a thumbnail with no EXIF; private to the account. The web and the Android app add and show them (`apps/android/docs/SPEC.md` FR-2.10); FR-16.6 and FR-16.7 are the web's.
+The user's own photos on an activity, each at a moment on its route, so an activity or Story shows its pictures on the map (`VISION.md` §4.2, ADR-0024). Each is stored as a resized copy and thumbnail without EXIF, visible only to the account. The web and Android add and show them (`apps/android/docs/SPEC.md` FR-2.10).
 
 ### FR-16.1 Upload
 
-**Behavior**:
-1. `POST /v1/photos` takes a multipart body: `activity_id`; `file`, the resized photo, and `thumb`, its thumbnail, each a JPEG or WebP; and optionally what the client read from the original's EXIF — `taken_at` (RFC 3339) or `taken_local` (`YYYY-MM-DDTHH:MM:SS`, a capture time with no time zone), and `lat`/`lon`; and optionally `route_at` (RFC 3339), the place on the track the user chose, and `caption` (trimmed, at most 500 characters). It answers `201` with the photo (FR-16.3), placed per FR-16.2.
-2. Each image's type is read from its bytes, never from its filename or declared type.
-3. An account holds at most 2,000 photos.
-4. `POST /v1/photos/place` takes the same placement fields as JSON — `{activity_id, taken_at, taken_local, lat, lon}` — and answers where an upload with them would be placed, `{route_at, taken_at}`, storing nothing. It refuses as the upload does: `photo_needs_place` (`422`), no track (`409`), a field that doesn't parse (`400`), another account's activity (`404`), a demo session (`403`).
-
-**Error cases**:
-- No session → `401`. A demo session → `403` (`demo_read_only`).
-- An activity that isn't the caller's, or a missing or malformed `activity_id` → `404`.
-- The account already holds 2,000 photos → `409`.
-- A missing `file` or `thumb` → `400`; a `taken_at`, `taken_local`, `lat`/`lon` or `route_at` that doesn't parse → `400`; a caption over 500 characters → `400`.
-- An activity with no track → `409`: a photo needs a place on one.
-- A photo FR-16.2 can't place → `422` with the error code `photo_needs_place` and a message; nothing is stored. The client asks the user where it goes and sends it again with `route_at`.
-- An image that isn't a decodable JPEG or WebP → `415`.
-- `file` larger than 3 MiB or `thumb` larger than 256 KiB (or the body over its limit) → `413`.
-- `file` larger than 2560 px, or `thumb` larger than 640 px, on either side → `422`: an original must be resized first.
+- The client resizes first: the copy at most 2,560 px a side and 3 MiB, the thumbnail 640 px and 256 KiB, JPEG or WebP (the web sends 2,048 px and 320 px). Larger is refused; the type is read from the bytes.
+- EXIF capture time and position are sent for placement only. Captions are up to 500 characters.
+- At most 2,000 photos per account, on the account's own activities that have a track.
+- A photo that can't be placed is refused with `photo_needs_place`, nothing stored, for the client to ask the user. A placement check answers where a photo would go without storing anything.
+- A demo session can't add photos.
 
 ### FR-16.2 Placement
 
-**Behavior**:
-1. Every photo has a place on its activity's track: a moment on it (`route_at`), never a stored position. Its position is that moment's point on the track, worked out on every read.
-2. A `route_at` the user chose places it there, clamped to the track's first and last moment.
-3. Otherwise it's placed at its capture time when that falls within the track; a capture time up to 5 minutes before the track starts or after it ends places it at that end.
-4. A `taken_local` time is read in the time zone the activity was recorded in (FR-3.11), where the camera's clock most likely was; if that misses the track, in the UTC offset (in 15-minute steps, −12:00 to +14:00) nearest that zone's that puts it on the track. `taken_at` (FR-16.3) is the instant it resolved to.
-5. Without a capture time that places it, an EXIF position within 500 m of the track places it at the track's nearest point.
-6. With none of these, the upload is refused for the user to choose (FR-16.1).
-7. A photo is always on the track as it's drawn: a moment the track no longer covers — cut off by Edit track or a Private location at its start or end — reads as the track's nearest end, and `route_at` is kept, so the photo returns to its moment if the track does. A track that passes through a Private location is drawn whole (FR-8.1), so a photo on that stretch shows nothing the track doesn't.
+- A photo's place is a moment on the track, never a stored position; its position is worked out on every read.
+- A moment the user chose places it there, clamped to the track.
+- Otherwise its capture time does, on the track or within 5 minutes of either end (placing it at that end).
+- A capture time without a zone is read in the activity's zone (FR-3.11), else in the UTC offset nearest it, in 15-minute steps from −12:00 to +14:00, that puts it on the track.
+- Else an EXIF position within 500 m of the track places it at the nearest point. Else the upload is refused for the user to choose.
+- A moment outside the drawn track (cut off by Edit track or a Private location) shows at the nearest end, and is kept so the photo returns if the track does. A photo on a stretch passing through a Private location shows nothing the track doesn't (FR-8.1).
 
 ### FR-16.3 Listing and images
 
-**Behavior**:
-1. `GET /v1/photos?activity={id}` answers `{photos}`: the activity's photos as `{id, activity_id, taken_at, route_at, timezone, lon, lat, caption, width, height, url, thumb_url}` (`timezone` the activity's, FR-3.11, which the photo's times are shown in), in route order (by `route_at`, then upload). `lon`/`lat` are null only when the activity has no track left at all. `width`/`height` are the stored copy's. `GET /v1/photos?story={id}` answers the same for every activity in a Story (FR-14), in the same order across all of them.
-2. `GET /v1/photos/{id}` and `GET /v1/photos/{id}/thumb` serve the stored copy and its thumbnail with their sniffed content type, to their owner only, cacheable for good (a photo's images never change).
-
-**Error cases**:
-- Neither `activity` nor `story` → `400`. An activity, Story or photo that isn't the caller's, or a malformed id → `404`.
+Photos are listed per activity or Story in route order. Images are served only to their owner and never change, so they're cacheable for good.
 
 ### FR-16.4 Editing
 
-**Behavior**:
-1. `PATCH /v1/photos/{id}` takes a JSON object; a field present changes, a field absent doesn't. `caption`: trimmed; empty or null clears it; at most 500 characters. `route_at`: RFC 3339, the photo's new moment on the track, clamped to it. A photo can't be taken off the track. A request refused for either field changes neither. It answers `200` with the photo.
-2. `GET /v1/activities/track-metrics/{id}` (FR-4.8) carries each display point's moment as `time_s` (epoch seconds), so a client can turn a place on the track into a `route_at`.
-
-**Error cases**:
-- A body that isn't a JSON object, or a `route_at` that is null or not an RFC 3339 time → `400`. A caption over 500 characters → `400`.
-- A `route_at` for an activity with no track → `409`.
-- A photo that isn't the caller's → `404`. A demo session → `403`.
+The caption and the moment can change; the moment is clamped to the track, and a photo can't leave it.
 
 ### FR-16.5 Deleting
 
-**Behavior**:
-1. `DELETE /v1/photos/{id}` deletes the photo and both its images, answering `204`; a photo that isn't the caller's → `404`, a demo session → `403`.
-2. Deleting an activity deletes its photos (FR-5.11).
-
-### FR-16.6 The Photos tab (web)
-
-**Preconditions**: The Edit window (FR-5.10) open on exactly one activity, which has a track; otherwise the tab is disabled, with a tooltip saying why.
-
-**Behavior**:
-1. The Edit window's Photos tab, beside Activity and Track, lists the activity's photos in route order (FR-16.3): each with its thumbnail, its caption (or "Photo n"), the time of its place on the route, Edit and Delete. Its label shows how many photos Save would leave, and a dot while it holds unsaved changes.
-2. Nothing on the tab is written until the window's Save, which writes the activity's fields, then the photos, then a track edit; Cancel throws every photo change away, new photos included; Escape asks first (FR-5.10 behavior 3). While there are photo changes, or while they're being written, leaving the page — a reload, closing the tab, following a link — has the browser ask first. While the photos are written the Save button reads "Saving photos n of m…". If a write fails, the window stays open with the error, and Save again carries on from the first unwritten change; whatever was written stays written even if the window is then cancelled.
-3. Add photos opens the browser's file picker for any number of images. Each is read for its EXIF capture time (with its zone, when the file has one or a GPS clock to derive it from) and position, redrawn at most 2048 px on its long side plus a 320 px thumbnail, upright per its EXIF orientation, and its place asked of the placement check (FR-16.1), with "Preparing n of m…" while it runs; Save, Cancel and Escape wait until it's done. One the check places joins the list, marked New, and the map.
-4. A photo the check can't place (FR-16.2) waits at the top of the list, saying so, with a slider along the route and its thumbnail on the map where the slider has it. Place here puts it there, joining the list as New; Remove drops it. Several wait their turn, one slider at a time. A waiting photo's slider starts just after the photo picked before it — where the check placed that one, or where the user put it (past a removed one, to the one before) — 1% of the route further on; the first of a batch with nothing before it starts at the beginning of the route. Photos picked in the order they were taken so walk forward along the route. Save is refused while any photo waits, with a message, on the Photos tab.
-5. Edit opens a photo's slider, at its place, and its caption; Done closes it. Moving the slider moves the photo along the route on the map, with the time at that point shown. A saved photo with a change is marked Changed; changing it back unmarks it. The list keeps its order while a photo is open and takes up the new order when it closes.
-6. The slider runs along the track as drawn, by distance, so a stop takes up none of it; the place is kept as that point's moment.
-7. Delete marks a saved photo Will be deleted, struck through and off the map, with a button to keep it after all; on a New photo it simply removes it. No confirmation: Cancel undoes it all.
-8. A file that fails is listed by name with the reason — one the browser can't open (most HEIC files outside Safari), or the server's refusal — and the rest carry on.
-9. The Edit window isn't available to a demo session (FR-5.10), so neither is the tab.
-
-### FR-16.7 On the map (web)
-
-**Behavior**:
-1. Whenever an activity is selected (FR-5.5) — and while the Edit window is open on one, as its Photos tab would leave them — each of its photos is drawn on its route as its thumbnail in a round frame, over the tracks. With no activity selected and a Story open (FR-14), every photo of the Story's activities is. None show in Fog of War or Heatmap, for an activity hidden on the map (FR-5.8), or while the Edit window's Track tab has the map. The photo in hand in the Photos tab is drawn larger.
-2. Photos whose markers would overlap at the current zoom — a whole trip seen zoomed out, or several taken at one spot — share one marker: the first of them in route order, stacked, with their count. The groups are worked out again after every move of the map, so zooming in splits them. The photo in hand in the Photos tab is never grouped.
-3. Zoomed out, the markers make way for the tracks: below zoom 10 each is drawn smaller — the frame, the stack and the count — and grouped at that size, so the routes still show under them; the one open or in hand is the usual size. Below zoom 4, where tracks aren't drawn either (FR-4.1), no marker is.
-4. The photos follow the track: they're refetched when an Edit track or a Private location change has been reprocessed (FR-5.14, FR-8.1), and sit at the track's nearest end when their stretch was cut away (FR-16.2).
-5. Clicking a group's marker zooms the map in to fit its photos (to at most z19) when they lie more than 15 m apart; when they don't — photos taken at one spot, which no zoom separates — it opens the popup on the first of them, with ‹ › and "n of m" to step through the rest in route order, the popup staying where it opened.
-6. Clicking a photo's marker opens a popup at it, on the map rather than over the page: the picture, which opens the photo viewer when clicked (FR-16.8), its caption, when it was taken (if known), and Full size, which opens the stored copy in a new browser tab. It opens on whichever side of the marker it fits, moves with the map, and closes with its ×; its marker is drawn larger meanwhile. A marker's click doesn't change the selection. A demo session sees the same.
-7. Changing or deleting a photo is the Photos tab's (FR-16.6), not the popup's.
-
-### FR-16.8 The photo viewer (web)
-
-**Behavior**:
-1. Clicking the picture in a photo's popup (FR-16.7) shows it over the whole page on a dark background, as large as fits but never larger than the stored copy, with its caption and capture time (if known), and with ‹ › and "n of m" when the popup holds a group. Stepping moves the popup along with it.
-2. Zooming: the mouse wheel or a trackpad pinch zooms about the pointer, a two-finger pinch about the point between the fingers, and a double-click zooms in to 3× about the clicked point (or back to fitted, if zoomed in). Zoom in and Zoom out (and the `+`/`=` and `-` keys) zoom by 1.5× about the center, and Fit to screen (and `0`) goes back to fitted. Zoom runs from fitted to 8× fitted.
-3. Zoomed in, the picture is dragged with the mouse or a finger. It can't be dragged past its edges, and a side that still fits the screen stays centered. A step to another photo starts it fitted. The ← and → keys step through a group.
-4. A Full size link opens the stored copy in a new browser tab, as the popup's does. The × button or Escape closes the viewer and leaves the popup open. A demo session sees the same.
+Deleting a photo deletes both images. Deleting an activity deletes its photos (FR-5.11), except images a copied Story's photo still uses.
 
 ## 22. FR-17 — Daily capacity
 
 ### FR-17.1 What the day's spend stops
 
-**Description**: The service can spend up to a set amount a day on requests to its object store, `R2_DAILY_BUDGET_USD` ($2 by default), counted across every account and reset at midnight UTC. As the day's spend nears it, the service gives things up in stages, keeping what everyone sees for last (ADR-0044).
+The service spends up to `R2_DAILY_BUDGET_USD` a day ($2 by default) on object-store requests, across every account, reset at midnight UTC. Nearing it, the service gives things up in stages, keeping what everyone sees for last (ADR-0044).
 
-**Behavior**:
-1. **At 70% of the budget**, Fog of War and Heatmap stop being redrawn: a new or edited activity reaches the map's tracks as usual, and its coverage follows after midnight UTC, the map meanwhile saying coverage is updating (FR-4.2).
-2. **At 85%**, anything that adds to what's stored is refused: an upload (FR-3.1), a phone sync (FR-3.6), a photo (FR-16.1), an avatar (FR-1.7), accepting a copy of a Story (FR-14.7) and asking for a data download (FR-1.12); a download already asked for is built after midnight UTC. Each is refused with `503 Service Unavailable`, a `Retry-After` of the seconds left until midnight UTC, and a message saying it's paused until then and that nothing already stored is affected. The Android app's sync shows that message and keeps what it didn't send.
-3. **At 100%**, the reads of stored files are refused the same way: Fog and Heatmap tiles, photo images, avatars, data download archives, and the track editor's points (FR-5.14). The map's tracks, the Activities list, Stories, totals, Spots and every page keep working.
-4. The stages lift at midnight UTC, or as soon as the budget is raised past the day's spend.
-5. A stage can start up to about a minute after the spend that crosses it, the time the count takes to reach every server process.
+- **At 70%**, Fog and Heatmap stop being redrawn: new and edited activities reach the tracks, and their coverage follows after midnight UTC, the map saying it's updating.
+- **At 85%**, everything that adds to storage is refused: uploads, phone syncs, photos, avatars, accepting a Story copy and asking for a data download. A download already asked for is built after midnight. Refusals carry `Retry-After` until midnight UTC and say nothing stored is affected; the Android app keeps what it didn't send.
+- **At 100%**, reads of stored files are refused the same way: Fog and Heatmap tiles, photos, avatars, download archives and the track editor's points. Tracks, lists, Stories, totals, Spots and pages keep working.
+- The stages lift at midnight UTC, or when the budget is raised past the day's spend. A stage can start up to a minute after the spend that crosses it.
