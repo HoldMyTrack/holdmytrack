@@ -360,6 +360,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
                     spots.closePopup()
                     photos.closePopup()
                     layers.dismiss()
+                } else {
+                    // The sheet comes back only where it belongs: not in Fog or Heatmap.
+                    renderDateFooter()
                 }
             },
         )
