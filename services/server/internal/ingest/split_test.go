@@ -57,7 +57,7 @@ func TestCheckSplit(t *testing.T) {
 
 // A walk ending at home, inside a Private location, with one stray fix just outside it as its
 // last point: the first clip keeps every point, since the track doesn't end inside. Once the
-// stray fix is deleted, the saved track stops at the circle's edge — but the editor still shows
+// stray fix is deleted, the saved track stops short of the circle — but the editor still shows
 // the points inside, and a split among them would leave one part with nothing to show.
 func TestCheckSplitInsidePrivateLocation(t *testing.T) {
 	points, at := editFixture()
@@ -68,8 +68,8 @@ func TestCheckSplitInsidePrivateLocation(t *testing.T) {
 	if err := CheckSplit(points, zones, dropStray, at[7]); err != ErrSplitHidden {
 		t.Errorf("split inside the location: %v, want ErrSplitHidden", err)
 	}
-	// Before the location, the later part keeps the points up to the circle's edge.
-	if err := CheckSplit(points, zones, dropStray, at[3]); err != nil {
+	// Well before the location, the later part keeps the points up to a radius short of it.
+	if err := CheckSplit(points, zones, dropStray, at[1]); err != nil {
 		t.Errorf("split before the location: %v", err)
 	}
 	// Without the edit the later part keeps the stray fix, and with it a track.
