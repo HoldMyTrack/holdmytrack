@@ -12,8 +12,8 @@ import java.util.concurrent.atomic.AtomicBoolean
  * The server's refusal of a build older than its minimum: `426 app_outdated` on any `/v1/`
  * request (root `docs/IMPLEMENTATION.md` §4.33). Seen once, in [HoldMyTrackApi]'s client, for
  * every call the app makes, so no screen has to recognise it; the Update screen covers whatever
- * was showing. The caller still gets its failure as usual, which leaves anything waiting to sync
- * on the phone.
+ * was showing. A callback caller hears nothing back (`HoldMyTrackApi.refusedBuild`); a suspending
+ * one gets its exception. Either way anything waiting to sync stays on the phone.
  *
  * It holds the application's own context, which lives as long as the process: nothing to leak.
  */

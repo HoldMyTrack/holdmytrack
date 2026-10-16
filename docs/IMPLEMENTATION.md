@@ -193,7 +193,7 @@ Path 2's endpoint (`sync_activities.go`); each activity gets its own result. It 
 
 #### 4.0.4 In-app GPS recording (Android)
 
-A stopped recording posts to §4.0.3 with `source = "recorded"` and a UUID minted at recording start, so a retried submit is recognized (ADR-0007). It is the one path that sets `name` and `description` at ingest. Its `activity_type` is free text, which is why §4.0.3 bounds it. The app side is `apps/android/docs/IMPLEMENTATION.md` §7.
+A stopped recording posts to §4.0.3 with `source = "recorded"` and a UUID minted at recording start, so a retried submit is recognized (ADR-0007). It is the one path that sets `name` and `description` at ingest. Its `activity_type` is free text, which is why §4.0.3 bounds it. The app side is `apps/android/docs/IMPLEMENTATION.md` §5.
 
 ### 4.1 Ingestion pipeline
 
@@ -450,7 +450,7 @@ sequenceDiagram
 - A new page path goes in `registerPages` and `vite.config.ts`'s `pageRoutes`, whose patterns end `(\?|$)` because Vite matches them with the query string.
 - Pages that quote the system change with it: Help's numbers; the privacy policy's processors, cookies, session lifetimes and backup window, in both language files with their date; `testing.html`, which quotes `strings.xml` and the server catalog word for word (FR-10.7). `cmd/make-testing-files` generates its sample files from `demo_data/`, and its test fails on any byte of drift.
 - Screenshots committed to the public repository have the account photo, name, email and file lists painted over.
-- `tokens.css` is the one source of the palette and the spacing, radius, type and elevation scales, loaded first by the page layout and the map shell alike; every colour has a light and a dark value. The Android theme carries the same palette, fonts, scales and Lucide icon set (`apps/android/docs/IMPLEMENTATION.md` §1.3), so a change to either needs the matching change there.
+- `tokens.css` is the one source of the palette and the spacing, radius, type and elevation scales, loaded first by the page layout and the map shell alike; every colour has a light and a dark value. The Android theme carries the same palette, fonts, scales and Lucide icon set (`apps/android/docs/IMPLEMENTATION.md` §6), so a change to either needs the matching change there.
 
 ### 4.20 Admin panel (FR-12)
 

@@ -8,7 +8,7 @@ import java.time.Instant
 /**
  * The recording in progress, written as it happens, so a process death mid-recording — a
  * low-memory kill, a crash, Force stop — leaves it on disk rather than taking it with
- * `RecordingService`'s in-memory list (`apps/android/docs/IMPLEMENTATION.md` §7.9). One row in
+ * `RecordingService`'s in-memory list (`apps/android/docs/IMPLEMENTATION.md` §5.2). One row in
  * `live_recording` for the totals, one row per fix in `live_points`: a fix is an append, not a
  * rewrite of the whole track, which over a multi-hour recording `points_json` would be.
  *
@@ -25,7 +25,8 @@ class LiveRecordingJournal(context: Context) {
     private val helper = RecordingDbHelper(context)
 
     /** What a process death left behind: the account it was recorded under, the moving time
-     *  and distance as of its last fix or pause, and every point recorded. */
+     *  and distance as of its last fix or pause, and every point recorded. Moving time is kept
+     *  as a duration, not as `elapsedRealtime` marks, which reset on reboot. */
     data class Leftover(
         val id: String,
         val account: String,

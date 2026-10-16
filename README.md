@@ -43,7 +43,7 @@ holdmytrack/
 ├── .editorconfig
 ├── docs/
 │   ├── VISION.md                # product, market, funding, milestones
-│   ├── ARCHITECTURE.md          # system architecture, key decisions, stack
+│   ├── ARCHITECTURE.md          # system architecture, key decisions, stack, the Android app's shape
 │   ├── IMPLEMENTATION.md        # schema, workflows, each feature's own detail
 │   ├── SPEC.md                  # observable behavior, FR-N.M, independent of the above
 │   ├── ROADMAP.md               # the remaining-work checklist
@@ -98,7 +98,7 @@ This tree is the canonical one; do not let a second tree exist anywhere else to 
 | [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | Measured performance: each load test or benchmark session's target, method and results. A session you run gets its entry here. |
 | [`docs/DPIA.md`](docs/DPIA.md) | The data protection impact assessment: the personal data processed, its legal basis, the risks to users and the measures against them. |
 | [`services/server/api/`](services/server/api/) | The JSON API's contract: `openapi.yaml` indexes every path, `paths/` holds each area's operations and `components/` the shared shapes. The server's tests and Android's `WireContractTest` hold the code to it. |
-| [`apps/android/docs/`](apps/android/docs/) | The Android app's own `ARCHITECTURE.md`, `IMPLEMENTATION.md`, `SPEC.md` and `ROADMAP.md`, mirroring the root set. |
+| [`apps/android/docs/`](apps/android/docs/) | The Android app's own `SPEC.md`, `IMPLEMENTATION.md` and `ROADMAP.md`. Its shape, decisions and stack are `docs/ARCHITECTURE.md` §3. |
 | [`AGENTS.md`](AGENTS.md) | You are a coding agent: the product's boundaries and the documentation, commit and Markdown conventions. |
 
 ## License

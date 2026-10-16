@@ -52,7 +52,7 @@ data class RecordingStats(
 
 /**
  * A foreground, GPS-only recording — a declared foreground service rather than plain
- * background location (`apps/android/docs/IMPLEMENTATION.md` §7): an ordinary background process is
+ * background location (`apps/android/docs/IMPLEMENTATION.md` §5): an ordinary background process is
  * free for the OS to kill, and continuous GPS is a battery cost a user needs visible feedback
  * about, so this runs as a declared foreground service with a persistent notification for as
  * long as a recording is in progress, tied to start/pause/resume/stop rather than to any

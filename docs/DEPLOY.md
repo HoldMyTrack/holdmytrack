@@ -73,7 +73,7 @@ A deployment without R2 can serve the archive same-origin instead: leave `VITE_B
 
 **Protect it at the edge.** Anyone who can read the archive can run up its request bill, and the app never sees those requests, so the limits live on the domain's zone, under **Domains → <your-domain> → Security → Security rules** (the zone's own rules on the free plan, not the account-level WAF, which is an Enterprise add-on):
 
-1. A **custom rule** that refuses every caller but the site and the apps. Name it, choose **Edit expression**, paste the rule below, set the action to **Block**, place it first and deploy. A request with no `Origin` is refused too: browsers send one on every basemap request, being cross-origin, and so does the Android app (`OriginInterceptor`, `apps/android/docs/IMPLEMENTATION.md`), so a missing one is a script or a pasted URL. Leave out `http://localhost:5173` if local dev shouldn't read this archive.
+1. A **custom rule** that refuses every caller but the site and the apps. Name it, choose **Edit expression**, paste the rule below, set the action to **Block**, place it first and deploy. A request with no `Origin` is refused too: browsers send one on every basemap request, being cross-origin, and so does the Android app (`OriginInterceptor`, `apps/android/docs/IMPLEMENTATION.md` §2.1), so a missing one is a script or a pasted URL. Leave out `http://localhost:5173` if local dev shouldn't read this archive.
    ```
    (http.host eq "tiles.<your-domain>" and not any(http.request.headers["origin"][*] in {"https://<your-domain>" "http://localhost:5173"}))
    ```
@@ -321,7 +321,7 @@ cd apps/android/holdmytrack
 scp app/build/outputs/apk/debug/app-debug.apk <vps>:/srv/holdmytrack/downloads/holdmytrack.apk
 ```
 
-The APK carries its own version — `versionName` (the release number) and the commit's short SHA, shown at the foot of the app's You tab — and a `versionCode` that is the commit count, so a newer build always installs over an older one (`apps/android/docs/IMPLEMENTATION.md` §8). Build from the commit you deployed and the app's SHA matches `/healthz`'s `version`.
+The APK carries its own version — `versionName` (the release number) and the commit's short SHA, shown at the foot of the app's You tab — and a `versionCode` that is the commit count, so a newer build always installs over an older one (`apps/android/docs/IMPLEMENTATION.md` §6). Build from the commit you deployed and the app's SHA matches `/healthz`'s `version`.
 
 It's served with `Cache-Control: no-cache`, so a replaced file is never masked by a cached copy. No page links to it: it's for testers handed the URL, while the app's public route is Google Play's closed test. This is a debug-signed APK: installable by sideloading, and it keeps Donate, which the Play build leaves out. The Play build is the release-signed bundle (`apps/android/holdmytrack/README.md`, Release build), and the two can't install over each other without uninstalling first. Google sign-in works in it only if that debug key's SHA-1 has an Android OAuth client (step 4).
 

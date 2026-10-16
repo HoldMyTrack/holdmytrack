@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Material 3 on Views (apps/android/docs/ARCHITECTURE.md §1.1): the
+<!-- Material 3 on Views (docs/ARCHITECTURE.md §3): the
      web's design tokens mapped onto Material's roles once, so every widget picks them up from
      the theme rather than from literals — colors.xml onto the color roles, dimens.xml's type
      and radius scales onto the type roles and corner sizes, and Inter/Fraunces (res/font) as
      the two faces. DayNight, like the web: res/values-night/colors.xml swaps in the dark
      palette under the same names, so nothing here changes between the two. Dynamic color is
-     deliberately not applied — it would replace this palette with one derived from the user's
+     not applied — it would replace this palette with one derived from the user's
      wallpaper. -->
 <resources>
     <style name="Base.Theme.HoldMyTrack" parent="Theme.Material3.DayNight">

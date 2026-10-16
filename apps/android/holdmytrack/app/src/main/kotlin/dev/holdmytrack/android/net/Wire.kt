@@ -8,7 +8,9 @@ import kotlinx.serialization.json.Json
 // they read or write — the server's snake_case through @SerialName. HoldMyTrackApi maps each
 // response to the app's own class. Every class here is checked against the API contract,
 // services/server/api (WireContractTest): a field the server renames, drops or starts sending as
-// null fails that test rather than a decode on someone's phone.
+// null fails that test rather than a decode on someone's phone. Hand-written rather than generated
+// as the web's types are: openapi-generator invented names for every unnamed response object, typed
+// the server's doubles and Unix milliseconds as BigDecimal and Int, and left the errors empty.
 //
 // A response class lists only the fields the app reads. Rules the test holds them to:
 // - A field with no default and not nullable must be one the contract requires and never null.

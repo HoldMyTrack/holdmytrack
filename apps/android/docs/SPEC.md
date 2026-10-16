@@ -4,7 +4,7 @@
 | :-- | :-- |
 | **Status** | Current: the app as built |
 | **Last updated** | 2026-10-16 |
-| **Related documents** | `docs/SPEC.md` (the server and web behavior this app shares), `apps/android/docs/IMPLEMENTATION.md` (how it's built), `apps/android/docs/ROADMAP.md` (open work) |
+| **Related documents** | `docs/SPEC.md` (the server and web behavior this app shares), `docs/ARCHITECTURE.md` §3 (the app's shape and stack), `apps/android/docs/IMPLEMENTATION.md` (how it's built), `apps/android/docs/ROADMAP.md` (open work) |
 
 ## 1. Introduction
 

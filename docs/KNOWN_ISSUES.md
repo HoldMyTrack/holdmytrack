@@ -23,3 +23,9 @@ The overlap hint (`SPEC.md` FR-3.7, `IMPLEMENTATION.md` §4.6) marks a candidate
 A sent recording is deleted from the phone once the server takes it, and put back if its ingest then fails (`apps/android/docs/SPEC.md` FR-5.2). `SyncProgress` keeps what it sent only in memory, so if the process dies between the send and the failure, nothing puts the recording back and the phone no longer holds it.
 
 - [ ] Keep sent recordings on disk until their ingest lands, or until the failure has put them back.
+
+### Deleting an account on Android leaves two pieces of its state on the phone
+
+Account deletion clears what the device keeps for the account (`AccountDeletion.forget`): unsynced recordings, hidden Sync rows, the Health Connect switch and what Load last read. It does not clear the last-used recording type (`RecordingTypes`) or an unfinished recording's journal (`LiveRecordingJournal`), so a new account signing in with the same email inherits them.
+
+- [ ] Clear both in `AccountDeletion.forget`.

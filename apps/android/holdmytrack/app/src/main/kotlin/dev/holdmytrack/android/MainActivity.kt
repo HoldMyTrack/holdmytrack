@@ -18,7 +18,7 @@ import dev.holdmytrack.android.recording.RecordingService
 
 /**
  * The app's main window: the bottom bar — Map, Stories, Record, Sync, You — and the tab above it
- * (`apps/android/docs/ARCHITECTURE.md` §1.1). Map, Stories
+ * (`apps/android/docs/IMPLEMENTATION.md` §1.3). Map, Stories
  * and Sync are all the map ([MapFragment]): Stories and Sync are its panel's Stories and Sync
  * tabs, Sync's list drawn on the map it covers. You is [YouFragment]. Tabs are shown and hidden
  * rather than replaced, so the map — its camera, its layers, a recording on it — is just as it

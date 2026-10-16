@@ -9,8 +9,7 @@ import dev.holdmytrack.android.recording.db.RecordedActivityRecord
 /**
  * The activity-type field is free text — a custom type is the whole point — but the Type
  * picker (`ActivityTypePicker`) still lists these five even on an account that has never used
- * them (`apps/android/docs/IMPLEMENTATION.md` §7.6's walk/hike/run/ride/drive default set), so
- * most recordings stay on the shared vocabulary `health/ExerciseTypes.kt` already uses, rather
+ * them, so most recordings stay on the shared vocabulary `health/ExerciseTypes.kt` already uses, rather
  * than fragmenting the Activities panel's TYPE facet (`docs/IMPLEMENTATION.md` §4.7) with
  * one-off spellings. Values are the exact wire strings
  * `internal/parse/fit_sport.go` already recognizes server-side, so a preset picked here lands

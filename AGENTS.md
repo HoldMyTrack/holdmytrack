@@ -26,7 +26,7 @@ HoldMyTrack is a free, community-funded platform that keeps the outdoor journeys
 
 When `VISION.md` or an ADR changes a position, scan the other documents, the Android ones included, for restatements of the old position and fix each one or replace it with a pointer.
 
-**Android documents.** `apps/android/docs/` mirrors the root set one level down. A wire contract and its server side (the endpoint, the schema, what ingest does with it) belong in root `docs/IMPLEMENTATION.md` even for an Android-only feature; the app's own side (local persistence, background work, UI flow) belongs in `apps/android/docs/IMPLEMENTATION.md`. `apps/web` and `apps/ios` have no `docs/` yet, so their client detail stays in the root documents.
+**Android documents.** `apps/android/docs/` holds the app's own `SPEC.md`, `IMPLEMENTATION.md` and `ROADMAP.md`; its shape, key decisions and stack are root `docs/ARCHITECTURE.md` §3. A wire contract and its server side (the endpoint, the schema, what ingest does with it) belong in root `docs/IMPLEMENTATION.md` even for an Android-only feature; the app's own side (local persistence, background work, UI flow) belongs in `apps/android/docs/IMPLEMENTATION.md`. `apps/web` and `apps/ios` have no `docs/` yet, so their client detail stays in the root documents.
 
 **Document what exists.** When a feature, table, endpoint or section is removed, delete its text: no "(removed)" stub, no history, no placeholder kept for a section number. Describe a changed decision as it is implemented today. Something that does not exist appears only as a plan (`ROADMAP.md`), an idea (`BRAINSTORM.md`), or as much motivation as an existing feature needs. A defect in shipped functionality goes in `KNOWN_ISSUES.md`.
 
