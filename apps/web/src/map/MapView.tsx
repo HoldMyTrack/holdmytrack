@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { activityQuery as queryFor } from './activityQuery';
 import { flyToBBox, flyToView, unionBBox } from './bbox';
@@ -9,7 +9,8 @@ import { defaultRange } from './defaultRange';
 import type { MapMode } from './mapMode';
 import { loadOverlays, saveOverlays, type Overlays } from './overlays';
 import { pendingChange } from './pending';
-import { invertedChecks, mapHiddenIds as hiddenOnMap, toggled, toggledVisibility, toolbarTarget, withoutIds } from './selection';
+import { initialSession, mapSessionReducer } from './session';
+import { invertedChecks, mapHiddenIds as hiddenOnMap, toolbarTarget } from './selection';
 import { storiesTabParam, storyParam, urlWithStory, type StoryNav } from './storyUrl';
 import type { SpotCategory } from './spots';
 import { clearTrackBands, setTrackBands } from './trackBands';
@@ -68,8 +69,10 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   const { initial, flavor, pinned } = useInitialView();
 
   const container = useRef<HTMLDivElement>(null);
-  // One of Normal, Fog and Heatmap at a time (docs/SPEC.md FR-4.4).
-  const [mapMode, setMapModeState] = useState<MapMode>('normal');
+  // The range or Story shown, the selection over it and the mode (session.ts).
+  const [session, dispatch] = useReducer(mapSessionReducer, null, () => initialSession(storyParam(window.location.search)));
+  const { range: selectedRange, storyId, mode: mapMode } = session;
+  const { checked: checkedActivityIds, focused: focusedActivityId, hidden: hiddenActivityIds, excludedTypes, distanceFilter } = session.selection;
   // The Satellite button and the Layers menu's paths and Spots categories, remembered per browser (overlays.ts).
   const [overlays, setOverlays] = useState<Overlays>(loadOverlays);
   const changeOverlays = useCallback((next: Overlays) => {
@@ -90,17 +93,9 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
 
   const today = useMemo(() => todayLocal(), []);
 
-  // Selection lives here because the map and the fly-to callbacks need it. Focus and the checked
-  // group are independent: a row's text or its track *focuses* it (one at a time, bolded, flown
-  // to; clicking empty space clears it). A checkbox only builds the toolbar's group: no bold, no
-  // fly, and it never touches the focus. Both start empty.
-  const [checkedActivityIds, setCheckedActivityIds] = useState<Set<string>>(() => new Set());
-  const [focusedActivityId, setFocusedActivityId] = useState<string | null>(null);
   // The row or track under the pointer, from either surface, so one effect owns the map's hover
   // feature-state. A preview only: it never moves the camera.
   const [hoveredActivityId, setHoveredActivityId] = useState<string | null>(null);
-  // Tracks hidden from the map; independent of selection and of the TYPE/DISTANCE filters.
-  const [hiddenActivityIds, setHiddenActivityIds] = useState<Set<string>>(() => new Set());
 
   // The focused activity's pace-colored segments (trackBands.ts); null whenever nothing is focused.
   const [trackMetrics, setTrackMetrics] = useState<ActivityTrackMetrics | null>(null);
@@ -131,55 +126,20 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
           : 'activities',
   );
 
-  // The date slider's selection. The slider's own window lives in useActivityDays, so paging
-  // through history never changes the selection. Starts null: its default needs the first page of days.
-  const [selectedRange, setSelectedRangeState] = useState<DateRange | null>(null);
-
-  // The open Story (FR-14.6). While one is open, the list and tracks are its activities with no
-  // date range; `selectedRange` is kept for when the Story closes.
-  const [storyId, setStoryId] = useState<string | null>(() => storyParam(window.location.search));
   const storyState = useStory(storyId);
 
   // The Edit window's tab: its Track tab hides the photos.
   const [editTab, setEditTab] = useState<EditTab>('activity');
   const storiesList = useStories(panelTab === 'stories');
 
-  // TYPE/DISTANCE filters over the loaded activities (activityFacets.ts).
-  const [excludedTypes, setExcludedTypes] = useState<Set<string>>(() => new Set());
-  const [distanceFilter, setDistanceFilter] = useState<DistanceRange | null>(null);
-
-  const toggleActivityChecked = useCallback((id: string) => {
-    setCheckedActivityIds((prev) => toggled(prev, id));
-  }, []);
+  const toggleActivityChecked = useCallback((id: string) => dispatch({ type: 'checkToggled', id }), []);
   const toolbarTargetIds = useMemo(() => toolbarTarget(checkedActivityIds, focusedActivityId), [checkedActivityIds, focusedActivityId]);
-  const toggleGroupVisibility = useCallback(() => {
-    setHiddenActivityIds((prev) => toggledVisibility(prev, toolbarTargetIds));
-  }, [toolbarTargetIds]);
+  const toggleGroupVisibility = useCallback(() => dispatch({ type: 'visibilityToggled' }), []);
   // A toggle: the type stays in the dropdown either way, so it can be turned back on without Reset filters.
-  const toggleType = useCallback((type: string) => {
-    setExcludedTypes((prev) => toggled(prev, type));
-  }, []);
-  const resetActivityFilters = useCallback(() => {
-    setExcludedTypes(new Set());
-    setDistanceFilter(null);
-  }, []);
-
-  // Once the user picks a range, the default never replaces it, even when an upload lands outside it.
-  const userChangedRangeRef = useRef(false);
-  // Only a range the user picked moves the camera, never a re-derived default.
-  const flyToNextRangeRef = useRef(false);
-  // A new range clears the selection, focus, hidden set and filters (docs/SPEC.md FR-6.6): they
-  // could name activities the new range doesn't list, and a stale distance band could exclude all.
-  const changeSelectedRange = useCallback((next: DateRange) => {
-    userChangedRangeRef.current = true;
-    flyToNextRangeRef.current = true;
-    setSelectedRangeState(next);
-    setCheckedActivityIds(new Set());
-    setFocusedActivityId(null);
-    setHiddenActivityIds(new Set());
-    setExcludedTypes(new Set());
-    setDistanceFilter(null);
-  }, []);
+  const toggleType = useCallback((activityType: string) => dispatch({ type: 'typeToggled', activityType }), []);
+  const resetActivityFilters = useCallback(() => dispatch({ type: 'filtersReset' }), []);
+  const setDistanceFilter = useCallback((filter: DistanceRange | null) => dispatch({ type: 'distanceSet', filter }), []);
+  const changeSelectedRange = useCallback((range: DateRange) => dispatch({ type: 'rangePicked', range }), []);
 
   // A Story or the date range, never both.
   const activityQuery = useMemo(() => queryFor(storyId, selectedRange), [selectedRange, storyId]);
@@ -208,17 +168,17 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   } = useActivityDays();
 
   // The default range (defaultRange.ts) is re-derived on every real refetch of days
-  // (`historyGeneration`) until the user picks a range. Trap: keying on `visibleDays` would also
+  // (`historyGeneration`) until the user picks a range (session.ts ignores it after). Trap: keying on `visibleDays` would also
   // re-pick on Earlier/Later paging, and settling once would freeze a zero-history account (every
   // demo) on `{today, today}` past its first upload.
   //
   // Held while the Edit window is open: an import landing newer days would slide the default past
   // the edited activity and close the window. It catches up when the window closes.
   useEffect(() => {
-    if (userChangedRangeRef.current || !daysReady || editOpen) return;
-    setSelectedRangeState(defaultRange(visibleDays, earliest, today));
+    if (session.userPicked || !daysReady || editOpen) return;
+    dispatch({ type: 'defaultRange', range: defaultRange(visibleDays, earliest, today) });
     // visibleDays isn't a dependency; see above.
-  }, [daysReady, earliest, historyGeneration, today, editOpen]);
+  }, [session.userPicked, daysReady, earliest, historyGeneration, today, editOpen]);
 
   // Rows with a reprocess pending (a track edit or a Private location change). A Pending track isn't drawn (FR-5.15).
   const pendingIds = useMemo(() => activities.filter((a) => a.pending).map((a) => a.id), [activities]);
@@ -279,35 +239,14 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     [map],
   );
 
-  // Fog and Heatmap can't select or focus, so leaving Normal clears the checked group and focus
-  // and returning to Normal restores them. Switching between Fog and Heatmap touches neither. A
-  // mode change never moves the camera.
-  const modeSnapshotRef = useRef<{ checked: Set<string>; focused: string | null } | null>(null);
-  const changeMapMode = useCallback(
-    (next: MapMode) => {
-      if (next === mapMode) return;
-      if (mapMode === 'normal') {
-        modeSnapshotRef.current = { checked: checkedActivityIds, focused: focusedActivityId };
-        setCheckedActivityIds(new Set());
-        setFocusedActivityId(null);
-      } else if (next === 'normal') {
-        const snapshot = modeSnapshotRef.current;
-        modeSnapshotRef.current = null;
-        if (snapshot) {
-          setCheckedActivityIds(snapshot.checked);
-          setFocusedActivityId(snapshot.focused);
-        }
-      }
-      setMapModeState(next);
-    },
-    [mapMode, checkedActivityIds, focusedActivityId],
-  );
+  // A mode change never moves the camera.
+  const changeMapMode = useCallback((mode: MapMode) => dispatch({ type: 'modeChanged', mode }), []);
 
   // Focuses one activity and flies to it, unless it's hidden (an empty fit is a no-op). With the
   // toolbar's Focus on map, the only fly to an activity.
   const focusActivity = useCallback(
     (id: string) => {
-      setFocusedActivityId(id);
+      dispatch({ type: 'focused', id });
       const target = activities.filter((a) => a.id === id && !mapHiddenIds.has(a.id));
       fitToSelection(target);
     },
@@ -329,11 +268,9 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
         return;
       }
       pendingFocusIdRef.current = activityId;
-      changeSelectedRange({ from: day, to: day });
-      // The focus flies to the activity; the range fly would override it.
-      flyToNextRangeRef.current = false;
+      dispatch({ type: 'dayViewed', day });
     },
-    [mapMode, changeMapMode, selectedRange, changeSelectedRange, focusActivity, revealDay],
+    [mapMode, changeMapMode, selectedRange, focusActivity, revealDay],
   );
   // `/?activity=&day=`, once, on arrival: before any range of the user's own, so the default never replaces it.
   const arrivedOnActivityRef = useRef(false);
@@ -353,25 +290,20 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   }, [map, activities, focusActivity]);
 
   // A click on empty list space, the counterpart of clicking away from every track. The checked group stays.
-  const clearFocus = useCallback(() => {
-    setFocusedActivityId(null);
-  }, []);
+  const clearFocus = useCallback(() => dispatch({ type: 'focused', id: null }), []);
 
   // The master checkbox while fully checked: empties the group; the focus stays.
-  const clearSelection = useCallback(() => {
-    setCheckedActivityIds(new Set());
-  }, []);
+  const clearSelection = useCallback(() => dispatch({ type: 'checkedSet', ids: [] }), []);
 
   // The master checkbox while unchecked or partial: checks every row listed, so never a row the
   // filters hide. No fly; Focus on map does that.
-  const selectAll = useCallback(() => {
-    setCheckedActivityIds(new Set(filteredActivities.map((a) => a.id)));
-  }, [filteredActivities]);
+  const selectAll = useCallback(() => dispatch({ type: 'checkedSet', ids: filteredActivities.map((a) => a.id) }), [filteredActivities]);
 
   // Inverts the check over the listed rows; a checked row the filters hide is dropped. No fly.
-  const invertSelection = useCallback(() => {
-    setCheckedActivityIds(invertedChecks(filteredActivities, checkedActivityIds));
-  }, [filteredActivities, checkedActivityIds]);
+  const invertSelection = useCallback(
+    () => dispatch({ type: 'checkedSet', ids: invertedChecks(filteredActivities, checkedActivityIds) }),
+    [filteredActivities, checkedActivityIds],
+  );
 
   // Focus on map: flies to the toolbar's target, hidden tracks excluded. The one way to look at a checked group.
   const showSelected = useCallback(() => {
@@ -407,12 +339,12 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       if (fit.length > 0) fitToSelection(fit);
       return;
     }
-    if (!flyToNextRangeRef.current) return;
-    flyToNextRangeRef.current = false;
+    if (!session.flyRequest) return;
+    dispatch({ type: 'flyConsumed' });
     const visible = activities.filter((a) => !mapHiddenIdsRef.current.has(a.id));
     const flyBounds = unionBBox(visible.flatMap((a) => (a.bbox ? [a.bbox] : [])));
     if (flyBounds) flyToBBox(map, flyBounds);
-  }, [map, activities, activitiesLoadedKey, fitToSelection, storyId]);
+  }, [map, activities, activitiesLoadedKey, fitToSelection, storyId, session.flyRequest]);
 
   // An account with no history at all: the account's Country view if set, else WORLD_VIEW; never geolocation.
   const hasFlownToFallbackRef = useRef(false);
@@ -515,10 +447,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   const handleActivitiesDeleted = useCallback(
     (ids: string[]) => {
       handleUploaded();
-      const deleted = new Set(ids);
-      setFocusedActivityId((current) => (current !== null && deleted.has(current) ? null : current));
-      setCheckedActivityIds((current) => withoutIds(current, deleted));
-      setHiddenActivityIds((current) => withoutIds(current, deleted));
+      dispatch({ type: 'activitiesRemoved', ids });
     },
     [handleUploaded],
   );
@@ -528,36 +457,16 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     setEditWindowIds(group.map((a) => a.id));
   }, []);
 
-  // Opening or closing a Story resets the list state as a new range does; the rows are a
-  // different set. Neither touches the date range.
-  const resetListState = useCallback(() => {
-    setCheckedActivityIds(new Set());
-    setFocusedActivityId(null);
-    setHiddenActivityIds(new Set());
-    setExcludedTypes(new Set());
-    setDistanceFilter(null);
+  // Opening or closing a Story resets the list state as a new range does (session.ts).
+  const enterStory = useCallback((id: string, nav: StoryNav = 'push') => {
+    dispatch({ type: 'storyEntered', id });
+    setPanelTab('stories');
+    moveStoryUrl(id, nav);
   }, []);
-  const enterStory = useCallback(
-    (id: string, nav: StoryNav = 'push') => {
-      // Fits the camera to the Story once its list lands.
-      flyToNextRangeRef.current = true;
-      resetListState();
-      setStoryId(id);
-      setPanelTab('stories');
-      moveStoryUrl(id, nav);
-    },
-    [resetListState],
-  );
-  const exitStory = useCallback(
-    (nav: StoryNav = 'push') => {
-      resetListState();
-      setStoryId(null);
-      // The list returns to the date range; the camera stays.
-      flyToNextRangeRef.current = false;
-      moveStoryUrl(null, nav);
-    },
-    [resetListState],
-  );
+  const exitStory = useCallback((nav: StoryNav = 'push') => {
+    dispatch({ type: 'storyExited' });
+    moveStoryUrl(null, nav);
+  }, []);
   // Leaving the Stories tab closes its Story; opening it opens the newest (the effect below).
   const changePanelTab = useCallback(
     (next: PanelTab) => {
@@ -630,7 +539,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   const handleStoryActivityRemoved = useCallback(
     (story: Story, activityId: string) => {
       handleStoryEdited(story);
-      setFocusedActivityId((id) => (id === activityId ? null : id));
+      dispatch({ type: 'activitiesRemoved', ids: [activityId], unfocusOnly: true });
       setHoveredActivityId((id) => (id === activityId ? null : id));
       reloadActivities();
       watchCoverage(() => {
