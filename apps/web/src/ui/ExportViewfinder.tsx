@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { Camera, X } from 'lucide-react';
+import { Camera, ChevronDown, X } from 'lucide-react';
 import { EXPORT_PLATFORMS, EXPORT_PRESET_ROWS, EXPORT_PRESETS, type ExportPreset } from '../map/exportPresets';
 import {
   CUSTOM_SIZES,
@@ -173,6 +173,7 @@ export function ExportViewfinder({
 
   const dragHandlers = { onPointerMove: onDragMove, onPointerUp: endDrag, onPointerCancel: endDrag };
   const size = outputSize(preset, customSize, win);
+  const currentSize = CUSTOM_SIZES.find((option) => option.id === customSize) ?? CUSTOM_SIZES[0];
   const style = {
     '--win-x': `${win.x}px`,
     '--win-y': `${win.y}px`,
@@ -229,20 +230,26 @@ export function ExportViewfinder({
           ))}
         </select>
         {preset === 'custom' && (
-          <select
-            className="export-viewfinder__select"
-            data-testid="export-viewfinder-size"
-            aria-label={t('export.size')}
-            value={customSize}
-            disabled={busy}
-            onChange={(event) => onCustomSizeChange(event.target.value as CustomSizeId)}
-          >
-            {CUSTOM_SIZES.map((option) => (
-              <option key={option.id} value={option.id} disabled={!customSizeAvailable(option.id, maxSidePx)}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          // The list says what a size is ("HD · 1920 px long side"); closed, the menu shows only
+          // "HD · 1920 px", which fits a phone's toolbar. The native select sits invisibly over
+          // that short label, so it still opens, takes focus and is read out as itself.
+          <span className="export-viewfinder__select export-viewfinder__picker">
+            <span aria-hidden="true">{t('export.size_short', { name: currentSize.label, px: String(currentSize.longSidePx) })}</span>
+            <ChevronDown size={14} aria-hidden="true" />
+            <select
+              data-testid="export-viewfinder-size"
+              aria-label={t('export.size')}
+              value={customSize}
+              disabled={busy}
+              onChange={(event) => onCustomSizeChange(event.target.value as CustomSizeId)}
+            >
+              {CUSTOM_SIZES.map((option) => (
+                <option key={option.id} value={option.id} disabled={!customSizeAvailable(option.id, maxSidePx)}>
+                  {t('export.size_option', { name: option.label, px: String(option.longSidePx) })}
+                </option>
+              ))}
+            </select>
+          </span>
         )}
         <button type="button" className="export-viewfinder__button" data-testid="export-viewfinder-close" aria-label={t('export.cancel')} onClick={onCancel}>
           <X size={16} />

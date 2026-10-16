@@ -204,6 +204,8 @@ export const ru: Record<MessageKey, string> & Record<string, string> = {
   'export.row_story': 'История',
   'export.shape': 'Форма снимка',
   'export.size': 'Размер снимка',
+  'export.size_option': '{name} · {px} пикс. по длинной стороне',
+  'export.size_short': '{name} · {px} пикс.',
   'edit_track.chop': 'Обрезать',
   'edit_track.chop_title': 'Оставить только часть между ручками',
   'edit_track.cut': 'Вырезать',

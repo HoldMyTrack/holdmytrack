@@ -1398,9 +1398,27 @@ button.activities-panel__story-badge:hover {
   cursor: pointer;
 }
 
-.export-viewfinder__select:focus-visible {
+.export-viewfinder__select:focus-visible,
+.export-viewfinder__picker:focus-within {
   outline: 2px solid var(--fm-accent);
   outline-offset: 1px;
+}
+
+/* The size menu: a short label with the real select laid invisibly over it (ExportViewfinder.tsx). */
+.export-viewfinder__picker {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fm-space-4);
+}
+
+.export-viewfinder__picker select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .export-viewfinder__button {
