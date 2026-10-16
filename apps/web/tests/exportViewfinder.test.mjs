@@ -1,11 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  choiceValue,
   customOutputSize,
   customSizeAvailable,
   fitWindow,
   MIN_WINDOW_PX,
   outputSize,
+  parseChoice,
   resizeWindow,
   settleWindow,
   usableCustomSize,
@@ -85,4 +87,15 @@ test("a preset makes its own size whatever the window's shape, Custom its size i
   const preset = { id: 'x-landscape', group: 'X', row: 'Landscape', widthPx: 1280, heightPx: 720 };
   assert.deepEqual(outputSize(preset, '4k', { x: 0, y: 0, w: 300, h: 300 }), { widthPx: 1280, heightPx: 720 });
   assert.deepEqual(outputSize('custom', '2k', { x: 0, y: 0, w: 400, h: 300 }), { widthPx: 2560, heightPx: 1920 });
+});
+
+test('the one menu names a Custom size or a preset, and reads back the same choice', () => {
+  assert.equal(choiceValue('custom', '2k'), 'custom-2k');
+  const presets = [{ id: 'instagram-story', group: 'Instagram', row: 'Story', widthPx: 1080, heightPx: 1920 }];
+  assert.deepEqual(parseChoice('custom-2k', presets), { preset: 'custom', customSize: '2k' });
+  const story = parseChoice('instagram-story', presets);
+  assert.equal(story.preset.id, 'instagram-story');
+  assert.equal(choiceValue(story.preset, 'hd'), 'instagram-story');
+  assert.equal(parseChoice('custom-8k', presets), null);
+  assert.equal(parseChoice('custom', presets), null);
 });

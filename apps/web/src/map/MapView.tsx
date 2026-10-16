@@ -5,7 +5,7 @@ import { flyToBBox, flyToView, unionBBox } from './bbox';
 import { basemapOrigin, satelliteSource, WORLD_VIEW } from './config';
 import { countryView } from './countryView';
 import { exportFramedImage, maxExportSide } from './exportMap';
-import { DEFAULT_CUSTOM_SIZE, fitWindow, outputSize, usableCustomSize, viewfinderArea, type CustomSizeId, type Rect } from './exportViewfinder';
+import { DEFAULT_CUSTOM_SIZE, fitWindow, outputSize, usableCustomSize, viewfinderArea, type CustomSizeId, type ExportChoice, type Rect } from './exportViewfinder';
 import type { ExportPreset } from './exportPresets';
 import { ensureBikePathLayers, setBikePathsVisible } from './bikePaths';
 import { ensureFogLayer } from './fog';
@@ -511,15 +511,17 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     });
   }, [map, exportMaxSide]);
 
-  const handleExportPresetChange = useCallback((preset: ExportPreset | 'custom') => {
+  // Another Custom size keeps the window as it is; any other change of entry fits a window of
+  // the new shape.
+  const handleExportChoiceChange = useCallback((choice: ExportChoice) => {
     const el = container.current;
     if (!el) return;
-    setExportFlow((flow) => (flow.stage === 'framing' ? { ...flow, preset, window: shapeWindow(preset, el) } : flow));
-  }, []);
-
-  const handleExportSizeChange = useCallback((customSize: CustomSizeId) => {
-    customSizeRef.current = customSize;
-    setExportFlow((flow) => (flow.stage === 'framing' ? { ...flow, customSize } : flow));
+    if (choice.preset === 'custom') customSizeRef.current = choice.customSize;
+    setExportFlow((flow) => {
+      if (flow.stage !== 'framing') return flow;
+      if (choice.preset === 'custom' && flow.preset === 'custom') return { ...flow, customSize: choice.customSize };
+      return { ...flow, ...choice, window: shapeWindow(choice.preset, el) };
+    });
   }, []);
 
   const handleExportCapture = useCallback(async () => {
@@ -1550,8 +1552,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               busy={exportFlow.stage === 'capturing'}
               error={exportError}
               onWindowChange={(window) => setExportFlow((flow) => (flow.stage === 'framing' ? { ...flow, window } : flow))}
-              onPresetChange={handleExportPresetChange}
-              onCustomSizeChange={handleExportSizeChange}
+              onChoiceChange={handleExportChoiceChange}
               onCapture={() => void handleExportCapture()}
               onCancel={handleExportCancel}
             />

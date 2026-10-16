@@ -4,16 +4,19 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { Camera, ChevronDown, X } from 'lucide-react';
 import { EXPORT_PLATFORMS, EXPORT_PRESET_ROWS, EXPORT_PRESETS, type ExportPreset } from '../map/exportPresets';
 import {
+  choiceValue,
   CUSTOM_SIZES,
   customSizeAvailable,
   fitWindow,
   outputSize,
+  parseChoice,
   resizeWindow,
   settleWindow,
   viewfinderArea,
   windowMoved,
   type Corner,
   type CustomSizeId,
+  type ExportChoice,
   type Rect,
 } from '../map/exportViewfinder';
 import { t } from '../i18n';
@@ -44,8 +47,7 @@ export interface ExportViewfinderProps {
   busy: boolean;
   error: string | null;
   onWindowChange: (window: Rect) => void;
-  onPresetChange: (preset: ExportPreset | 'custom') => void;
-  onCustomSizeChange: (size: CustomSizeId) => void;
+  onChoiceChange: (choice: ExportChoice) => void;
   onCapture: () => void;
   onCancel: () => void;
 }
@@ -82,8 +84,7 @@ export function ExportViewfinder({
   busy,
   error,
   onWindowChange,
-  onPresetChange,
-  onCustomSizeChange,
+  onChoiceChange,
   onCapture,
   onCancel,
 }: ExportViewfinderProps) {
@@ -205,52 +206,49 @@ export function ExportViewfinder({
       </div>
 
       <div className="export-viewfinder__toolbar" data-testid="export-viewfinder-toolbar">
-        <select
-          className="export-viewfinder__select"
-          data-testid="export-viewfinder-shape"
-          aria-label={t('export.shape')}
-          value={preset === 'custom' ? 'custom' : preset.id}
-          disabled={busy}
-          onChange={(event) => onPresetChange(EXPORT_PRESETS.find((p) => p.id === event.target.value) ?? 'custom')}
-        >
-          <option value="custom">{t('export.custom')}</option>
-          {EXPORT_PLATFORMS.map((platform) => (
-            <optgroup key={platform} label={platform}>
-              {EXPORT_PRESET_ROWS.map((row) => {
-                const p = EXPORT_PRESETS.find((candidate) => candidate.group === platform && candidate.row === row);
-                return (
-                  p && (
-                    <option key={p.id} value={p.id}>
-                      {platform} · {t(ROW_LABELS[row])}
-                    </option>
-                  )
-                );
-              })}
-            </optgroup>
-          ))}
-        </select>
-        {preset === 'custom' && (
-          // The list says what a size is ("HD · 1920 px long side"); closed, the menu shows only
-          // "HD · 1920 px", which fits a phone's toolbar. The native select sits invisibly over
-          // that short label, so it still opens, takes focus and is read out as itself.
-          <span className="export-viewfinder__select export-viewfinder__picker">
-            <span aria-hidden="true">{t('export.size_short', { name: currentSize.label, px: String(currentSize.longSidePx) })}</span>
-            <ChevronDown size={14} aria-hidden="true" />
-            <select
-              data-testid="export-viewfinder-size"
-              aria-label={t('export.size')}
-              value={customSize}
-              disabled={busy}
-              onChange={(event) => onCustomSizeChange(event.target.value as CustomSizeId)}
-            >
+        {/* One menu of shape-and-size pairs: Custom at each size, then each platform's presets.
+            Its list says what a Custom size is ("Custom · HD (1920 px long side)"); closed, it
+            shows only "Custom · HD", which fits a phone's toolbar. The native select sits
+            invisibly over that short label, so it still opens, takes focus and is read out as
+            itself. */}
+        <span className="export-viewfinder__select export-viewfinder__picker">
+          <span aria-hidden="true">
+            {preset === 'custom' ? t('export.custom_size', { name: currentSize.label }) : `${preset.group} · ${t(ROW_LABELS[preset.row as keyof typeof ROW_LABELS])}`}
+          </span>
+          <ChevronDown size={14} aria-hidden="true" />
+          <select
+            data-testid="export-viewfinder-choice"
+            aria-label={t('export.shape')}
+            value={choiceValue(preset, customSize)}
+            disabled={busy}
+            onChange={(event) => {
+              const choice = parseChoice(event.target.value, EXPORT_PRESETS);
+              if (choice) onChoiceChange(choice);
+            }}
+          >
+            <optgroup label={t('export.custom')}>
               {CUSTOM_SIZES.map((option) => (
-                <option key={option.id} value={option.id} disabled={!customSizeAvailable(option.id, maxSidePx)}>
-                  {t('export.size_option', { name: option.label, px: String(option.longSidePx) })}
+                <option key={option.id} value={`custom-${option.id}`} disabled={!customSizeAvailable(option.id, maxSidePx)}>
+                  {t('export.custom_size_full', { name: option.label, px: String(option.longSidePx) })}
                 </option>
               ))}
-            </select>
-          </span>
-        )}
+            </optgroup>
+            {EXPORT_PLATFORMS.map((platform) => (
+              <optgroup key={platform} label={platform}>
+                {EXPORT_PRESET_ROWS.map((row) => {
+                  const p = EXPORT_PRESETS.find((candidate) => candidate.group === platform && candidate.row === row);
+                  return (
+                    p && (
+                      <option key={p.id} value={p.id}>
+                        {platform} · {t(ROW_LABELS[row])}
+                      </option>
+                    )
+                  );
+                })}
+              </optgroup>
+            ))}
+          </select>
+        </span>
         <button type="button" className="export-viewfinder__button" data-testid="export-viewfinder-close" aria-label={t('export.cancel')} onClick={onCancel}>
           <X size={16} />
         </button>

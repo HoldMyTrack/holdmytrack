@@ -126,6 +126,24 @@ export function outputSize(preset: ExportPreset | 'custom', customSize: CustomSi
   return customOutputSize(window.w / window.h, longSide);
 }
 
+/** One entry of the viewfinder's one menu: a Custom size (any shape, its long side fixed) or a
+ *  platform preset (its own shape and size). */
+export type ExportChoice = { preset: 'custom'; customSize: CustomSizeId } | { preset: ExportPreset };
+
+/** The menu's value for a choice: `custom-hd`, or a preset's own id. */
+export function choiceValue(preset: ExportPreset | 'custom', customSize: CustomSizeId): string {
+  return preset === 'custom' ? `custom-${customSize}` : preset.id;
+}
+
+/** The choice a menu value names among `presets` (exportPresets.ts's EXPORT_PRESETS), or null
+ *  for one that names nothing. */
+export function parseChoice(value: string, presets: readonly ExportPreset[]): ExportChoice | null {
+  const size = CUSTOM_SIZES.find((option) => `custom-${option.id}` === value);
+  if (size) return { preset: 'custom', customSize: size.id };
+  const preset = presets.find((p) => p.id === value);
+  return preset ? { preset } : null;
+}
+
 /** Whether this device can draw a Custom size: its long side within `maxSidePx`, the most
  *  the browser's WebGL can draw in one image. */
 export function customSizeAvailable(id: CustomSizeId, maxSidePx: number): boolean {
