@@ -38,6 +38,7 @@ import androidx.fragment.app.Fragment
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.progressindicator.LinearProgressIndicator
+import dev.holdmytrack.android.export.ExportViewfinder
 import dev.holdmytrack.android.map.ActivityDays
 import dev.holdmytrack.android.map.BoxUnion
 import dev.holdmytrack.android.map.CaptureMode
@@ -198,6 +199,14 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /** Back closes the Edit window before it leaves the map. */
     private val closeEditOnBack = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() = editWindow.back()
+    }
+
+    /** The map image export's viewfinder (`export/ExportViewfinder`), from the rail's camera. */
+    private lateinit var exportViewfinder: ExportViewfinder
+
+    /** Back closes the export viewfinder, nothing captured, before anything else on the map. */
+    private val closeExportOnBack = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() = exportViewfinder.close()
     }
 
     /** Back closes the Private location editor, unsaved, before it leaves the map. */
@@ -541,6 +550,16 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         locateButton = findViewById(R.id.locate_button)
         locatePanel = findViewById(R.id.locate_panel)
         locateButton.setOnClickListener { onLocateTap() }
+        exportViewfinder = ExportViewfinder(
+            host = findViewById(R.id.map_root),
+            map = { map.takeIf { style != null } },
+            styleUrl = ::styleUrl,
+            prepare = ::prepareExportStyle,
+            darkBase = { style?.let(::darkBase) ?: isNight() },
+            satelliteOn = { satelliteAvailable && MapSatellite.isOn(requireContext()) },
+            onShown = ::renderExportShown,
+        )
+        findViewById<View>(R.id.export_button).setOnClickListener { exportViewfinder.toggle() }
 
         dateFooter = findViewById(R.id.date_footer)
         zoomLevelNotice = ZoomLevelNotice(findViewById(R.id.zoom_level_notice))
@@ -641,6 +660,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, endSelectingOnBack)
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, closeEditOnBack)
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, closePrivateOnBack)
+        // Last, so it's asked first.
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, closeExportOnBack)
         activityDays = ActivityDays(DateRangeSlider.WINDOW_DAYS, ::onActivityDaysChanged)
         dateSlider = DateRangeSlider(
             dateFooter,
@@ -1409,7 +1430,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             MapMode.FOG -> R.string.mode_chip_fog
             MapMode.HEATMAP -> R.string.mode_chip_heatmap
         }
-        modeChip.isVisible = text != null && modeBarReady && !isRecording()
+        modeChip.isVisible = text != null && modeBarReady && !isRecording() && !(::exportViewfinder.isInitialized && exportViewfinder.isOpen)
         if (text != null) modeChip.setText(text)
     }
 
@@ -1857,6 +1878,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         renderRecordingStatus(state, hasFix = points.isNotEmpty())
         renderModeBar()
         locatePanel.visibility = if (active) View.GONE else View.VISIBLE
+        // A recording has the map to itself; the export would draw what it hides.
+        findViewById<View>(R.id.export_panel).visibility = if (active) View.GONE else View.VISIBLE
+        if (active && ::exportViewfinder.isInitialized) exportViewfinder.close()
         renderModeChip()
         renderDateFooter()
         updateNoticeVisibility()
@@ -2112,6 +2136,43 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
     /** Whether the basemap reads dark — the dark flavor, or satellite imagery over either —
      *  which picks Fog's veil and Heatmap's wash (`MapOverlays.setDarkVeil`), the web's `isDarkBase`. */
+    /**
+     * The export's hidden map (`export/MapImageRenderer`) made to look like this one: the same
+     * calls [loadStyle] and [syncSession] make on the live style — paths, satellite, the user
+     * layers in the current mode, range and Story, the panel's hidden set and selection. No
+     * Spots, photos or recording: the web's export leaves them out too.
+     */
+    private fun prepareExportStyle(loaded: Style) {
+        val context = requireContext()
+        MapPaths.apply(loaded, shownPaths(MapPaths.get(context)))
+        MapSatellite.apply(loaded, satelliteAvailable && MapSatellite.isOn(context))
+        MapOverlays.attach(loaded, mode, selectedRange, darkBase(loaded), isNight(), storyId)
+        MapPaths.apply(loaded, shownPaths(MapPaths.get(context)))
+        MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.highlighted)
+    }
+
+    /** While the viewfinder shows, the map's own chrome steps aside — the top row and its
+     *  notices, the mode's chip, the sheet, the popups and photo markers, MapLibre's logo,
+     *  attribution and compass — since what sits inside the window would cover the picture. */
+    private fun renderExportShown(shown: Boolean) {
+        closeExportOnBack.isEnabled = shown
+        val visibility = if (shown) View.INVISIBLE else View.VISIBLE
+        topChrome.visibility = visibility
+        sheet.visibility = visibility
+        findViewById<View>(R.id.photo_markers).visibility = visibility
+        renderModeChip()
+        if (shown) {
+            spotPopup.close()
+            photoPopup.close()
+            layersMenu.dismiss()
+        }
+        map?.uiSettings?.apply {
+            isLogoEnabled = !shown
+            isAttributionEnabled = !shown
+            isCompassEnabled = !shown
+        }
+    }
+
     private fun darkBase(style: Style): Boolean =
         isNight() || (MapSatellite.isOn(requireContext()) && MapSatellite.isAvailable(style))
 
@@ -2251,6 +2312,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     /** The You tab over the map, or the map back: the Sync tab stops reading, or reads again. */
     override fun onHiddenChanged(hidden: Boolean) {
         super.onHiddenChanged(hidden)
+        if (hidden && ::exportViewfinder.isInitialized) exportViewfinder.close()
         if (!::panel.isInitialized) return
         if (hidden) panel.syncTab.pause() else panel.syncTab.resume()
     }
@@ -2302,6 +2364,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     }
 
     override fun onDestroyView() {
+        exportViewfinder.close()
         leftoverDialog?.dismiss()
         stopDialog?.dismiss()
         layersMenu.dismiss()

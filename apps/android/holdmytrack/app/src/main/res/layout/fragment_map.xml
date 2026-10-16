@@ -44,9 +44,9 @@
         <!-- Floating chrome over the map, one row along the top. At the start, the map-mode
              toggle, mirroring the web client's own top-left mode control
              (apps/web/src/index.css's .map-mode-toggle) — or, while recording, the recording's
-             status card in its place — with Show in this area under it. At the end, a rail of two
-             round buttons: Layers, then Find my location, where the web has its geolocate
-             control. MapLibre's compass, also top-end, is pushed below the row
+             status card in its place — with Show in this area under it. At the end, a rail of round
+             buttons: Layers, Find my location, where the web has its geolocate control, and Export
+             map image, where the web has its camera. MapLibre's compass, also top-end, is pushed below the row
              (MapFragment.applyCompassMargin). The row itself takes no touches, so the map still
              pans through the gaps. Styled from the theme (res/values/themes.xml). -->
         <LinearLayout
@@ -345,8 +345,9 @@
                  the show-or-hide switch and Satellite — then Find my location
                  (MapFragment.onLocateTap), which shows the position dot and flies the camera to it,
                  the counterpart of the web map's geolocate control, hidden while recording, when
-                 the camera already follows the recording. The rail steps aside while an editor
-                 opens over the top of the map (MapFragment.renderRail). -->
+                 the camera already follows the recording — then Export map image, also hidden while
+                 recording. The rail steps aside while an editor opens over the top of the map
+                 (MapFragment.renderRail). -->
             <LinearLayout
                 android:id="@+id/map_rail"
                 android:layout_width="wrap_content"
@@ -406,6 +407,25 @@
                         android:layout_height="wrap_content"
                         android:contentDescription="@string/locate_button"
                         app:icon="@drawable/ic_locate_fixed" />
+                </FrameLayout>
+
+                <!-- Export map image (export/ExportViewfinder): the viewfinder over the map, the
+                     web map's camera control under its geolocate. -->
+                <FrameLayout
+                    android:id="@+id/export_panel"
+                    style="@style/Widget.HoldMyTrack.MapPanel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/hmt_space_8">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/export_button"
+                        style="@style/Widget.HoldMyTrack.Button.MapIcon"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:contentDescription="@string/export_open"
+                        android:tooltipText="@string/export_open"
+                        app:icon="@drawable/ic_camera" />
                 </FrameLayout>
             </LinearLayout>
         </LinearLayout>

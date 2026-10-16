@@ -629,7 +629,7 @@ Only one track is hovered and only one is focused at a time. Hovering the focuse
 
 ### FR-4.10 Map image export
 
-**Description**: The map's camera button opens a viewfinder: the map dimmed around a window in its middle, which is the picture. The map moves under the window, and Capture downloads what's in it as a PNG image of a chosen size, however small the screen.
+**Description**: The map's camera button opens a viewfinder: the map dimmed around a window in its middle, which is the picture. The map moves under the window, and Capture downloads what's in it as a PNG image of a chosen size, however small the screen. The Android app has the same viewfinder (`apps/android/docs/SPEC.md` FR-2.11).
 
 **Preconditions**: Active session; the map has finished its initial load. No activity selection is required — the user frames whatever region of the map they want, independent of any checked/focused activity.
 

@@ -431,7 +431,7 @@ What this doesn't remove is the first request for each tile per device and versi
 
 #### 4.3.3 Map image export
 
-`VISION.md` §4.2's "Export" pillar, first slice; what the viewfinder does is FR-4.10, and §5.5 says why it is client-side rather than a server render. `ExportViewfinder.tsx` is the viewfinder, `map/exportViewfinder.ts` its geometry and sizes, `exportMap.ts` the capture.
+`VISION.md` §4.2's "Export" pillar, first slice; what the viewfinder does is FR-4.10, and §5.5 says why it is client-side rather than a server render. `ExportViewfinder.tsx` is the viewfinder, `map/exportViewfinder.ts` its geometry and sizes, `exportMap.ts` the capture. The Android app's export is the same design on its own map (`apps/android/docs/IMPLEMENTATION.md` §3.5).
 
 **A viewfinder fixed on the screen, the map moving under it**, the pattern photo croppers and map print tools use. The window only says what's in the picture and its shape; the image's pixel size is chosen apart from it, so a phone makes as large an image as a desktop.
 - **A crop settles back with a zoom** (`settleWindow`): on release the window returns to the largest size its new shape fits, and the map eases by `log2` of the growth about the crop's middle, with an `offset` because the window's middle isn't the map's (room is kept above for the toolbar). The window's CSS transition and the map's ease share one duration, so the two move together.
