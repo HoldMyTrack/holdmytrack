@@ -6,11 +6,12 @@ import { t } from '../i18n';
 
 export interface ExportControlProps {
   map: MapLibreMap;
-  /** Whether the export frame is currently shown — the button reads as pressed while it is. */
+  /** Whether the export viewfinder is shown — the button reads as pressed while it is. */
   active: boolean;
-  /** Shows the export frame (`ExportFrame.tsx`), or puts it away if it's already shown — this
-   *  button never captures directly. Busy/error state belongs to the frame's own Capture
-   *  step, since the frame/capture sequence spans components this button doesn't own. */
+  /** Opens the export viewfinder (`ExportViewfinder.tsx`), or puts it away if it's already
+   *  shown — this button never captures directly. Busy/error state belongs to the viewfinder's
+   *  own Capture step, since the framing/capture sequence spans components this button
+   *  doesn't own. */
   onOpen: () => void;
 }
 

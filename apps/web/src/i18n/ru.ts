@@ -203,6 +203,7 @@ export const ru: Record<MessageKey, string> & Record<string, string> = {
   'export.row_square': 'Квадрат',
   'export.row_story': 'История',
   'export.shape': 'Форма снимка',
+  'export.size': 'Размер снимка',
   'edit_track.chop': 'Обрезать',
   'edit_track.chop_title': 'Оставить только часть между ручками',
   'edit_track.cut': 'Вырезать',

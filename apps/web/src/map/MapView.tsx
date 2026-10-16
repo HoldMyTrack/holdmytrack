@@ -4,7 +4,8 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { flyToBBox, flyToView, unionBBox } from './bbox';
 import { basemapOrigin, satelliteSource, WORLD_VIEW } from './config';
 import { countryView } from './countryView';
-import { exportFramedImage } from './exportMap';
+import { exportFramedImage, maxExportSide } from './exportMap';
+import { DEFAULT_CUSTOM_SIZE, fitWindow, outputSize, usableCustomSize, viewfinderArea, type CustomSizeId, type Rect } from './exportViewfinder';
 import type { ExportPreset } from './exportPresets';
 import { ensureBikePathLayers, setBikePathsVisible } from './bikePaths';
 import { ensureFogLayer } from './fog';
@@ -36,7 +37,7 @@ import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '.
 import { ActivitiesPanel, type PanelTab, type StoriesPanel } from '../ui/ActivitiesPanel';
 import { EditActivityWindow, type EditTab, type EditWindowResult } from '../ui/EditActivityWindow';
 import { ExportControl } from '../ui/ExportControl';
-import { ExportFrame, type FrameGeometry } from '../ui/ExportFrame';
+import { ExportViewfinder } from '../ui/ExportViewfinder';
 import { OverlaysMenu } from '../ui/OverlaysMenu';
 import { BasemapToggle } from '../ui/BasemapToggle';
 import { PhotoPopup } from '../ui/PhotoPopup';
@@ -97,29 +98,16 @@ export interface MapViewProps {
   initialActivity?: { id: string; day: string } | null;
 }
 
-/** The frame-and-capture export flow's own state — lives here, not inside `ExportFrame.tsx`,
- *  since it spans that component, the map control that opens it (`ExportControl.tsx`), and the
- *  live map instance capture needs directly. */
+/** The export viewfinder's own state — lives here, not inside `ExportViewfinder.tsx`, since it
+ *  spans that component, the map control that opens it (`ExportControl.tsx`), and the live map
+ *  instance capture needs directly. The window is in the map container's CSS pixels. */
 type ExportFlow =
   | { stage: 'idle' }
-  | { stage: 'framing' | 'capturing'; preset: ExportPreset | 'custom'; geometry: FrameGeometry };
+  | { stage: 'framing' | 'capturing'; preset: ExportPreset | 'custom'; customSize: CustomSizeId; window: Rect };
 
-/** The frame's size, in CSS pixels, for a shape. Custom gets a generous 70% of the container
- *  so it's immediately visible and easy to grab. A preset keeps its declared aspect ratio,
- *  fitted inside `fit` (the current frame's size when switching shape, so the frame doesn't
- *  jump to a very different size) and never more than 80% of either container dimension. */
-function frameSize(
-  preset: ExportPreset | 'custom',
-  container: { width: number; height: number },
-  fit?: { widthPx: number; heightPx: number },
-): { widthPx: number; heightPx: number } {
-  if (preset === 'custom') {
-    return fit ?? { widthPx: container.width * 0.7, heightPx: container.height * 0.7 };
-  }
-  const maxW = Math.min(fit?.widthPx ?? Infinity, container.width * 0.8);
-  const maxH = Math.min(fit?.heightPx ?? Infinity, container.height * 0.8);
-  const ratio = preset.widthPx / preset.heightPx;
-  return maxW / maxH >= ratio ? { widthPx: maxH * ratio, heightPx: maxH } : { widthPx: maxW, heightPx: maxW / ratio };
+/** A shape's window: the largest it can be in the map's free area. Custom takes the whole area. */
+function shapeWindow(preset: ExportPreset | 'custom', container: HTMLElement): Rect {
+  return fitWindow(preset === 'custom' ? null : preset.widthPx / preset.heightPx, viewfinderArea(container.clientWidth, container.clientHeight));
 }
 
 /** How far apart, in metres, a group's photos must be for zooming in to separate them (§4.27). */
@@ -506,47 +494,45 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     scaleUnit: unitSystem,
   });
 
+  // The Custom size last picked, kept for the next time the viewfinder opens in this visit.
+  const customSizeRef = useRef<CustomSizeId>(DEFAULT_CUSTOM_SIZE);
+  const exportMaxSide = useMemo(() => (map ? maxExportSide(map) : 4096), [map]);
+
   const handleExportOpen = useCallback(() => {
-    if (!map || !container.current) return;
-    const center = map.getCenter();
-    const size = frameSize('custom', { width: container.current.clientWidth, height: container.current.clientHeight });
+    const el = container.current;
+    if (!map || !el) return;
     setExportError(null);
-    // The header button toggles: pressing Export again while framing puts the frame away
-    // (but not mid-capture — that finishes or fails first).
+    // The control toggles: pressing it again while framing closes the viewfinder (but not
+    // mid-capture — that finishes or fails first).
     setExportFlow((flow) => {
       if (flow.stage === 'framing') return { stage: 'idle' };
       if (flow.stage === 'capturing') return flow;
-      return { stage: 'framing', preset: 'custom', geometry: { center: { lng: center.lng, lat: center.lat }, ...size } };
+      return { stage: 'framing', preset: 'custom', customSize: usableCustomSize(customSizeRef.current, exportMaxSide), window: shapeWindow('custom', el) };
     });
-  }, [map]);
+  }, [map, exportMaxSide]);
 
   const handleExportPresetChange = useCallback((preset: ExportPreset | 'custom') => {
     const el = container.current;
     if (!el) return;
-    setExportFlow((flow) =>
-      flow.stage === 'framing'
-        ? {
-            stage: 'framing',
-            preset,
-            geometry: { center: flow.geometry.center, ...frameSize(preset, { width: el.clientWidth, height: el.clientHeight }, flow.geometry) },
-          }
-        : flow,
-    );
+    setExportFlow((flow) => (flow.stage === 'framing' ? { ...flow, preset, window: shapeWindow(preset, el) } : flow));
+  }, []);
+
+  const handleExportSizeChange = useCallback((customSize: CustomSizeId) => {
+    customSizeRef.current = customSize;
+    setExportFlow((flow) => (flow.stage === 'framing' ? { ...flow, customSize } : flow));
   }, []);
 
   const handleExportCapture = useCallback(async () => {
     if (exportFlow.stage !== 'framing' || !map) return;
-    const { preset, geometry } = exportFlow;
-    setExportFlow({ stage: 'capturing', preset, geometry });
+    const { preset, customSize, window: win } = exportFlow;
+    setExportFlow({ ...exportFlow, stage: 'capturing' });
     setExportError(null);
     try {
+      const center = map.unproject([win.x + win.w / 2, win.y + win.h / 2]);
       const blob = await exportFramedImage(
         map,
         { flavor, mode: mapMode, activityQuery, hiddenIds: [...mapHiddenIds], paths, satellite },
-        {
-          ...geometry,
-          ...(preset !== 'custom' && { target: { widthPx: preset.widthPx, heightPx: preset.heightPx } }),
-        },
+        { center: { lng: center.lng, lat: center.lat }, widthPx: win.w, heightPx: win.h, target: outputSize(preset, customSize, win) },
       );
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -561,9 +547,9 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       // The cause is a developer's detail (a canvas or render timeout), not something to act on.
       console.error('export failed', err);
       setExportError(t('export.failed'));
-      // Stays in 'framing', not 'idle' — a failed capture (e.g. a network timeout) shouldn't
-      // discard the frame the user just positioned, forcing them to redo it from scratch.
-      setExportFlow((flow) => (flow.stage === 'capturing' ? { stage: 'framing', preset: flow.preset, geometry: flow.geometry } : flow));
+      // Back to framing, not idle — a failed capture (e.g. a network timeout) shouldn't throw
+      // away the view the user just framed.
+      setExportFlow((flow) => (flow.stage === 'capturing' ? { ...flow, stage: 'framing' } : flow));
     }
   }, [exportFlow, map, flavor, mapMode, activityQuery, mapHiddenIds, paths, satellite]);
 
@@ -1540,7 +1526,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
         )}
 
         <div
-          className="map-root"
+          className={exportFlow.stage === 'idle' ? 'map-root' : 'map-root map-root--exporting'}
           onDragEnter={onMapDragEnter}
           onDragOver={onMapDragOver}
           onDragLeave={onMapDragLeave}
@@ -1554,17 +1540,18 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
           <div ref={container} className="map-canvas" data-testid="map-canvas" />
           {map && <ExportControl map={map} active={exportFlow.stage !== 'idle'} onOpen={handleExportOpen} />}
           {map && (exportFlow.stage === 'framing' || exportFlow.stage === 'capturing') && (
-            <ExportFrame
+            <ExportViewfinder
               map={map}
               containerRef={container}
               preset={exportFlow.preset}
-              geometry={exportFlow.geometry}
+              customSize={exportFlow.customSize}
+              maxSidePx={exportMaxSide}
+              window={exportFlow.window}
               busy={exportFlow.stage === 'capturing'}
               error={exportError}
-              onGeometryChange={(geometry) =>
-                setExportFlow((flow) => (flow.stage === 'framing' ? { stage: 'framing', preset: flow.preset, geometry } : flow))
-              }
+              onWindowChange={(window) => setExportFlow((flow) => (flow.stage === 'framing' ? { ...flow, window } : flow))}
               onPresetChange={handleExportPresetChange}
+              onCustomSizeChange={handleExportSizeChange}
               onCapture={() => void handleExportCapture()}
               onCancel={handleExportCancel}
             />

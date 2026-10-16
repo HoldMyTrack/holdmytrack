@@ -184,6 +184,7 @@ export const en = {
   'export.row_square': 'Square',
   'export.row_story': 'Story',
   'export.shape': 'Export shape',
+  'export.size': 'Image size',
   'edit_track.chop': 'Chop',
   'edit_track.chop_title': 'Keep only the part between the knobs',
   'edit_track.cut': 'Cut',
