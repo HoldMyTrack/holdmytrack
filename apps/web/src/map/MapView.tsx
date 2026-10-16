@@ -1,44 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Map as MapLibreMap } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { activityQuery as queryFor } from './activityQuery';
 import { flyToBBox, flyToView, unionBBox } from './bbox';
 import { firstListFit, needsFallbackView } from './cameraRules';
-import { basemapOrigin, satelliteSource, WORLD_VIEW } from './config';
+import { satelliteSource, WORLD_VIEW } from './config';
 import { countryView } from './countryView';
 import { defaultRange } from './defaultRange';
-import { exportFlowReducer, type ExportEvent, type ExportFlow } from './exportFlow';
-import { exportFramedImage, maxExportSide } from './exportMap';
-import { DEFAULT_CUSTOM_SIZE, outputSize, usableCustomSize, type CustomSizeId, type ExportChoice } from './exportViewfinder';
-import { ensureBikePathLayers, setBikePathsVisible } from './bikePaths';
-import { ensureFogLayer } from './fog';
-import { ensureHeatmapLayer } from './heatmap';
-import { setMapMode, type MapMode } from './mapMode';
+import type { MapMode } from './mapMode';
 import { loadOverlays, saveOverlays, type Overlays } from './overlays';
-import { raisePathLayers } from './paths';
 import { pendingChange } from './pending';
-import { GROUP_MAX_ZOOM, photoGroupAction, photoMarkerItems, photoScopeFor } from './photoMarkerItems';
-import { usePhotoMarkers, type PhotoMarkerItem, type PhotoMarkerOverlay } from './photos';
 import { invertedChecks, mapHiddenIds as hiddenOnMap, toggled, toggledVisibility, toolbarTarget, withoutIds } from './selection';
-import { setSatelliteVisible } from './satellite';
-import { capturesSince, mergeSpotCaptures } from './spotCaptures';
 import { storiesTabParam, storyParam, urlWithStory, type StoryNav } from './storyUrl';
-import { ensureSpotsLayer, setSpotClickHandler, setSpotsCaptured, setSpotsVisible, type Spot, type SpotCategory } from './spots';
-import { labelInsertionPoint } from './layers';
-import { buildStyle, isDarkBase, type Flavor } from './style';
-import { clearTrackBands, ensureBandLayer, setTrackBands } from './trackBands';
-import {
-  ensureTrackLayer,
-  refreshTrackLayer,
-  setHiddenTracks,
-  setHoveredTrack,
-  setSelectedTracks,
-  setTrackInteractivityHandlers,
-} from './tracks';
+import type { SpotCategory } from './spots';
+import { clearTrackBands, setTrackBands } from './trackBands';
+import { refreshTrackLayer, setHiddenTracks, setHoveredTrack, setSelectedTracks, setTrackInteractivityHandlers } from './tracks';
 import { useCoverageRefresh } from './useCoverageRefresh';
+import { useExportFlow } from './useExportFlow';
+import { useFileDrop } from './useFileDrop';
+import { useHashSync, useInitialView } from './useInitialView';
 import { useMapInstance } from './useMapInstance';
-import { flavorForTheme, parseHash, pinnedFlavor, replaceHash, type HashState, type ViewState } from './viewState';
-import { API_BASE_URL, getActivityTrackMetrics, getSpotCaptures, type Activity, type ActivityTrackMetrics, type SpotCapture, type Story } from '../api';
+import { useMapLayers } from './useMapLayers';
+import { usePhotoLayer } from './usePhotoLayer';
+import { useSpots } from './useSpots';
+import { getActivityTrackMetrics, type Activity, type ActivityTrackMetrics, type Story } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
 import { ActivitiesPanel, type PanelTab, type StoriesPanel } from '../ui/ActivitiesPanel';
@@ -56,12 +40,10 @@ import { todayLocal, type DateRange } from '../ui/dateMath';
 import { useUnitSystem } from '../ui/units';
 import { useActivityDays } from '../ui/useActivityDays';
 import { useActivityList } from '../ui/useActivityList';
-import { usePhotos, type PhotoScope } from '../ui/usePhotos';
 import { useStories } from '../ui/useStories';
 import { useStoryInbox } from '../ui/useStoryInbox';
 import { useStory } from '../ui/useStory';
-import { currentTheme, useTheme } from '../ui/useTheme';
-import { lang, t } from '../i18n';
+import { t } from '../i18n';
 
 /** How often the list is re-read while a reprocess is pending: one activity's ingest takes seconds. */
 const EDIT_PENDING_POLL_MS = 2000;
@@ -78,40 +60,14 @@ export interface MapViewProps {
   initialActivity?: { id: string; day: string } | null;
 }
 
-
 export function MapView({ initialPrivateLocationsOpen = false, initialActivity = null }: MapViewProps) {
   // A demo account is read-only (docs/SPEC.md FR-2.1); `'email' in user` tells a DemoUser from an AuthUser.
   const { user } = useAuth();
   const isDemo = !('email' in user);
 
-  // Read once per mount. Every sign-in, sign-up, demo start and sign-out ends in a redirect to a
-  // bare `/`, so a previous session's camera can't carry over (IMPLEMENTATION.md §4.19).
-  const [initial] = useState<{ hash: HashState; view: ViewState; flavor: Flavor }>(() => {
-    const hash = parseHash(window.location.hash);
-    return {
-      hash,
-      view: hash.view ?? { longitude: WORLD_VIEW.longitude, latitude: WORLD_VIEW.latitude, zoom: WORLD_VIEW.zoom },
-      flavor: pinnedFlavor(hash) ?? flavorForTheme(currentTheme()),
-    };
-  });
-
-  // The basemap flavor follows the page theme and swaps live. A URL can pin another flavor until
-  // the theme next changes: whoever switched the theme expects the map to follow.
-  const theme = useTheme();
-  const [pinned, setPinned] = useState(() => pinnedFlavor(initial.hash));
-  const initialTheme = useRef(theme);
-  useEffect(() => {
-    if (theme !== initialTheme.current) setPinned(undefined);
-  }, [theme]);
-  const flavor: Flavor = pinned ?? flavorForTheme(theme);
-  // Read by the hash sync's moveend listener, which outlives any one render.
-  const pinnedRef = useRef(pinned);
-  pinnedRef.current = pinned;
+  const { initial, flavor, pinned } = useInitialView();
 
   const container = useRef<HTMLDivElement>(null);
-  const [exportFlow, setExportFlow] = useState<ExportFlow>({ stage: 'idle' });
-  const exportEvent = useCallback((event: ExportEvent) => setExportFlow((flow) => exportFlowReducer(flow, event)), []);
-  const [exportError, setExportError] = useState<string | null>(null);
   // One of Normal, Fog and Heatmap at a time (docs/SPEC.md FR-4.4).
   const [mapMode, setMapModeState] = useState<MapMode>('normal');
   // The Satellite button and the Layers menu's paths and Spots categories, remembered per browser (overlays.ts).
@@ -131,9 +87,6 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // Satellite imagery (FR-4.14) only when the deployment configures some, whatever was saved.
   const satelliteAvailable = satelliteSource() !== null;
   const satellite = satelliteAvailable && overlays.satellite;
-  const [openSpot, setOpenSpot] = useState<Spot | null>(null);
-  // Places this account captured with the Android app (FR-15.6): badged, and dated in their popup.
-  const [spotCaptures, setSpotCaptures] = useState<readonly SpotCapture[]>([]);
 
   const today = useMemo(() => todayLocal(), []);
 
@@ -187,28 +140,8 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   const [storyId, setStoryId] = useState<string | null>(() => storyParam(window.location.search));
   const storyState = useStory(storyId);
 
-  // Photos (FR-16), in Normal mode only: the Edit window's single activity, else the focused
-  // activity, else the open Story.
-  const photoScope = useMemo<PhotoScope>(
-    () => photoScopeFor(mapMode, editWindowIds, focusedActivityId, storyId),
-    [mapMode, editWindowIds, focusedActivityId, storyId],
-  );
-  // A Story's photos change with its members too.
-  const storyMembers = storyState.story?.activityIds.join(',') ?? '';
-  const photoState = usePhotos(photoScope, `${trackMetricsVersion}|${storyMembers}`);
-  // The photos whose popup is open, from a marker's click; closed when the scope changes.
-  const [openGroup, setOpenGroup] = useState<{ ids: string[]; index: number } | null>(null);
-  // Only saved photos open.
-  const openPhotos = useMemo(
-    () => (openGroup ? openGroup.ids.flatMap((id) => photoState.photos.filter((p) => p.id === id)) : []),
-    [openGroup, photoState.photos],
-  );
-  // The Photos tab's unsaved changes as they alter the markers (PhotosTab.tsx).
-  const [photoOverlay, setPhotoOverlay] = useState<PhotoMarkerOverlay | null>(null);
   // The Edit window's tab: its Track tab hides the photos.
   const [editTab, setEditTab] = useState<EditTab>('activity');
-  const photoScopeKey = photoScope === null ? null : JSON.stringify(photoScope);
-  useEffect(() => setOpenGroup(null), [photoScopeKey]);
   const storiesList = useStories(panelTab === 'stories');
 
   // TYPE/DISTANCE filters over the loaded activities (activityFacets.ts).
@@ -274,9 +207,10 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     generation: historyGeneration,
   } = useActivityDays();
 
-  // The default range (defaultRange.ts) is re-derived on every real refetch of days (`historyGeneration`) until the user picks a
-  // range. Trap: keying on `visibleDays` would also re-pick on Earlier/Later paging, and settling
-  // once would freeze a zero-history account (every demo) on `{today, today}` past its first upload.
+  // The default range (defaultRange.ts) is re-derived on every real refetch of days
+  // (`historyGeneration`) until the user picks a range. Trap: keying on `visibleDays` would also
+  // re-pick on Earlier/Later paging, and settling once would freeze a zero-history account (every
+  // demo) on `{today, today}` past its first upload.
   //
   // Held while the Edit window is open: an import landing newer days would slide the default past
   // the edited activity and close the window. It catches up when the window closes.
@@ -316,60 +250,24 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     scaleUnit: unitSystem,
   });
 
-  // The Custom size last picked, kept for the next time the viewfinder opens in this visit.
-  const customSizeRef = useRef<CustomSizeId>(DEFAULT_CUSTOM_SIZE);
-  const exportMaxSide = useMemo(() => (map ? maxExportSide(map) : 4096), [map]);
-
-  const handleExportOpen = useCallback(() => {
-    const el = container.current;
-    if (!map || !el) return;
-    setExportError(null);
-    exportEvent({ type: 'toggle', customSize: usableCustomSize(customSizeRef.current, exportMaxSide), container: { width: el.clientWidth, height: el.clientHeight } });
-  }, [map, exportMaxSide, exportEvent]);
-
-  const handleExportChoiceChange = useCallback(
-    (choice: ExportChoice) => {
-      const el = container.current;
-      if (!el) return;
-      if (choice.preset === 'custom') customSizeRef.current = choice.customSize;
-      exportEvent({ type: 'choice', choice, container: { width: el.clientWidth, height: el.clientHeight } });
-    },
-    [exportEvent],
+  const exportScene = useMemo(
+    () => ({ flavor, mode: mapMode, activityQuery, hiddenIds: [...mapHiddenIds], paths, satellite }),
+    [flavor, mapMode, activityQuery, mapHiddenIds, paths, satellite],
   );
+  const exporter = useExportFlow(map, container, exportScene);
 
-  const handleExportCapture = useCallback(async () => {
-    if (exportFlow.stage !== 'framing' || !map) return;
-    const { preset, customSize, window: win } = exportFlow;
-    exportEvent({ type: 'capture' });
-    setExportError(null);
-    try {
-      const center = map.unproject([win.x + win.w / 2, win.y + win.h / 2]);
-      const blob = await exportFramedImage(
-        map,
-        { flavor, mode: mapMode, activityQuery, hiddenIds: [...mapHiddenIds], paths, satellite },
-        { center: { lng: center.lng, lat: center.lat }, widthPx: win.w, heightPx: win.h, target: outputSize(preset, customSize, win) },
-      );
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `holdmytrack-${new Date().toISOString().slice(0, 10)}.png`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      exportEvent({ type: 'close' });
-    } catch (err) {
-      // The cause (a canvas or render timeout) is for developers; the user gets a generic message.
-      console.error('export failed', err);
-      setExportError(t('export.failed'));
-      exportEvent({ type: 'failed' });
-    }
-  }, [exportFlow, map, flavor, mapMode, activityQuery, mapHiddenIds, paths, satellite, exportEvent]);
-
-  const handleExportCancel = useCallback(() => {
-    exportEvent({ type: 'close' });
-    setExportError(null);
-  }, [exportEvent]);
+  // A Story's photos change with its members too.
+  const storyMembers = storyState.story?.activityIds.join(',') ?? '';
+  const photoLayer = usePhotoLayer(map, {
+    mode: mapMode,
+    editWindowIds,
+    focusedId: focusedActivityId,
+    storyId,
+    version: `${trackMetricsVersion}|${storyMembers}`,
+    trackTabShown: editOpen && editTab === 'track',
+    mapHiddenIds,
+  });
+  const photoState = photoLayer.photos;
 
   // Flies to the combined bounds of the given activities; one activity is its own bbox.
   const fitToSelection = useCallback(
@@ -536,48 +434,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     );
   }, [focusActivity, clearFocus, editOpen]);
 
-  // A click on a spot opens its popup; hiding its category closes it.
-  useEffect(() => {
-    setSpotClickHandler(setOpenSpot);
-  }, []);
-  // Captures are made on the phone, so they're re-read when the page regains visibility or focus.
-  // The first read takes the whole list; later ones only what's newer (spotCaptures.ts).
-  useEffect(() => {
-    let controller: AbortController | null = null;
-    let known: readonly SpotCapture[] | null = null;
-    const load = () => {
-      controller?.abort();
-      controller = new AbortController();
-      const since = known ? capturesSince(known) : undefined;
-      getSpotCaptures(controller.signal, since).then(
-        (fresh) => {
-          known = known ? mergeSpotCaptures(known, fresh) : fresh;
-          setSpotCaptures(known);
-        },
-        () => {
-          // Offline or aborted: the badges stay as they were.
-        },
-      );
-    };
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') load();
-    };
-    load();
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('focus', load);
-    return () => {
-      controller?.abort();
-      document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('focus', load);
-    };
-  }, []);
-  useEffect(() => {
-    if (map) setSpotsCaptured(map, spotCaptures.map((c) => c.spot_id));
-  }, [map, spotCaptures]);
-  useEffect(() => {
-    if (map) setSpotsVisible(map, spotsShown);
-    setOpenSpot((open) => (open && !spotsShown.includes(open.category) ? null : open));
-  }, [map, spotsShown]);
+  const spots = useSpots(map, spotsShown);
 
   // Only the focused track is bold; checked tracks aren't.
   useEffect(() => {
@@ -611,24 +468,16 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // Draws the bands from data in hand. Not while the focused track is hidden: the bands are a
   // layer above the track and would keep painting it. Not while its edit is pending: they'd paint
   // the old shape over the new one.
-  const focusedPending = useMemo(
-    () => focusedActivityId !== null && pendingIds.includes(focusedActivityId),
-    [focusedActivityId, pendingIds],
-  );
+  const bands = useMemo(() => {
+    if (focusedActivityId === null || trackMetrics?.activityId !== focusedActivityId) return null;
+    if (mapHiddenIds.has(focusedActivityId) || pendingIds.includes(focusedActivityId)) return null;
+    return trackMetrics;
+  }, [trackMetrics, focusedActivityId, mapHiddenIds, pendingIds]);
   useEffect(() => {
     if (!map) return;
-    if (trackMetrics?.activityId === focusedActivityId && focusedActivityId !== null && !mapHiddenIds.has(focusedActivityId) && !focusedPending) {
-      setTrackBands(map, trackMetrics.points);
-    } else {
-      clearTrackBands(map);
-    }
-  }, [map, trackMetrics, focusedActivityId, mapHiddenIds, focusedPending]);
-
-  // Points the existing tracks source at the new query. Trap: `ensureTrackLayer` only seeds a new
-  // source, so it can't do this.
-  useEffect(() => {
-    if (map) refreshTrackLayer(map, activityQuery);
-  }, [map, activityQuery]);
+    if (bands) setTrackBands(map, bands.points);
+    else clearTrackBands(map);
+  }, [map, bands]);
 
   // Fog and Heatmap are re-rendered by queued jobs, so after an upload or delete this waits for the
   // account's jobs to drain and then refetches both (useCoverageRefresh.ts). `coverageRendering`
@@ -658,34 +507,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     return () => window.removeEventListener('hmt:imports-changed', handleUploaded);
   }, [handleUploaded]);
 
-  // Files dropped on the map go to the header's Upload menu. A demo account has none, so the map
-  // takes no drop. The cover counts enters and leaves, since each child the drag crosses fires a pair.
-  const [fileDragOver, setFileDragOver] = useState(false);
-  const dragDepthRef = useRef(0);
-  const carriesFiles = (event: React.DragEvent) => !isDemo && Array.from(event.dataTransfer.types).includes('Files');
-  const onMapDragEnter = (event: React.DragEvent) => {
-    if (!carriesFiles(event)) return;
-    event.preventDefault();
-    dragDepthRef.current += 1;
-    setFileDragOver(true);
-  };
-  const onMapDragOver = (event: React.DragEvent) => {
-    if (!carriesFiles(event)) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'copy';
-  };
-  const onMapDragLeave = (event: React.DragEvent) => {
-    if (!carriesFiles(event)) return;
-    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-    if (dragDepthRef.current === 0) setFileDragOver(false);
-  };
-  const onMapDrop = (event: React.DragEvent) => {
-    if (!carriesFiles(event)) return;
-    event.preventDefault();
-    dragDepthRef.current = 0;
-    setFileDragOver(false);
-    window.dispatchEvent(new CustomEvent('hmt:upload-files', { detail: event.dataTransfer.files }));
-  };
+  const fileDrop = useFileDrop(!isDemo);
 
   // Deleted activities: the upload refresh (the slider's days change too), once per batch, and
   // their ids dropped from the selection. The focus matters most: left on a deleted id, the bands
@@ -902,7 +724,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // The Edit window opens on its Activity tab, with nothing being moved on the map.
   useEffect(() => {
     setEditTab('activity');
-    setPhotoOverlay(null);
+    photoLayer.setOverlay(null);
   }, [editOpen]);
 
   // While any row is pending, re-read the list. Keyed on each fetched list, so polling stops by
@@ -942,119 +764,20 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     setTrackMetricsVersion((v) => v + 1);
   }, [pendingIds, map, activityQuery, reloadDays, storyState.reload, watchCoverage]);
 
-  /** Re-adds every overlay after a style load: `setStyle` keeps the camera but drops custom layers. */
-  const reattachOverlays = useCallback(
-    (instance: MapLibreMap) => {
-      const beforeId = labelInsertionPoint(instance);
-      // Layer order matters: MapLibre paints later layers on top, all beneath the basemap labels
-      // (layers.ts). Fog and heatmap first, so tracks show through the veil. Satellite imagery
-      // reads dark, so it takes the dark flavors' veil (style.ts's isDarkBase).
-      ensureFogLayer(instance, beforeId, isDarkBase(flavor, satellite));
-      ensureHeatmapLayer(instance, beforeId, isDarkBase(flavor, satellite));
-      // Trails and paths over the veil and under the activity tracks (paths.ts, bikePaths.ts).
-      raisePathLayers(instance, beforeId);
-      ensureBikePathLayers(instance, beforeId, flavor);
-      ensureTrackLayer(instance, beforeId, activityQuery);
-      // A recreated source has no feature-state, the focused track's `selected` included.
-      setSelectedTracks(instance, focusedActivityId !== null ? [focusedActivityId] : []);
-      // Bands after tracks, to paint over the one track they apply to (trackBands.ts).
-      ensureBandLayer(instance, beforeId);
-      // Spots last, above the basemap's labels too (spots.ts).
-      ensureSpotsLayer(instance, spotsShown);
-      // Re-applied because new layers start hidden or unfiltered: without these, a style load
-      // mid-mode would drop to Normal and un-hide every hidden track. Both diff against the layer's
-      // current value first (docs/DEVELOPMENT.md, the setFilter/setLayoutProperty gotcha).
-      setMapMode(instance, mapMode, editingTrack);
-      setBikePathsVisible(instance, paths);
-      setSatelliteVisible(instance, satellite, mapMode);
-      setHiddenTracks(instance, [...mapHiddenIds]);
-      // The band source is recreated empty; redraw it under the same conditions as the live effect.
-      if (trackMetrics?.activityId === focusedActivityId && focusedActivityId !== null && !mapHiddenIds.has(focusedActivityId) && !focusedPending) {
-        setTrackBands(instance, trackMetrics.points);
-      }
-    },
-    [flavor, satellite, mapMode, editingTrack, paths, spotsShown, mapHiddenIds, activityQuery, trackMetrics, focusedActivityId, focusedPending],
-  );
-
-  useEffect(() => {
-    if (!map) return;
-    const onStyleData = () => reattachOverlays(map);
-    map.on('styledata', onStyleData);
-    // Trap: `map` is set after 'load', and a later 'styledata' isn't guaranteed until a setStyle,
-    // so attach directly too or overlays would wait for a theme switch.
-    reattachOverlays(map);
-    return () => {
-      map.off('styledata', onStyleData);
-    };
-  }, [map, reattachOverlays]);
-
-  // A theme change swaps the style in place, camera kept. Declared after the styledata effect on
-  // purpose: effects run in order, so the reattach against the outgoing style happens before
-  // setStyle starts loading the new one. `diff: false` drops every custom source, so no fog source
-  // keeps the other theme's URL.
-  const appliedFlavor = useRef(initial.flavor);
-  useEffect(() => {
-    if (!map || appliedFlavor.current === flavor) return;
-    appliedFlavor.current = flavor;
-    map.setStyle(buildStyle({ flavor, origin: basemapOrigin(), satellite: satelliteSource(), satelliteOn: satellite, lang, globe: true }), {
-      diff: false,
-    });
-    // Only a flavor change swaps the style; the Satellite button flips layers in place (below).
-  }, [map, flavor]);
-
-  // Mode, paths and satellite changes between style loads flip the layers in place.
-  useEffect(() => {
-    if (!map) return;
-    setMapMode(map, mapMode, editingTrack);
-  }, [map, mapMode, editingTrack]);
-
-  useEffect(() => {
-    if (!map) return;
-    setBikePathsVisible(map, paths);
-  }, [map, paths]);
-
-  useEffect(() => {
-    if (!map) return;
-    setSatelliteVisible(map, satellite, mapMode);
-  }, [map, satellite, mapMode]);
-
-  // Keeps the hash current, once per gesture (`moveend`), not per frame.
-  useEffect(() => {
-    if (!map) return;
-    const sync = () => {
-      const centre = map.getCenter();
-      replaceHash({ longitude: centre.lng, latitude: centre.lat, zoom: map.getZoom() }, pinnedRef.current);
-    };
-    sync();
-    map.on('moveend', sync);
-    return () => {
-      map.off('moveend', sync);
-    };
-  }, [map, pinned]);
-
-  const photoMarkers = useMemo<PhotoMarkerItem[]>(
-    () => photoMarkerItems(photoScope, editOpen && editTab === 'track', mapHiddenIds, photoState.photos, photoOverlay, API_BASE_URL),
-    [photoScope, editOpen, editTab, mapHiddenIds, photoState.photos, photoOverlay],
-  );
-  // A marker's click: a spread group zooms to fit, else the popup opens on its first photo.
-  const openPhotoMarker = useCallback(
-    (ids: string[]) => {
-      if (!map) return;
-      const action = photoGroupAction(photoMarkers.filter((item) => ids.includes(item.id)));
-      if (action !== 'open') {
-        map.fitBounds(action.fit, { padding: 80, maxZoom: GROUP_MAX_ZOOM });
-        return;
-      }
-      setOpenGroup({ ids, index: 0 });
-    },
-    [map, photoMarkers],
-  );
-  const openPhotoId = openPhotos.length > 0 && openGroup ? openPhotos[Math.min(openGroup.index, openPhotos.length - 1)]!.id : null;
-  usePhotoMarkers(map, photoMarkers, {
-    onOpen: openPhotoMarker,
-    activeId: photoOverlay?.activeId ?? openPhotoId,
-    loneId: photoOverlay?.activeId ?? null,
+  useMapLayers(map, {
+    initialFlavor: initial.flavor,
+    flavor,
+    satellite,
+    mode: mapMode,
+    editingTrack,
+    paths,
+    spotsShown,
+    activityQuery,
+    mapHiddenIds,
+    focusedId: focusedActivityId,
+    bands,
   });
+  useHashSync(map, pinned);
 
   return (
     <div className="app-shell">
@@ -1113,33 +836,30 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
         )}
 
         <div
-          className={exportFlow.stage === 'idle' ? 'map-root' : 'map-root map-root--exporting'}
-          onDragEnter={onMapDragEnter}
-          onDragOver={onMapDragOver}
-          onDragLeave={onMapDragLeave}
-          onDrop={onMapDrop}
+          className={exporter.flow.stage === 'idle' ? 'map-root' : 'map-root map-root--exporting'}
+          {...fileDrop.handlers}
         >
-          {fileDragOver && (
+          {fileDrop.over && (
             <div className="map-drop" data-testid="map-drop">
               <span className="map-drop__label">{t('map.drop_files')}</span>
             </div>
           )}
           <div ref={container} className="map-canvas" data-testid="map-canvas" />
-          {map && <ExportControl map={map} active={exportFlow.stage !== 'idle'} onOpen={handleExportOpen} />}
-          {map && (exportFlow.stage === 'framing' || exportFlow.stage === 'capturing') && (
+          {map && <ExportControl map={map} active={exporter.flow.stage !== 'idle'} onOpen={exporter.toggle} />}
+          {map && exporter.flow.stage !== 'idle' && (
             <ExportViewfinder
               map={map}
               containerRef={container}
-              preset={exportFlow.preset}
-              customSize={exportFlow.customSize}
-              maxSidePx={exportMaxSide}
-              window={exportFlow.window}
-              busy={exportFlow.stage === 'capturing'}
-              error={exportError}
-              onWindowChange={(window) => exportEvent({ type: 'window', window })}
-              onChoiceChange={handleExportChoiceChange}
-              onCapture={() => void handleExportCapture()}
-              onCancel={handleExportCancel}
+              preset={exporter.flow.preset}
+              customSize={exporter.flow.customSize}
+              maxSidePx={exporter.maxSidePx}
+              window={exporter.flow.window}
+              busy={exporter.flow.stage === 'capturing'}
+              error={exporter.error}
+              onWindowChange={exporter.moveWindow}
+              onChoiceChange={exporter.changeChoice}
+              onCapture={() => void exporter.capture()}
+              onCancel={exporter.cancel}
             />
           )}
           {map && editWindowActivities && (
@@ -1153,19 +873,19 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               photos={{
                 photos: photoState.photos,
                 error: photoState.error,
-                onOverlay: setPhotoOverlay,
+                onOverlay: photoLayer.setOverlay,
               }}
               onTabChange={setEditTab}
               onClose={closeEditWindow}
             />
           )}
-          {map && openGroup && openPhotos.length > 0 && (
+          {map && photoLayer.popup && (
             <PhotoPopup
               map={map}
-              photos={openPhotos}
-              index={Math.min(openGroup.index, openPhotos.length - 1)}
-              onIndex={(index) => setOpenGroup({ ...openGroup, index })}
-              onClose={() => setOpenGroup(null)}
+              photos={photoLayer.popup.photos}
+              index={photoLayer.popup.index}
+              onIndex={photoLayer.showPopupIndex}
+              onClose={photoLayer.closePopup}
             />
           )}
           {!editOpen && (
@@ -1213,7 +933,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
             </div>
           )}
           {map && !editOpen && <ShowInArea map={map} categories={spotsShown} />}
-          {map && openSpot && <SpotPopup map={map} spot={openSpot} capturedAt={spotCaptures.find((c) => c.spot_id === openSpot.id)?.captured_at ?? null} onClose={() => setOpenSpot(null)} />}
+          {map && spots.openSpot && <SpotPopup map={map} spot={spots.openSpot} capturedAt={spots.capturedAt(spots.openSpot.id)} onClose={spots.closeSpot} />}
         </div>
       </div>
 
