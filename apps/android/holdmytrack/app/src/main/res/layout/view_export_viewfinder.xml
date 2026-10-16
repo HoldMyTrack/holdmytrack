@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The export viewfinder (export/ExportViewfinder), over the whole map while it's open: the dimmed
+     map and its window (export/ExportViewfinderView), the toolbar above the window — one menu of
+     shapes and sizes, Close, Capture — and under it the image's pixel size, or why the last
+     capture failed. The toolbar and the lines under the window are placed over the window in
+     code. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/export_viewfinder"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:elevation="12dp">
+
+    <dev.holdmytrack.android.export.ExportViewfinderView
+        android:id="@+id/export_frame"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <LinearLayout
+        android:id="@+id/export_toolbar"
+        style="@style/Widget.HoldMyTrack.MapPanel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/export_choice"
+            style="@style/Widget.HoldMyTrack.Button.Outlined"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="@dimen/hmt_space_4"
+            android:contentDescription="@string/export_shape"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minHeight="48dp"
+            app:icon="@drawable/ic_chevron_down"
+            app:iconGravity="end"
+            app:iconSize="18dp"
+            app:iconTint="@color/hmt_ink" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/export_close"
+            style="@style/Widget.HoldMyTrack.Button.MapIcon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/export_close"
+            app:icon="@drawable/ic_x" />
+
+        <FrameLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/export_capture"
+                style="@style/Widget.HoldMyTrack.Button.MapIcon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/export_capture"
+                app:backgroundTint="@color/hmt_accent"
+                app:icon="@drawable/ic_camera"
+                app:iconTint="@color/hmt_on_accent" />
+
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:id="@+id/export_busy"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:indeterminate="true"
+                android:visibility="gone"
+                app:indicatorColor="@color/hmt_on_accent"
+                app:indicatorSize="20dp"
+                app:trackThickness="2dp" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/export_size"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFeatureSettings="tnum"
+        android:shadowColor="#80000000"
+        android:shadowRadius="3"
+        android:textColor="#FFFFFF"
+        android:textSize="@dimen/hmt_text_sm"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/export_error"
+        style="@style/Widget.HoldMyTrack.ZoomLevelNotice"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:accessibilityLiveRegion="polite"
+        android:textColor="@color/hmt_danger"
+        android:visibility="gone" />
+</FrameLayout>

@@ -292,6 +292,21 @@ There is no administrator role and no cross-account visibility, exactly as `docs
 7. **Save** writes the activity's fields, then the photos one at a time — uploads, then changes, then deletes — reading "Saving photos n of m…", then a track edit, and closes, the map reading the photos again. If a write fails the window stays open with the server's reason, and Save again carries on from the first unwritten change. Cancel throws every photo change away at once; Back asks first while there are any ("Discard photo changes?" — Discard or Keep editing).
 8. The Edit window isn't available to a demo account (FR-2.7 item 7), so neither is the tab.
 
+### FR-2.11 Map image export
+
+**Description**: The rail's camera button, under Find my location, opens a viewfinder over the map, the web's (`docs/SPEC.md` FR-4.10): the map dimmed around a window, which is the picture. The map moves under the window, and Capture saves what's in it as a PNG image of a chosen size, however small the screen, and offers to share it.
+
+**Preconditions**: A session, the map loaded, no recording in progress (the camera button is hidden while one is).
+
+**Behavior**:
+1. The viewfinder dims the map everywhere but a window as large as the map allows, below a toolbar and above the image's pixel size. The map's own chrome is hidden while it shows: the top row and its notices, the mode's chip, the sheet, photo markers and popups, MapLibre's logo, attribution and compass. The camera button again, the toolbar's Close, Back, or leaving the Map tab closes it with nothing saved.
+2. The map pans, zooms and rotates inside the window as usual. The dimmed map doesn't respond to touch. A pinch that starts inside the window keeps zooming when a finger moves onto, or lands on, the dimmed part.
+3. Each corner of the window is a crop corner. Dragging one crops the window, the opposite corner staying put, never past the map's area or below 64dp a side. On release the window settles back to the largest size its new shape fits and the map zooms in to match, so the part cropped to fills it again. A platform preset keeps its shape while cropping; Custom takes any shape.
+4. The toolbar has one menu of shapes and sizes, Close and Capture. Its list is Custom at three sizes — "Custom · HD (1920 px long side)", "Custom · 2K (2560 px long side)", "Custom · 4K (3840 px long side)" — then the web's platform presets by platform (Instagram, Facebook, X) as "Instagram · Story", a divider between each group and a radio mark on the chosen entry. Closed, it shows the entry without the bracket ("Custom · HD"). A Custom size fixes the image's long side and its short side follows the window's shape. Custom · HD is chosen first, and a Custom size picked is kept while the app runs. Under the window, the image's pixel size. Choosing another Custom size leaves the window as it is; choosing any other entry fits a window of its shape to the area.
+5. Capture draws exactly what's inside the window, at the current zoom, rotation, theme, map mode, paths, Satellite, date range or open Story, and the list's filters and hidden activities, at that pixel size: the same picture as on screen, sharper. Spots, photos and pace colors aren't in it. Its bottom corners carry the map's credit, "Protomaps © OpenStreetMap" (with the imagery's after it in Satellite), on a dark plate, and the HoldMyTrack logo and wordmark, as on the web.
+6. While it's drawn, Capture shows a spinner and the menu and the corners don't respond. The image is saved to Pictures/HoldMyTrack as `holdmytrack-<date>-<time>.png`, "Saved to Pictures" shows, the viewfinder closes and Android's share sheet opens on it. A failure says "Couldn't create the image. Please try again." under the window in place of its size, and the viewfinder stays as it was.
+7. A turned phone refits the window in its own shape.
+
 ## 5. FR-3 — Sync and Imports
 
 All of FR-3 requires an active session (demo or registered); Health Connect sync has no unauthenticated path, and syncing to a demo account works identically to a registered one.

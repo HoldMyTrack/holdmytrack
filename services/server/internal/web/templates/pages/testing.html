@@ -182,6 +182,10 @@
     <h3 id="MA-10">MA-10 · Map still being updated</h3>
     <p>Switch to <strong>Fog</strong>. On the web, upload any file you haven't uploaded before (or delete an activity in the app), then come straight back to the map.</p>
     <p class="testing__expect"><strong>Expected:</strong> under the toggle, "Your map is still being updated, so Fog and Heatmap may be incomplete for now. They'll refresh on their own." It goes by itself once the server is done (seconds for one file, longer for a big import) and the fog updates without reopening the app. Normal never shows it.</p>
+
+    <h3 id="MA-11">MA-11 · Export a map image</h3>
+    <p>In <strong>Fog</strong>, tap the camera button under Find my location. Pinch and pan inside the bright window, then drag its bottom-right corner in towards the middle and let go. Open the menu above the window, choose <strong>Instagram · Story</strong>, and tap the camera button next to it.</p>
+    <p class="testing__expect"><strong>Expected:</strong> the map dims around the window, the buttons and the sheet go away, and the window's size in pixels shows under it ("1080 × 1920" for the Story). Dragging on the dimmed part does nothing. After the corner is let go, the window grows back to full size and the map zooms in to what you kept. Capture spins for a few seconds, says "Saved to Pictures", and opens the share sheet on the image: exactly what was in the window, with "Protomaps © OpenStreetMap" in the bottom-right corner and the HoldMyTrack logo in the bottom-left. The image is in your phone's Pictures, in a HoldMyTrack folder.</p>
   </section>
 
   <section class="page-section" id="dates">

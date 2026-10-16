@@ -114,6 +114,21 @@
     </plurals>
 
     <string name="locate_button">Find my location</string>
+    <string name="export_open">Export map image</string>
+    <string name="export_shape">Image shape and size</string>
+    <string name="export_close">Close</string>
+    <string name="export_capture">Save and share</string>
+    <string name="export_custom">Custom · %1$s</string>
+    <string name="export_custom_full">Custom · %1$s (%2$d px long side)</string>
+    <string name="export_preset" translatable="false">%1$s · %2$s</string>
+    <string name="export_row_square">Square</string>
+    <string name="export_row_portrait">Portrait</string>
+    <string name="export_row_landscape">Landscape</string>
+    <string name="export_row_story">Story</string>
+    <string name="export_size" translatable="false">%1$d × %2$d</string>
+    <string name="export_failed">Couldn\'t create the image. Please try again.</string>
+    <string name="export_saved">Saved to Pictures</string>
+    <string name="export_share_title">Share map image</string>
     <string name="date_range_shift_earlier">Move the range earlier</string>
     <string name="date_range_shift_later">Move the range later</string>
     <string name="locate_needs_location">HoldMyTrack needs location access to show where you are.</string>

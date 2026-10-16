@@ -118,6 +118,19 @@
     </plurals>
 
     <string name="locate_button">Моё местоположение</string>
+    <string name="export_open">Экспорт карты в картинку</string>
+    <string name="export_shape">Форма и размер снимка</string>
+    <string name="export_close">Закрыть</string>
+    <string name="export_capture">Сохранить и поделиться</string>
+    <string name="export_custom">Свой · %1$s</string>
+    <string name="export_custom_full">Свой · %1$s (%2$d пикс. по длинной стороне)</string>
+    <string name="export_row_square">Квадрат</string>
+    <string name="export_row_portrait">Портретная</string>
+    <string name="export_row_landscape">Альбомная</string>
+    <string name="export_row_story">История</string>
+    <string name="export_failed">Не удалось создать изображение. Попробуйте ещё раз.</string>
+    <string name="export_saved">Сохранено в «Изображения»</string>
+    <string name="export_share_title">Поделиться картой</string>
     <string name="date_range_shift_earlier">Сдвинуть диапазон раньше</string>
     <string name="date_range_shift_later">Сдвинуть диапазон позже</string>
     <string name="locate_needs_location">HoldMyTrack нужен доступ к местоположению, чтобы показать, где вы.</string>
