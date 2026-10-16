@@ -1346,7 +1346,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       // The bike-path layers just added start hidden, and a style swap brings the imagery back
       // at whatever the swap's buildStyle was given.
       setBikePathsVisible(instance, paths);
-      setSatelliteVisible(instance, satellite);
+      setSatelliteVisible(instance, satellite, mapMode);
       // Same reasoning as setMapMode just above: addLayer always starts the tracks layer
       // with no filter, so a styledata that recreates it would otherwise silently un-hide
       // everything the eye icon/TYPE/DISTANCE filters had hidden. Both setMapMode and
@@ -1410,8 +1410,8 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
 
   useEffect(() => {
     if (!map) return;
-    setSatelliteVisible(map, satellite);
-  }, [map, satellite]);
+    setSatelliteVisible(map, satellite, mapMode);
+  }, [map, satellite, mapMode]);
 
   // Keep the hash current. `moveend` rather than `move`: one rewrite per gesture,
   // not one per animation frame.

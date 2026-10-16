@@ -8,6 +8,7 @@ import type {
 } from 'maplibre-gl';
 import { GLYPHS_PATH, PMTILES_PATH, SPRITE_BASE_PATH } from './config';
 import { globeProjection } from './globe';
+import { satelliteRoadLayerIds } from './satelliteRoads';
 
 /**
  * Style construction, kept pure and DOM-free on purpose.
@@ -73,6 +74,10 @@ export const SATELLITE_HIDES_METADATA = 'holdmytrack:satellite-hides';
  *  read from the style rather than re-derived, since a dimmed layer no longer looks undimmed. */
 export const SATELLITE_DIMS_METADATA = 'holdmytrack:satellite-dims';
 export const SATELLITE_ROAD_OPACITY_METADATA = 'holdmytrack:satellite-road-opacity';
+
+/** The style `metadata` key listing the road layers that come off over imagery in Fog and
+ *  Heatmap (satelliteRoads.ts), for Android's `MapSatellite` to read rather than re-derive. */
+export const SATELLITE_ROADS_METADATA = 'holdmytrack:satellite-roads';
 
 /** Over imagery the roads are drawn see-through, so they mark the way without painting over the
  *  ground they cross — the flavors' road colors are made for a flat background, not a photo. */
@@ -299,6 +304,7 @@ export function buildStyle(options: BuildStyleOptions): StyleSpecification {
         [SATELLITE_HIDES_METADATA]: hidden,
         [SATELLITE_DIMS_METADATA]: dimmed,
         [SATELLITE_ROAD_OPACITY_METADATA]: SATELLITE_ROAD_OPACITY,
+        [SATELLITE_ROADS_METADATA]: satelliteRoadLayerIds(vector, BASEMAP_SOURCE),
       },
     }),
     layers: satellite ? withSatelliteLayer(vector, hidden, dimmed, satelliteOn) : vector,

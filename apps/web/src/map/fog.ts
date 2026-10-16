@@ -42,7 +42,7 @@ const REGION_FOG_TILE_URL = `${API_BASE_URL}${TILES_V1}/region-fog/{z}/{x}/{y}.m
 // identical so nothing shifts hue when a pan/zoom crosses the Region/City boundary. Each is the
 // opposite of the basemap it sits on: dark ink over a light map, a cream mist over a dark one.
 const LIGHT_VEIL = { color: '#202b25', opacity: 0.82 };
-const DARK_VEIL = { color: '#f7f4ec', opacity: 0.6 };
+const DARK_VEIL = { color: '#f7f4ec', opacity: 0.82 };
 
 /** Which veil each map currently has, so a coverage refresh keeps it and a theme swap that
  *  somehow left the fog in place can still repaint it. */
