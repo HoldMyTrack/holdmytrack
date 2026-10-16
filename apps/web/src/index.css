@@ -1216,135 +1216,177 @@ button.activities-panel__story-badge:hover {
   inset: 0;
 }
 
-/* The export frame (ExportFrame.tsx) — a sibling of .map-canvas, anchored to a map position.
-   --frame-cx/--frame-cy (the frame's projected center, set from JS on every map move) and
-   --frame-w/--frame-h (its on-screen size) drive every piece below. Nothing here blocks the
-   map: the wrapper and the box, interior included, are `pointer-events: none`; only the edge
-   strips, the corner handles and the toolbar opt back in. */
-.export-frame {
+/* The export viewfinder (ExportViewfinder.tsx) — a sibling of .map-canvas, over everything on
+   the map. --win-x/-y/-w/-h (the window, set from React) place every piece. The four shades dim
+   the map around the window and take its pointer events; the window itself has no box, so the
+   map under it gets them. While a touch gesture that began in the window runs (--gesture), the
+   shades let touches through so a pinch keeps its second finger. --settling animates a crop's
+   return to full size in step with the map's own ease. */
+/* The map's own controls step aside while the viewfinder is open: where one sits inside the
+   window it would otherwise show, and take taps, over the picture being framed. */
+.map-root--exporting .map-toggles,
+.map-root--exporting .maplibregl-control-container {
+  visibility: hidden;
+}
+
+.export-viewfinder {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  z-index: 4;
+  z-index: 8;
 }
 
-/* A dashed border and nothing else, so the framed map stays fully visible. A light outer
-   halo keeps the dashes readable over both light and dark basemaps. */
-.export-frame__box {
+.export-viewfinder__shade {
   position: absolute;
-  left: calc(var(--frame-cx) - var(--frame-w) / 2);
-  top: calc(var(--frame-cy) - var(--frame-h) / 2);
-  width: var(--frame-w);
-  height: var(--frame-h);
-  box-sizing: border-box;
-  border: 2px dashed var(--fm-ink);
-  box-shadow:
-    0 0 0 1px rgb(var(--fm-surface-rgb) / 70%),
-    inset 0 0 0 1px rgb(var(--fm-surface-rgb) / 70%);
-}
-
-/* Move targets: 12px strips straddling each side of the border. */
-.export-frame__edge {
-  position: absolute;
-  cursor: move;
-  touch-action: none;
+  background: rgb(10 14 12 / 58%);
   pointer-events: auto;
+  touch-action: none;
 }
 
-.export-frame__edge--n,
-.export-frame__edge--s {
+.export-viewfinder--gesture .export-viewfinder__shade {
+  pointer-events: none;
+}
+
+.export-viewfinder__shade--top {
   left: 0;
   right: 0;
-  height: 12px;
-}
-
-.export-frame__edge--e,
-.export-frame__edge--w {
   top: 0;
+  height: var(--win-y);
+}
+
+.export-viewfinder__shade--bottom {
+  left: 0;
+  right: 0;
+  top: calc(var(--win-y) + var(--win-h));
   bottom: 0;
-  width: 12px;
 }
 
-.export-frame__edge--n {
-  top: -7px;
+.export-viewfinder__shade--left {
+  left: 0;
+  top: var(--win-y);
+  width: var(--win-x);
+  height: var(--win-h);
 }
 
-.export-frame__edge--s {
-  bottom: -7px;
+.export-viewfinder__shade--right {
+  left: calc(var(--win-x) + var(--win-w));
+  right: 0;
+  top: var(--win-y);
+  height: var(--win-h);
 }
 
-.export-frame__edge--e {
-  right: -7px;
-}
-
-.export-frame__edge--w {
-  left: -7px;
-}
-
-/* Resize handles, one per corner, above the edge strips they overlap. */
-.export-frame__handle {
+.export-viewfinder__window {
   position: absolute;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--fm-surface);
-  border: 2px solid var(--fm-ink);
+  left: var(--win-x);
+  top: var(--win-y);
+  width: var(--win-w);
+  height: var(--win-h);
+  box-sizing: border-box;
+  border: 2px solid rgb(255 255 255 / 92%);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 25%);
+}
+
+.export-viewfinder--settling .export-viewfinder__shade,
+.export-viewfinder--settling .export-viewfinder__window,
+.export-viewfinder--settling .export-viewfinder__toolbar,
+.export-viewfinder--settling .export-viewfinder__note {
+  transition-property: left, top, width, height;
+  transition-duration: var(--settle-ms);
+  transition-timing-function: ease-out;
+}
+
+/* Crop corners: an L of the window's border, thicker, over a 36px touch target. */
+.export-viewfinder__handle {
+  position: absolute;
+  width: 36px;
+  height: 36px;
   touch-action: none;
   pointer-events: auto;
-  z-index: 1;
 }
 
-.export-frame__handle--nw {
-  top: -8px;
-  left: -8px;
-  cursor: nwse-resize;
-}
-
-.export-frame__handle--ne {
-  top: -8px;
-  right: -8px;
-  cursor: nesw-resize;
-}
-
-.export-frame__handle--sw {
-  bottom: -8px;
-  left: -8px;
-  cursor: nesw-resize;
-}
-
-.export-frame__handle--se {
-  bottom: -8px;
-  right: -8px;
-  cursor: nwse-resize;
-}
-
-/* Centred above the frame's top edge; `--toolbar-inside` (set from JS when there's no room
-   above) tucks it just inside the top edge instead. */
-.export-frame__toolbar {
+.export-viewfinder__handle::before {
+  content: '';
   position: absolute;
-  left: var(--frame-cx);
-  top: calc(var(--frame-cy) - var(--frame-h) / 2 - 12px);
+  width: 20px;
+  height: 20px;
+  border: 0 solid #fff;
+  filter: drop-shadow(0 0 1px rgb(0 0 0 / 50%));
+}
+
+.export-viewfinder__handle--nw {
+  top: -18px;
+  left: -18px;
+  cursor: nwse-resize;
+}
+
+.export-viewfinder__handle--nw::before {
+  top: 14px;
+  left: 14px;
+  border-top-width: 4px;
+  border-left-width: 4px;
+}
+
+.export-viewfinder__handle--ne {
+  top: -18px;
+  right: -18px;
+  cursor: nesw-resize;
+}
+
+.export-viewfinder__handle--ne::before {
+  top: 14px;
+  right: 14px;
+  border-top-width: 4px;
+  border-right-width: 4px;
+}
+
+.export-viewfinder__handle--sw {
+  bottom: -18px;
+  left: -18px;
+  cursor: nesw-resize;
+}
+
+.export-viewfinder__handle--sw::before {
+  bottom: 14px;
+  left: 14px;
+  border-bottom-width: 4px;
+  border-left-width: 4px;
+}
+
+.export-viewfinder__handle--se {
+  bottom: -18px;
+  right: -18px;
+  cursor: nwse-resize;
+}
+
+.export-viewfinder__handle--se::before {
+  bottom: 14px;
+  right: 14px;
+  border-bottom-width: 4px;
+  border-right-width: 4px;
+}
+
+/* Centred over the window, in the room viewfinderArea keeps above it. */
+.export-viewfinder__toolbar {
+  position: absolute;
+  left: calc(var(--win-x) + var(--win-w) / 2);
+  top: calc(var(--win-y) - 10px);
   transform: translate(-50%, -100%);
   display: flex;
   align-items: center;
   gap: var(--fm-space-4);
+  max-width: calc(100% - 16px);
   padding: var(--fm-space-4);
   border-radius: var(--fm-radius-lg);
   background: var(--fm-surface);
   box-shadow: var(--fm-shadow-md);
   pointer-events: auto;
   white-space: nowrap;
-  z-index: 2;
 }
 
-.export-frame--toolbar-inside .export-frame__toolbar {
-  top: calc(var(--frame-cy) - var(--frame-h) / 2 + 12px);
-  transform: translate(-50%, 0);
-}
-
-.export-frame__shape {
-  height: 30px;
+.export-viewfinder__select {
+  min-width: 0;
+  height: 32px;
   padding: 0 var(--fm-space-8);
   border: 1px solid rgb(var(--fm-ink-rgb) / 15%);
   border-radius: var(--fm-radius-sm);
@@ -1356,14 +1398,32 @@ button.activities-panel__story-badge:hover {
   cursor: pointer;
 }
 
-.export-frame__shape:focus-visible {
+.export-viewfinder__picker:focus-within {
   outline: 2px solid var(--fm-accent);
   outline-offset: 1px;
 }
 
-.export-frame__button {
-  width: 30px;
-  height: 30px;
+/* The menu: a short label with the real select laid invisibly over it (ExportViewfinder.tsx). */
+.export-viewfinder__picker {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fm-space-4);
+}
+
+.export-viewfinder__picker select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.export-viewfinder__button {
+  flex: none;
+  width: 32px;
+  height: 32px;
   border: 0;
   border-radius: var(--fm-radius-sm);
   background: transparent;
@@ -1374,53 +1434,62 @@ button.activities-panel__story-badge:hover {
   cursor: pointer;
 }
 
-.export-frame__button:hover:not(:disabled) {
+.export-viewfinder__button:hover:not(:disabled) {
   background: rgb(var(--fm-ink-rgb) / 7%);
 }
 
-.export-frame__button--capture {
+.export-viewfinder__button--capture {
   background: var(--fm-accent);
   color: var(--fm-on-accent);
 }
 
-.export-frame__button--capture:hover:not(:disabled) {
+.export-viewfinder__button--capture:hover:not(:disabled) {
   background: var(--fm-accent-hover);
 }
 
-.export-frame__button:disabled {
+.export-viewfinder__button:disabled {
   cursor: default;
 }
 
-.export-frame__spinner {
+.export-viewfinder__spinner {
   width: 14px;
   height: 14px;
   border-radius: 50%;
   border: 2px solid color-mix(in srgb, var(--fm-on-accent) 35%, transparent);
   border-top-color: var(--fm-on-accent);
-  animation: export-frame-spin 0.7s linear infinite;
+  animation: export-viewfinder-spin 0.7s linear infinite;
 }
 
-@keyframes export-frame-spin {
+@keyframes export-viewfinder-spin {
   to {
     transform: rotate(360deg);
   }
 }
 
-/* Below the frame, wide enough to wrap a network/timeout message without overrunning a narrow
-   custom frame. */
-.export-frame__error {
+/* Under the window, in the room viewfinderArea keeps below it: the image's pixel size, or why
+   the last capture failed. */
+.export-viewfinder__note {
   position: absolute;
-  left: calc(var(--frame-cx) - var(--frame-w) / 2);
-  top: calc(var(--frame-cy) + var(--frame-h) / 2 + 12px);
-  max-width: min(20rem, calc(100% - 20px));
+  left: calc(var(--win-x) + var(--win-w) / 2);
+  top: calc(var(--win-y) + var(--win-h) + 10px);
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
   margin: 0;
-  padding: var(--fm-space-8) var(--fm-space-12);
-  border-radius: var(--fm-radius-md);
+  padding: 2px var(--fm-space-8);
+  border-radius: var(--fm-radius-sm);
+  font-size: var(--fm-text-md);
+  font-weight: var(--fm-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  text-align: center;
+}
+
+.export-viewfinder__note--error {
+  padding: var(--fm-space-4) var(--fm-space-12);
   background: var(--fm-surface);
   box-shadow: var(--fm-shadow-md);
-  font-size: var(--fm-text-md);
   color: var(--fm-danger);
-  pointer-events: none;
+  font-weight: var(--fm-weight-regular);
 }
 
 /* The mode toggle and the Trails & bike paths toggle, side by side, wrapping on a narrow map. */

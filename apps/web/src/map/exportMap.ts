@@ -5,7 +5,6 @@ import logoOnDarkUrl from '../assets/logo-on-dark.png';
 import logoOnLightUrl from '../assets/logo-on-light.png';
 import { basemapOrigin, satelliteSource } from './config';
 import { withApiCredentials } from './requestCredentials';
-import { customOutputSize } from './exportPresets';
 import { ensureFogLayer } from './fog';
 import { ensureBikePathLayers, setBikePathsVisible } from './bikePaths';
 import { ensureHeatmapLayer } from './heatmap';
@@ -23,10 +22,10 @@ import { ensureTrackLayer, setHiddenTracks } from './tracks';
  * one — the live map is never resized, never flickers, and never pays `preserveDrawingBuffer`'s
  * cost for a feature used rarely.
  *
- * The user frames a region of the live map manually (`ExportFrame.tsx` — a frame anchored to
- * a map position, with its shape picked from its own toolbar) rather than exporting an
- * automatic fit of whatever happens to be on screen — `exportFramedImage` below is the one
- * entry point this module exports.
+ * The user frames a region of the live map manually (`ExportViewfinder.tsx` — a window fixed in
+ * the map's middle, the map moving under it) rather than exporting an automatic fit of whatever
+ * happens to be on screen — `exportFramedImage` below is the entry point, and `maxExportSide`
+ * says how large an image this browser can draw.
  */
 
 /** How long to wait for a render to actually settle before giving up — generous, since a
@@ -68,25 +67,36 @@ export interface ExportViewState {
 }
 
 export interface ExportFrameCapture {
-  /** The frame's center, as a map position — the frame is anchored to the map, not the
-   *  screen, so it may be partly (or wholly) scrolled out of the live viewport by now. */
+  /** The window's center, as a map position. */
   center: { lng: number; lat: number };
-  /** The frame's on-screen size in CSS pixels, at the live map's current zoom. */
+  /** The window's on-screen size in CSS pixels, at the live map's current zoom. */
   widthPx: number;
   heightPx: number;
-  /** Exact output pixel dimensions for a platform preset. Omitted for Custom, which
-   *  exports at the frame's own on-screen pixel size (`customOutputSize`). */
-  target?: { widthPx: number; heightPx: number };
+  /** The image's exact pixel size: a platform preset's, or a Custom size in the window's shape. */
+  target: { widthPx: number; heightPx: number };
 }
 
 /**
- * Renders exactly what's inside the frame and resolves to a PNG blob. The offscreen instance
- * *is* the frame: a container of the frame's own CSS size, centred on the frame's own map
+ * The longest side, in pixels, an image this browser can draw: the smaller of the GPU's
+ * render-buffer limit and MapLibre's own canvas cap (`maxCanvasSize`, 4096 by default), past
+ * which MapLibre would quietly draw smaller and the image would come out blurred. Read from the
+ * live map's own WebGL context, which `getContext` hands back for the same type it was made with.
+ */
+export function maxExportSide(liveMap: MapLibreMap): number {
+  const MAPLIBRE_MAX_CANVAS = 4096;
+  const canvas = liveMap.getCanvas();
+  const gl = canvas.getContext('webgl2') ?? canvas.getContext('webgl');
+  const buffer = gl ? Number(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)) : MAPLIBRE_MAX_CANVAS;
+  return Math.min(MAPLIBRE_MAX_CANVAS, buffer || MAPLIBRE_MAX_CANVAS);
+}
+
+/**
+ * Renders exactly what's inside the window and resolves to a PNG blob. The offscreen instance
+ * *is* the window: a container of the window's own CSS size, centred on the window's own map
  * position, at the live camera's zoom/bearing/pitch — so it shows precisely the framed
  * extent, with labels and line widths at the same proportions as on screen — and rendered
- * at a `pixelRatio` that makes its backing canvas the output size. "What's in the frame, only
- * sharper", with no crop step, and independent of whether the frame is still inside the live
- * viewport. `liveMap` is read from directly for the camera rather than requiring the caller
+ * at a `pixelRatio` that makes its backing canvas the output size. "What's in the window, only
+ * sharper", with no crop step. `liveMap` is read from directly for the camera rather than requiring the caller
  * to track it — MapView.tsx doesn't keep camera position in React state at all (FR-4.5: the
  * URL hash is the only place it's persisted).
  */
@@ -96,7 +106,7 @@ export async function exportFramedImage(
   capture: ExportFrameCapture,
 ): Promise<Blob> {
   const { center, widthPx, heightPx, target } = capture;
-  const { widthPx: outWidth, heightPx: outHeight } = target ?? customOutputSize(widthPx, heightPx);
+  const { widthPx: outWidth, heightPx: outHeight } = target;
   const cssWidth = Math.max(1, Math.round(widthPx));
   const cssHeight = Math.max(1, Math.round(heightPx));
 

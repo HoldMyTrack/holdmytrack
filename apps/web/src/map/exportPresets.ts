@@ -1,6 +1,6 @@
 /**
- * Platform image-size presets for the frame-and-capture export flow (`ExportFrame.tsx`'s shape
- * dropdown, `exportMap.ts`'s output size). Dimensions from Hootsuite's social-media-image-sizes guide
+ * Platform image-size presets for the export viewfinder (`ExportViewfinder.tsx`'s shape
+ * dropdown, the image's output size). Dimensions from Hootsuite's social-media-image-sizes guide
  * (blog.hootsuite.com/social-media-image-sizes-guide), profile-picture and cover-photo sizes
  * excluded — this feature frames map content, not an account avatar. A standalone data file
  * rather than inline in a component, since both the shape dropdown and the capture pipeline's
@@ -34,10 +34,3 @@ export const EXPORT_PRESETS: ExportPreset[] = [
   { id: 'x-square', group: 'X', row: 'Square', widthPx: 1080, heightPx: 1080 },
   { id: 'x-landscape', group: 'X', row: 'Landscape', widthPx: 1280, heightPx: 720 },
 ];
-
-/** A Custom frame's output pixel size: exactly the frame's own on-screen size, in CSS pixels.
- *  Shared by the capture pipeline and the shape dropdown's Custom label, so the size shown is
- *  the size produced. */
-export function customOutputSize(frameWidthPx: number, frameHeightPx: number): { widthPx: number; heightPx: number } {
-  return { widthPx: Math.max(1, Math.round(frameWidthPx)), heightPx: Math.max(1, Math.round(frameHeightPx)) };
-}
