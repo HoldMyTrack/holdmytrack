@@ -1,21 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { activityQuery as queryFor } from './activityQuery';
 import { flyToBBox, flyToView, unionBBox } from './bbox';
+import { firstListFit, needsFallbackView } from './cameraRules';
 import { basemapOrigin, satelliteSource, WORLD_VIEW } from './config';
 import { countryView } from './countryView';
+import { defaultRange } from './defaultRange';
+import { exportFlowReducer, type ExportEvent, type ExportFlow } from './exportFlow';
 import { exportFramedImage, maxExportSide } from './exportMap';
-import { DEFAULT_CUSTOM_SIZE, fitWindow, outputSize, usableCustomSize, viewfinderArea, type CustomSizeId, type ExportChoice, type Rect } from './exportViewfinder';
-import type { ExportPreset } from './exportPresets';
+import { DEFAULT_CUSTOM_SIZE, outputSize, usableCustomSize, type CustomSizeId, type ExportChoice } from './exportViewfinder';
 import { ensureBikePathLayers, setBikePathsVisible } from './bikePaths';
 import { ensureFogLayer } from './fog';
 import { ensureHeatmapLayer } from './heatmap';
 import { setMapMode, type MapMode } from './mapMode';
 import { loadOverlays, saveOverlays, type Overlays } from './overlays';
 import { raisePathLayers } from './paths';
+import { pendingChange } from './pending';
+import { GROUP_MAX_ZOOM, photoGroupAction, photoMarkerItems, photoScopeFor } from './photoMarkerItems';
 import { usePhotoMarkers, type PhotoMarkerItem, type PhotoMarkerOverlay } from './photos';
+import { invertedChecks, mapHiddenIds as hiddenOnMap, toggled, toggledVisibility, toolbarTarget, withoutIds } from './selection';
 import { setSatelliteVisible } from './satellite';
 import { capturesSince, mergeSpotCaptures } from './spotCaptures';
+import { storiesTabParam, storyParam, urlWithStory, type StoryNav } from './storyUrl';
 import { ensureSpotsLayer, setSpotClickHandler, setSpotsCaptured, setSpotsVisible, type Spot, type SpotCategory } from './spots';
 import { labelInsertionPoint } from './layers';
 import { buildStyle, isDarkBase, type Flavor } from './style';
@@ -35,6 +42,7 @@ import { API_BASE_URL, getActivityTrackMetrics, getSpotCaptures, type Activity, 
 import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
 import { ActivitiesPanel, type PanelTab, type StoriesPanel } from '../ui/ActivitiesPanel';
+import { editPhotosBlocker, editTrackBlocker } from '../ui/editAvailability';
 import { EditActivityWindow, type EditTab, type EditWindowResult } from '../ui/EditActivityWindow';
 import { ExportControl } from '../ui/ExportControl';
 import { ExportViewfinder } from '../ui/ExportViewfinder';
@@ -58,31 +66,9 @@ import { lang, t } from '../i18n';
 /** How often the list is re-read while a reprocess is pending: one activity's ingest takes seconds. */
 const EDIT_PENDING_POLL_MS = 2000;
 
-/** The Story the URL opens, `/?story=<id>` (FR-14.6). Kept in the URL so a refresh or a shared link returns to it. */
-function storyParam(): string | null {
-  return new URLSearchParams(window.location.search).get('story') || null;
-}
-
-/** `/?tab=stories` opens the Stories tab with no Story picked; the copy-arrived email links here (FR-14.7). */
-function storiesTabParam(): boolean {
-  return new URLSearchParams(window.location.search).get('tab') === 'stories';
-}
-
-/** The current URL with `?story=` set, or removed for null; the hash and other parameters kept. */
-function urlWithStory(id: string | null): string {
-  const params = new URLSearchParams(window.location.search);
-  if (id === null) params.delete('story');
-  else params.set('story', id);
-  const qs = params.toString();
-  return window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash;
-}
-
-/** What opening or closing a Story does to history: push, replace, or nothing (Back/Forward already moved it). */
-type StoryNav = 'push' | 'replace' | 'none';
-
 function moveStoryUrl(id: string | null, nav: StoryNav) {
-  if (nav === 'push') window.history.pushState(null, '', urlWithStory(id));
-  else if (nav === 'replace') window.history.replaceState(null, '', urlWithStory(id));
+  if (nav === 'push') window.history.pushState(null, '', urlWithStory(window.location, id));
+  else if (nav === 'replace') window.history.replaceState(null, '', urlWithStory(window.location, id));
 }
 
 export interface MapViewProps {
@@ -92,25 +78,6 @@ export interface MapViewProps {
   initialActivity?: { id: string; day: string } | null;
 }
 
-/** The export viewfinder's state. Lives here because it spans `ExportViewfinder`, `ExportControl` and the map
- *  instance capture needs. The window is in the map container's CSS pixels. */
-type ExportFlow =
-  | { stage: 'idle' }
-  | { stage: 'framing' | 'capturing'; preset: ExportPreset | 'custom'; customSize: CustomSizeId; window: Rect };
-
-/** A shape's window: the largest it can be in the map's free area. Custom takes the whole area. */
-function shapeWindow(preset: ExportPreset | 'custom', container: HTMLElement): Rect {
-  return fitWindow(preset === 'custom' ? null : preset.widthPx / preset.heightPx, viewfinderArea(container.clientWidth, container.clientHeight));
-}
-
-/** How far apart, in metres, a group's photos must be for zooming in to separate them (§4.27). */
-const GROUP_SPREAD_M = 15;
-
-function haversineM(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const rad = Math.PI / 180;
-  const h = Math.sin(((lat2 - lat1) * rad) / 2) ** 2 + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(((lon2 - lon1) * rad) / 2) ** 2;
-  return 2 * 6_371_008.8 * Math.asin(Math.min(1, Math.sqrt(h)));
-}
 
 export function MapView({ initialPrivateLocationsOpen = false, initialActivity = null }: MapViewProps) {
   // A demo account is read-only (docs/SPEC.md FR-2.1); `'email' in user` tells a DemoUser from an AuthUser.
@@ -143,6 +110,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
 
   const container = useRef<HTMLDivElement>(null);
   const [exportFlow, setExportFlow] = useState<ExportFlow>({ stage: 'idle' });
+  const exportEvent = useCallback((event: ExportEvent) => setExportFlow((flow) => exportFlowReducer(flow, event)), []);
   const [exportError, setExportError] = useState<string | null>(null);
   // One of Normal, Fog and Heatmap at a time (docs/SPEC.md FR-4.4).
   const [mapMode, setMapModeState] = useState<MapMode>('normal');
@@ -203,7 +171,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   const [panelTab, setPanelTab] = useState<PanelTab>(
     initialActivity !== null
       ? 'activities'
-      : storyParam() !== null || storiesTabParam()
+      : storyParam(window.location.search) !== null || storiesTabParam(window.location.search)
         ? 'stories'
         : initialPrivateLocationsOpen
           ? 'private'
@@ -216,18 +184,15 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
 
   // The open Story (FR-14.6). While one is open, the list and tracks are its activities with no
   // date range; `selectedRange` is kept for when the Story closes.
-  const [storyId, setStoryId] = useState<string | null>(storyParam);
+  const [storyId, setStoryId] = useState<string | null>(() => storyParam(window.location.search));
   const storyState = useStory(storyId);
 
   // Photos (FR-16), in Normal mode only: the Edit window's single activity, else the focused
   // activity, else the open Story.
-  const photoScope = useMemo<PhotoScope>(() => {
-    if (mapMode !== 'normal') return null;
-    if (editWindowIds !== null) return editWindowIds.length === 1 ? { activity: editWindowIds[0]! } : null;
-    if (focusedActivityId !== null) return { activity: focusedActivityId };
-    if (storyId !== null) return { story: storyId };
-    return null;
-  }, [mapMode, editWindowIds, focusedActivityId, storyId]);
+  const photoScope = useMemo<PhotoScope>(
+    () => photoScopeFor(mapMode, editWindowIds, focusedActivityId, storyId),
+    [mapMode, editWindowIds, focusedActivityId, storyId],
+  );
   // A Story's photos change with its members too.
   const storyMembers = storyState.story?.activityIds.join(',') ?? '';
   const photoState = usePhotos(photoScope, `${trackMetricsVersion}|${storyMembers}`);
@@ -251,46 +216,15 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   const [distanceFilter, setDistanceFilter] = useState<DistanceRange | null>(null);
 
   const toggleActivityChecked = useCallback((id: string) => {
-    setCheckedActivityIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+    setCheckedActivityIds((prev) => toggled(prev, id));
   }, []);
-  // The toolbar acts on the checked group if anything is checked, else the focused row. Checked
-  // wins over a union so a Delete never reaches past what was ticked.
-  const toolbarTargetIds = useMemo(() => {
-    if (checkedActivityIds.size > 0) return checkedActivityIds;
-    return new Set(focusedActivityId !== null ? [focusedActivityId] : []);
-  }, [checkedActivityIds, focusedActivityId]);
-  // Show/Hide over the toolbar's target: if any of it is hidden, show all; otherwise hide all.
-  // One click never leaves the group mixed.
+  const toolbarTargetIds = useMemo(() => toolbarTarget(checkedActivityIds, focusedActivityId), [checkedActivityIds, focusedActivityId]);
   const toggleGroupVisibility = useCallback(() => {
-    setHiddenActivityIds((prev) => {
-      const anyHidden = [...toolbarTargetIds].some((id) => prev.has(id));
-      const next = new Set(prev);
-      for (const id of toolbarTargetIds) {
-        if (anyHidden) next.delete(id);
-        else next.add(id);
-      }
-      return next;
-    });
+    setHiddenActivityIds((prev) => toggledVisibility(prev, toolbarTargetIds));
   }, [toolbarTargetIds]);
   // A toggle: the type stays in the dropdown either way, so it can be turned back on without Reset filters.
   const toggleType = useCallback((type: string) => {
-    setExcludedTypes((prev) => {
-      const next = new Set(prev);
-      if (next.has(type)) {
-        next.delete(type);
-      } else {
-        next.add(type);
-      }
-      return next;
-    });
+    setExcludedTypes((prev) => toggled(prev, type));
   }, []);
   const resetActivityFilters = useCallback(() => {
     setExcludedTypes(new Set());
@@ -315,15 +249,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   }, []);
 
   // A Story or the date range, never both.
-  const activityQuery = useMemo(
-    () =>
-      storyId !== null
-        ? { story: storyId }
-        : selectedRange
-          ? { from: selectedRange.from, to: selectedRange.to }
-          : {},
-    [selectedRange, storyId],
-  );
+  const activityQuery = useMemo(() => queryFor(storyId, selectedRange), [selectedRange, storyId]);
 
   // Fetched once here so the panel and the drawn tracks agree on the same rows.
   const {
@@ -348,10 +274,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     generation: historyGeneration,
   } = useActivityDays();
 
-  // The default range is the 5 most recent activity-days: what opening the map asks about, quick
-  // to draw, and both knobs inside the slider's window.
-  //
-  // It is re-derived on every real refetch of days (`historyGeneration`) until the user picks a
+  // The default range (defaultRange.ts) is re-derived on every real refetch of days (`historyGeneration`) until the user picks a
   // range. Trap: keying on `visibleDays` would also re-pick on Earlier/Later paging, and settling
   // once would freeze a zero-history account (every demo) on `{today, today}` past its first upload.
   //
@@ -359,8 +282,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // the edited activity and close the window. It catches up when the window closes.
   useEffect(() => {
     if (userChangedRangeRef.current || !daysReady || editOpen) return;
-    const recentDays = visibleDays.slice(-5);
-    setSelectedRangeState({ from: recentDays[0]?.date ?? earliest ?? today, to: today });
+    setSelectedRangeState(defaultRange(visibleDays, earliest, today));
     // visibleDays isn't a dependency; see above.
   }, [daysReady, earliest, historyGeneration, today, editOpen]);
 
@@ -379,13 +301,11 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     () => activities.filter((a) => passesFilters(a, excludedTypes, distanceFilter)),
     [activities, excludedTypes, distanceFilter],
   );
-  // Tracks not drawn and not flown to: filtered out, hidden, or Pending. The tile already omits a
-  // Pending activity; this hides it before the refetch lands. Pending stays out of
-  // hiddenActivityIds so the user's own choice survives the reprocess.
-  const mapHiddenIds = useMemo(() => {
-    const filteredOut = activities.filter((a) => !passesFilters(a, excludedTypes, distanceFilter)).map((a) => a.id);
-    return new Set([...filteredOut, ...hiddenActivityIds, ...pendingIds]);
-  }, [activities, excludedTypes, distanceFilter, hiddenActivityIds, pendingIds]);
+  // The tile already omits a Pending activity; this hides it before the refetch lands.
+  const mapHiddenIds = useMemo(
+    () => hiddenOnMap(activities, excludedTypes, distanceFilter, hiddenActivityIds, pendingIds),
+    [activities, excludedTypes, distanceFilter, hiddenActivityIds, pendingIds],
+  );
 
   const unitSystem = useUnitSystem();
   const map = useMapInstance({
@@ -404,30 +324,23 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     const el = container.current;
     if (!map || !el) return;
     setExportError(null);
-    // The control toggles the viewfinder, except mid-capture.
-    setExportFlow((flow) => {
-      if (flow.stage === 'framing') return { stage: 'idle' };
-      if (flow.stage === 'capturing') return flow;
-      return { stage: 'framing', preset: 'custom', customSize: usableCustomSize(customSizeRef.current, exportMaxSide), window: shapeWindow('custom', el) };
-    });
-  }, [map, exportMaxSide]);
+    exportEvent({ type: 'toggle', customSize: usableCustomSize(customSizeRef.current, exportMaxSide), container: { width: el.clientWidth, height: el.clientHeight } });
+  }, [map, exportMaxSide, exportEvent]);
 
-  // Another Custom size keeps the window; any other choice fits a window of the new shape.
-  const handleExportChoiceChange = useCallback((choice: ExportChoice) => {
-    const el = container.current;
-    if (!el) return;
-    if (choice.preset === 'custom') customSizeRef.current = choice.customSize;
-    setExportFlow((flow) => {
-      if (flow.stage !== 'framing') return flow;
-      if (choice.preset === 'custom' && flow.preset === 'custom') return { ...flow, customSize: choice.customSize };
-      return { ...flow, ...choice, window: shapeWindow(choice.preset, el) };
-    });
-  }, []);
+  const handleExportChoiceChange = useCallback(
+    (choice: ExportChoice) => {
+      const el = container.current;
+      if (!el) return;
+      if (choice.preset === 'custom') customSizeRef.current = choice.customSize;
+      exportEvent({ type: 'choice', choice, container: { width: el.clientWidth, height: el.clientHeight } });
+    },
+    [exportEvent],
+  );
 
   const handleExportCapture = useCallback(async () => {
     if (exportFlow.stage !== 'framing' || !map) return;
     const { preset, customSize, window: win } = exportFlow;
-    setExportFlow({ ...exportFlow, stage: 'capturing' });
+    exportEvent({ type: 'capture' });
     setExportError(null);
     try {
       const center = map.unproject([win.x + win.w / 2, win.y + win.h / 2]);
@@ -444,20 +357,19 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      setExportFlow({ stage: 'idle' });
+      exportEvent({ type: 'close' });
     } catch (err) {
       // The cause (a canvas or render timeout) is for developers; the user gets a generic message.
       console.error('export failed', err);
       setExportError(t('export.failed'));
-      // Back to framing, so a failed capture keeps the framed view.
-      setExportFlow((flow) => (flow.stage === 'capturing' ? { ...flow, stage: 'framing' } : flow));
+      exportEvent({ type: 'failed' });
     }
-  }, [exportFlow, map, flavor, mapMode, activityQuery, mapHiddenIds, paths, satellite]);
+  }, [exportFlow, map, flavor, mapMode, activityQuery, mapHiddenIds, paths, satellite, exportEvent]);
 
   const handleExportCancel = useCallback(() => {
-    setExportFlow({ stage: 'idle' });
+    exportEvent({ type: 'close' });
     setExportError(null);
-  }, []);
+  }, [exportEvent]);
 
   // Flies to the combined bounds of the given activities; one activity is its own bbox.
   const fitToSelection = useCallback(
@@ -560,8 +472,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
 
   // Inverts the check over the listed rows; a checked row the filters hide is dropped. No fly.
   const invertSelection = useCallback(() => {
-    const inverted = filteredActivities.filter((a) => !checkedActivityIds.has(a.id));
-    setCheckedActivityIds(new Set(inverted.map((a) => a.id)));
+    setCheckedActivityIds(invertedChecks(filteredActivities, checkedActivityIds));
   }, [filteredActivities, checkedActivityIds]);
 
   // Focus on map: flies to the toolbar's target, hidden tracks excluded. The one way to look at a checked group.
@@ -578,8 +489,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   }, [mapHiddenIds]);
 
   // Camera moves on a newly loaded list:
-  // - The first list flies to the most recent activity (a whole Story inside one), unless the URL
-  //   carries a view (FR-4.5). Fitting the whole default range could zoom out to the world.
+  // - The first list's fit is cameraRules.ts's firstListFit.
   // - After that, only a range the user picked or a Story opened from the map flies, to what's visible.
   // Keyed on the query the list was fetched for, because `activities` is a new array on every reload:
   // the Pending poll, a finished upload or a Private location change must not move the camera.
@@ -591,17 +501,12 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     if (activitiesLoadedKey === flownRangeKeyRef.current) return;
     flownRangeKeyRef.current = activitiesLoadedKey;
     if (!hasFlownToActivitiesRef.current) {
-      const drawn = activities.filter((a) => a.bbox !== null && !a.pending);
-      // A Story with nothing to draw leaves this for the date range, which closing it returns to.
-      if (storyId !== null && drawn.length === 0) return;
+      const fit = firstListFit(activities, storyId, initial.hash.view != null);
+      if (fit === null) return;
       // The first list, even an empty one: an account with no history gets the fallback view
       // below, and its first upload doesn't fly either.
       hasFlownToActivitiesRef.current = true;
-      if (initial.hash.view == null && drawn.length > 0) {
-        // A Story is a trip: show the whole of it.
-        const mostRecent = drawn.reduce((latest, a) => (a.startedAt > latest.startedAt ? a : latest));
-        fitToSelection(storyId !== null ? drawn : [mostRecent]);
-      }
+      if (fit.length > 0) fitToSelection(fit);
       return;
     }
     if (!flyToNextRangeRef.current) return;
@@ -611,15 +516,11 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     if (flyBounds) flyToBBox(map, flyBounds);
   }, [map, activities, activitiesLoadedKey, fitToSelection, storyId]);
 
-  // An account with no history at all: the account's Country view if set, else WORLD_VIEW; never
-  // geolocation. Trap: `activities` is empty for any range without activity, so "no history" is
-  // read from useActivityDays' `earliest`.
+  // An account with no history at all: the account's Country view if set, else WORLD_VIEW; never geolocation.
   const hasFlownToFallbackRef = useRef(false);
   useEffect(() => {
     if (!map || hasFlownToFallbackRef.current) return;
-    if (initial.hash.view != null) return;
-    if (activities.length > 0) return;
-    if (!daysReady || earliest != null) return;
+    if (!needsFallbackView(initial.hash.view != null, activities.length, daysReady, earliest)) return;
     hasFlownToFallbackRef.current = true;
     flyToView(map, countryView(user.country) ?? WORLD_VIEW);
   }, [map, activities, daysReady, earliest, user.country]);
@@ -794,18 +695,8 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       handleUploaded();
       const deleted = new Set(ids);
       setFocusedActivityId((current) => (current !== null && deleted.has(current) ? null : current));
-      setCheckedActivityIds((current) => {
-        if (![...deleted].some((id) => current.has(id))) return current;
-        const next = new Set(current);
-        for (const id of deleted) next.delete(id);
-        return next;
-      });
-      setHiddenActivityIds((current) => {
-        if (![...deleted].some((id) => current.has(id))) return current;
-        const next = new Set(current);
-        for (const id of deleted) next.delete(id);
-        return next;
-      });
+      setCheckedActivityIds((current) => withoutIds(current, deleted));
+      setHiddenActivityIds((current) => withoutIds(current, deleted));
     },
     [handleUploaded],
   );
@@ -865,7 +756,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   useEffect(() => {
     const onPopState = () => {
       const { storyId: current, enterStory: enter, exitStory: exit } = storyNavRef.current;
-      const next = storyParam();
+      const next = storyParam(window.location.search);
       if (next === current) return;
       if (next !== null) {
         enter(next, 'none');
@@ -1004,27 +895,10 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
       setEditingActivityId(null);
     }
   }, [editOpen, editWindowActivities, activitiesLoading]);
-  // The Track tab edits one activity with a finished track.
-  const editTrackUnavailable =
-    editWindowActivities === null || editWindowActivities.length !== 1
-      ? t('activities.edit_track_check_one')
-      : editWindowActivities[0]!.pending
-        ? t('activities.edit_track_processing')
-        : editWindowActivities[0]!.private
-          ? t('activities.private_title')
-          : editWindowActivities[0]!.bbox === null
-            ? t('activities.no_track')
-            : null;
-
-  // Photos belong to one activity and need a track to sit on (FR-16.1).
-  const editPhotosUnavailable =
-    editWindowActivities === null || editWindowActivities.length !== 1
-      ? t('photos.check_one')
-      : editWindowActivities[0]!.private
-        ? t('activities.private_title')
-        : editWindowActivities[0]!.bbox === null
-          ? t('photos.no_track')
-          : null;
+  const editTrackKey = editTrackBlocker(editWindowActivities);
+  const editTrackUnavailable = editTrackKey === null ? null : t(editTrackKey);
+  const editPhotosKey = editPhotosBlocker(editWindowActivities);
+  const editPhotosUnavailable = editPhotosKey === null ? null : t(editPhotosKey);
   // The Edit window opens on its Activity tab, with nothing being moved on the map.
   useEffect(() => {
     setEditTab('activity');
@@ -1042,32 +916,24 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // A row that leaves Pending has new points: the track, the days, the open Story and the bands
   // refresh. The camera stays (FR-5.15). Fog and Heatmap go through the coverage watch, because the
   // server clears Pending just before its last render; a row that enters Pending starts the same watch.
-  //
-  // Trap: the job often finishes before the list reload after Apply returns, so the row is never
-  // seen Pending. An activity applied here therefore also counts as finished the first time a list
-  // fetched after Apply shows it not pending. Each fetched list is a new `pendingIds` array, and
-  // Apply's fetch aborts earlier ones, so every list seen after Apply was fetched after it.
+  // An edit applied here counts as finished once a later list shows it not pending (pending.ts).
+  // Each fetched list is a new `pendingIds` array, and Apply's fetch aborts earlier ones, so every
+  // list seen after Apply was fetched after it.
   const previousPendingRef = useRef<ReadonlySet<string>>(new Set());
   const lastPendingIdsRef = useRef<string[] | null>(null);
   useEffect(() => {
     // Only a newly fetched list says anything new; the map or range changing re-runs this on an older list.
     if (pendingIds === lastPendingIdsRef.current) return;
     lastPendingIdsRef.current = pendingIds;
-    const now = new Set(pendingIds);
-    let finished = [...previousPendingRef.current].some((id) => !now.has(id));
-    const started = pendingIds.some((id) => !previousPendingRef.current.has(id));
-    previousPendingRef.current = now;
-    if (started) {
+    const change = pendingChange(previousPendingRef.current, pendingIds, awaitingEditIdsRef.current);
+    previousPendingRef.current = change.now;
+    awaitingEditIdsRef.current = change.awaiting;
+    if (change.started) {
       // Drawn from tiles fetched before it went Pending; the server now leaves it out.
       if (map) refreshTrackLayer(map, activityQuery);
       watchCoverage();
     }
-    for (const id of awaitingEditIdsRef.current) {
-      if (now.has(id)) continue;
-      awaitingEditIdsRef.current.delete(id);
-      finished = true;
-    }
-    if (!finished) return;
+    if (!change.finished) return;
     if (map) refreshTrackLayer(map, activityQuery);
     // Includes the Country/Region tiers: an edit can un-visit a region.
     watchCoverage();
@@ -1166,32 +1032,17 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     };
   }, [map, pinned]);
 
-  // The photos in scope sit on their route while it's drawn (FR-16): not while the Track tab has the
-  // map or the route is hidden. The Photos tab's unsaved moves and new photos are overlaid.
-  const photoMarkers = useMemo<PhotoMarkerItem[]>(() => {
-    if (photoScope === null || (editOpen && editTab === 'track')) return [];
-    if ('activity' in photoScope && mapHiddenIds.has(photoScope.activity)) return [];
-    const items: PhotoMarkerItem[] = photoState.photos
-      .filter((p) => p.lon !== null && p.lat !== null && !mapHiddenIds.has(p.activityId))
-      .map((p) => ({ id: p.id, lon: p.lon!, lat: p.lat!, thumbSrc: API_BASE_URL + p.thumbUrl, caption: p.caption }));
-    if (photoOverlay === null) return items;
-    const upserts = new Map(photoOverlay.upserts.map((item) => [item.id, item]));
-    const kept = items.filter((item) => !photoOverlay.hidden.includes(item.id)).map((item) => upserts.get(item.id) ?? item);
-    const keptIds = new Set(kept.map((item) => item.id));
-    return [...kept, ...photoOverlay.upserts.filter((item) => !keptIds.has(item.id))];
-  }, [photoScope, editOpen, editTab, mapHiddenIds, photoState.photos, photoOverlay]);
-  // A marker's click: one photo opens its popup. A group spread over more than GROUP_SPREAD_M zooms
-  // to fit (at most z19, where that spread is wider than a marker); a tighter group opens the popup
-  // on its first photo.
+  const photoMarkers = useMemo<PhotoMarkerItem[]>(
+    () => photoMarkerItems(photoScope, editOpen && editTab === 'track', mapHiddenIds, photoState.photos, photoOverlay, API_BASE_URL),
+    [photoScope, editOpen, editTab, mapHiddenIds, photoState.photos, photoOverlay],
+  );
+  // A marker's click: a spread group zooms to fit, else the popup opens on its first photo.
   const openPhotoMarker = useCallback(
     (ids: string[]) => {
       if (!map) return;
-      const group = photoMarkers.filter((item) => ids.includes(item.id));
-      const spread = Math.max(0, ...group.flatMap((a) => group.map((b) => haversineM(a.lat, a.lon, b.lat, b.lon))));
-      if (group.length > 1 && spread > GROUP_SPREAD_M) {
-        const lons = group.map((p) => p.lon);
-        const lats = group.map((p) => p.lat);
-        map.fitBounds([Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)], { padding: 80, maxZoom: 19 });
+      const action = photoGroupAction(photoMarkers.filter((item) => ids.includes(item.id)));
+      if (action !== 'open') {
+        map.fitBounds(action.fit, { padding: 80, maxZoom: GROUP_MAX_ZOOM });
         return;
       }
       setOpenGroup({ ids, index: 0 });
@@ -1285,7 +1136,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               window={exportFlow.window}
               busy={exportFlow.stage === 'capturing'}
               error={exportError}
-              onWindowChange={(window) => setExportFlow((flow) => (flow.stage === 'framing' ? { ...flow, window } : flow))}
+              onWindowChange={(window) => exportEvent({ type: 'window', window })}
               onChoiceChange={handleExportChoiceChange}
               onCapture={() => void handleExportCapture()}
               onCancel={handleExportCancel}

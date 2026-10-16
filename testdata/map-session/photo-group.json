@@ -1,0 +1,9 @@
+{
+  "rule": "photoGroup",
+  "description": "A photo marker's tap: a group spread over more than 15 m zooms to fit its bounds [west, south, east, north]; one photo or a tighter group opens the popup.",
+  "cases": [
+    { "name": "one photo opens", "input": { "photos": [{ "lat": 59.43, "lon": 24.75 }] }, "expected": "open" },
+    { "name": "photos taken at one spot open", "input": { "photos": [{ "lat": 59.43, "lon": 24.75 }, { "lat": 59.43005, "lon": 24.75 }] }, "expected": "open" },
+    { "name": "a spread group fits", "input": { "photos": [{ "lat": 59.43, "lon": 24.75 }, { "lat": 59.431, "lon": 24.752 }] }, "expected": { "fit": [24.75, 59.43, 24.752, 59.431] } }
+  ]
+}
