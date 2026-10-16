@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md FR-1.11 (deleting an account).
+
 import (
 	"context"
 	"net/http"

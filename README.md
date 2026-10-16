@@ -18,7 +18,7 @@ Each feature links to the part of [`docs/SPEC.md`](docs/SPEC.md) that defines it
 - **Photos.** Your own photos on an activity, each placed on the route where it was taken by its capture time, moved along it with a slider in the Edit window, shown on the route whenever it's selected and across a whole Story; kept as a resized copy, never the original ([FR-16](docs/SPEC.md#21-fr-16--activity-photos)).
 - **Activity graph and trends.** A private, GitHub-style daily grid of your activity, and weekly or monthly totals of the ground you covered ([FR-7](docs/SPEC.md#9-fr-7--activity-graph-profile), [FR-9](docs/SPEC.md#11-fr-9--trends)).
 - **Private by default.** Nobody else sees your map. Private locations hide where tracks start and end near home or work, and no heart rate or other health data is ever read or stored ([FR-8](docs/SPEC.md#10-fr-8--privacy-controls), [ADR-0017](docs/adr/0017-no-health-data.md)).
-- **Share an image, not your map.** Frame any view and export it as a high-resolution image, sized for social media if you like ([FR-4.10](docs/SPEC.md#fr-410-interactive-frame-and-capture-map-export)).
+- **Share an image, not your map.** Frame any view and export it as a high-resolution image, sized for social media if you like ([FR-4.10](docs/SPEC.md#fr-410-map-image-export)).
 
 ## Layout
 

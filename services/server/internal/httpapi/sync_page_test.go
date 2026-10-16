@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md FR-3.9 (the Sync page).
+
 import (
 	"context"
 	"net/http"

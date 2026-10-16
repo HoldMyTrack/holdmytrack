@@ -2357,7 +2357,7 @@ button.activities-panel__story-badge:hover {
   color: var(--fm-ink-secondary);
 }
 
-/* PhotosTab.tsx (FR-16.6): Add photos, then the photos as rows — a thumbnail, a name, Edit and
+/* PhotosTab.tsx (FR-16): Add photos, then the photos as rows — a thumbnail, a name, Edit and
    Delete — one of which may be open with its slider and caption. The list scrolls inside the
    window rather than growing it past the map. */
 .photos-tab {
@@ -2735,9 +2735,10 @@ button.activities-panel__story-badge:hover {
    rule above this point is the desktop layout, unmodified and unaffected outside this
    query. Scope is "core flows fully touch-usable," a direct decision, not full parity with
    every desktop interaction: the map-track-hover ↔ Activities-row-underline two-way
-   highlight (FR-4.1/FR-5.4) stays mouse-only on purpose — a continuous-position hover
-   read with no discrete point to tap. See docs/SPEC.md §19
-   and docs/IMPLEMENTATION.md §5.9. */
+   highlight stays mouse-only — a continuous-position hover read with no discrete point to
+   tap (docs/SPEC.md §19). Desktop phone emulation has a fixed viewport, no browser toolbar,
+   no iOS focus-zoom and a pointer-precise "tap", so it passes layouts that fail on a phone:
+   the traps below were each found on a real one. */
 @media (max-width: 768px) {
   /* Defensive backstop, not a fix for a specific known overflow (those are fixed at their
      own source below) — a phone browser turns any stray horizontal overflow into a
@@ -2899,7 +2900,9 @@ button.activities-panel__story-badge:hover {
 
   /* The date slider leaves the sheet for the bottom of the screen, so the range can be changed
      with the sheet collapsed and the map in view. Still rendered by the panel (fixed
-     positioning escapes its `overflow: hidden`), so it comes and goes with the Activities tab.
+     positioning escapes its `overflow: hidden`, but only while the sheet has no `transform`,
+     which would make the sheet its containing block), so it comes and goes with the Activities
+     tab.
      A fixed height (its content is one 32px row plus one label line), since the sheet is
      anchored to its top edge by that same number. */
   .activities-panel__dates {

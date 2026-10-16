@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md FR-1.9 (Sign in with Google from Android).
+
 import (
 	"context"
 	"crypto"

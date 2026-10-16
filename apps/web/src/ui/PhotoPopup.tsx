@@ -17,9 +17,9 @@ export interface PhotoPopupProps {
 }
 
 /**
- * A photo's popup (FR-16.7), opened from its marker: the picture, its caption and when it was
+ * A photo's popup (FR-16), opened from its marker: the picture, its caption and when it was
  * taken, anchored at its place on the route so it moves with the map — no window over the page.
- * Clicking the picture opens it over the page to zoom into (PhotoViewer.tsx, FR-16.8); Full size
+ * Clicking the picture opens it over the page to zoom into (PhotoViewer.tsx); Full size
  * opens the stored copy in a browser tab. Opened from a group's marker (photos taken
  * at one spot, which no zoom separates), it steps through the group with ‹ › and "2 of 5",
  * staying anchored at the group's first photo so it doesn't jump between them. Changing a photo

@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md FR-15.6 (captures).
+
 import (
 	"context"
 	"fmt"

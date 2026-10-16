@@ -1,5 +1,7 @@
 package ingest
 
+// Covers docs/SPEC.md FR-3.1 (why an import fails).
+
 import (
 	"errors"
 	"fmt"

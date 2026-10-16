@@ -2,7 +2,7 @@ import type { Photo } from '../api';
 import type { PreparedPhoto } from './photoPrep';
 
 /**
- * The Photos tab's unsaved changes (FR-16.6) — what the Edit window's one Save writes, after the
+ * The Photos tab's unsaved changes (FR-16) — what the Edit window's one Save writes, after the
  * activity's fields and before its track edit, and what its Cancel throws away. Nothing here has
  * reached the server: a new photo is prepared in the browser and its place settled by the
  * placement check (`POST /v1/photos/place`) or by the user, and goes up only on Save.

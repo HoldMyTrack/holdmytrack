@@ -1,5 +1,7 @@
 package ingest
 
+// Covers docs/SPEC.md FR-5.17 (splitting and merging).
+
 import (
 	"testing"
 	"time"

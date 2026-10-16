@@ -43,7 +43,7 @@ import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 
 /**
- * The Edit window's Photos tab (`docs/SPEC.md` FR-16.6), the web's `PhotosTab.tsx`: the activity's
+ * The Edit window's Photos tab (`apps/android/docs/SPEC.md` FR-2.10), the web's `PhotosTab.tsx`: the activity's
  * photos as a list, each with Edit and Delete, and Add photos. Nothing here is written until the
  * window's Save ([save]); Cancel throws it all away. The tab edits [draft] ([PhotoDraft]), and the
  * list and the map ([onOverlay]) show the photos as Save would leave them.

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- A copy of a Story someone sent, at the top of the Stories tab (the web's .stories-tab__inbox,
-     docs/SPEC.md FR-14.6 item 13): who sent which Story and how many activities, then Accept and
+     docs/SPEC.md FR-14.6): who sent which Story and how many activities, then Accept and
      Decline — or, once accepted, "Copying …" with no buttons until it has arrived. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"

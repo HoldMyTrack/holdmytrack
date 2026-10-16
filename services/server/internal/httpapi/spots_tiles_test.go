@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md FR-15.4 (Spots tiles).
+
 import (
 	"bytes"
 	"context"

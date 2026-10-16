@@ -1,5 +1,7 @@
 package export
 
+// Covers docs/SPEC.md FR-1.12 (what the data download holds).
+
 import (
 	"archive/zip"
 	"bytes"

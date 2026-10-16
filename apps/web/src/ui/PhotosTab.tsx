@@ -32,7 +32,7 @@ export interface PhotosTabProps {
 }
 
 /**
- * The Edit window's Photos tab (FR-16.6): the activity's photos as a list, each with Edit and
+ * The Edit window's Photos tab (FR-16): the activity's photos as a list, each with Edit and
  * Delete, and Add photos. Nothing here is written until the window's Save; Cancel throws it all
  * away. The tab edits `draft` (photoDraft.ts), and the list and the map show the photos as Save
  * would leave them.

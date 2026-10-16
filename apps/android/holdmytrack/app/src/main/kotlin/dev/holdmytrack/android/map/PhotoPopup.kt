@@ -14,7 +14,7 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 
 /**
- * A photo's popup (`docs/SPEC.md` FR-16.7), the web's `PhotoPopup.tsx`: [view]
+ * A photo's popup (`apps/android/docs/SPEC.md` FR-2.10), the web's `PhotoPopup.tsx`: [view]
  * (`view_photo_popup`) over the map at the photo's marker — above it, or under it when there's
  * no room above, below [top] — following it as the camera moves ([place]). The picture, its
  * caption, when it was taken, and Full size, which opens the stored copy over the whole screen

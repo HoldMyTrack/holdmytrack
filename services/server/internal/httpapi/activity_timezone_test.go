@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md FR-3.11 (an activity's own timezone).
+
 import (
 	"context"
 	"net/http"

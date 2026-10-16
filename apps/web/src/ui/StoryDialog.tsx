@@ -6,7 +6,7 @@ import { useBackdropClose } from './ConfirmDialog';
 /**
  * A Story's Name, required, and optional Description, in one of two uses:
  *
- *  - **Create** (`SPEC.md` FR-5.16) — the Activities panel toolbar's Create story, making a Story
+ *  - **Create** (`SPEC.md` FR-14.2) — the Activities panel toolbar's Create story, making a Story
  *    of the checked activities with one `POST /v1/stories` that carries them too.
  *  - **Edit** (FR-14.6) — a Stories tab folder's pencil, renaming it or changing its description.
  *

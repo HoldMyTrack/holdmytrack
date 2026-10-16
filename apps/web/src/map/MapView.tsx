@@ -1236,7 +1236,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
             ? t('activities.no_track')
             : null;
 
-  // Photos belong to one activity, and need a track to sit on (FR-16.6).
+  // Photos belong to one activity, and need a track to sit on (FR-16.1).
   const editPhotosUnavailable =
     editWindowActivities === null || editWindowActivities.length !== 1
       ? t('photos.check_one')
@@ -1429,7 +1429,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   }, [map, pinned]);
 
   // Every photo of the activity in view is on its route whenever the route is drawn selected
-  // (FR-16.7): not while the Edit window's Track tab has the map, nor while the route itself is
+  // (FR-16): not while the Edit window's Track tab has the map, nor while the route itself is
   // hidden. The one the Photos tab is moving sits where its slider has it; one it is placing
   // before upload is drawn from its local thumbnail.
   const photoMarkers = useMemo<PhotoMarkerItem[]>(() => {
@@ -1444,7 +1444,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     const keptIds = new Set(kept.map((item) => item.id));
     return [...kept, ...photoOverlay.upserts.filter((item) => !keptIds.has(item.id))];
   }, [photoScope, editOpen, editTab, mapHiddenIds, photoState.photos, photoOverlay]);
-  // A marker's click (FR-16.7): one photo opens its popup. A group the map can separate — its
+  // A marker's click: one photo opens its popup. A group the map can separate — its
   // photos more than GROUP_SPREAD_M apart — zooms in to fit them, at most to z19, where that
   // spread is wider than a marker; one it can't (several taken at one spot) opens the popup on
   // its first photo, to step through the rest.

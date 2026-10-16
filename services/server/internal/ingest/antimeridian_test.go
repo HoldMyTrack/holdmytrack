@@ -1,5 +1,7 @@
 package ingest
 
+// Covers docs/SPEC.md FR-4.1 (tracks across the 180° meridian).
+
 import (
 	"math"
 	"slices"

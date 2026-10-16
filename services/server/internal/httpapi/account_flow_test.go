@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md FR-1.1–FR-1.6 and FR-2.1 (accounts, sessions, the demo).
+
 import (
 	"bytes"
 	"context"

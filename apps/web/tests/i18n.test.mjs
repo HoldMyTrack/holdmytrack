@@ -1,3 +1,4 @@
+// Covers docs/SPEC.md FR-13.1 (every message in every language).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 // Plain .mjs, like editTrackOps.test.mjs: Node strips the types from the catalogs itself.

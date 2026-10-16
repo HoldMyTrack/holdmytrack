@@ -1,5 +1,7 @@
 package worker
 
+// Covers docs/SPEC.md FR-1.11 (what deleting an account removes).
+
 import (
 	"context"
 	"log/slog"

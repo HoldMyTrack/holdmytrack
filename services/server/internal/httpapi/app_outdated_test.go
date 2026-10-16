@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md §1.5 (old Android builds refused).
+
 import (
 	"encoding/json"
 	"log/slog"

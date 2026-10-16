@@ -1,5 +1,7 @@
 package ingest
 
+// Covers docs/SPEC.md FR-8.1 (Private location clipping).
+
 import (
 	"math"
 	"slices"

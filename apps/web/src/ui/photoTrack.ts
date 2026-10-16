@@ -82,7 +82,7 @@ export type PlaceAnchor = { t: number } | { waiting: string } | null;
 export const NEXT_PHOTO_STEP = 0.01;
 
 /**
- * Where a waiting photo's slider starts (FR-16.6): just after the photo picked before it, which
+ * Where a waiting photo's slider starts: just after the photo picked before it, which
  * is where the next picture of a walk usually is. A previous one that waited is followed by
  * where the user put it (`placed`), or past it to its own predecessor if it was skipped (null).
  * The first of a batch, or one after nothing placed at all, starts at the beginning of the route.

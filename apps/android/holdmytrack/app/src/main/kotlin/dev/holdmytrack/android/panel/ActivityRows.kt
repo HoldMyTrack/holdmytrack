@@ -59,7 +59,7 @@ private fun kindIcon(kind: ActivityKind): Int = when (kind) {
  * several, a menu of their names. The tile of its kind is its checkbox, as Gmail's avatar is: a
  * tap on it, or a long press on the row, is [onCheck], and a checked row's tile is a ✓ on the
  * accent; [onCheck] null leaves it a plain tile. [onRemove] shows the × that takes the row out
- * of the open Story (`docs/SPEC.md` FR-14.6 item 3).
+ * of the open Story (`docs/SPEC.md` FR-14.6).
  */
 class ActivityRowHolder(view: View) : RecyclerView.ViewHolder(view) {
     private val res = view.resources

@@ -16,7 +16,7 @@ import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Story
 
 /**
- * Send a copy, the web's `SendCopyDialog.tsx` (`docs/SPEC.md` FR-14.6 item 14, FR-14.7): a
+ * Send a copy, the web's `SendCopyDialog.tsx` (`docs/SPEC.md` FR-14.6, FR-14.7): a
  * Story folder's send button, asking for the email address to send a copy of the Story to,
  * over `dialog_send_copy`. Send stays disabled until the field has something in it, and the
  * keyboard's Send does the same as tapping it. Once sent it stays up on "Sent to …", with the

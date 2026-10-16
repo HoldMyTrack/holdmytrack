@@ -1,5 +1,7 @@
 package ingest
 
+// Covers docs/SPEC.md FR-5.14 (Edit track).
+
 import (
 	"encoding/json"
 	"testing"

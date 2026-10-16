@@ -28,7 +28,7 @@ Fill in every value — see that file's own comments for what each one means and
 
 **Uploads per hour.** `UPLOADS_PER_HOUR` (default 100) is how many files one account may send to `POST /v1/activities/upload` in an hour (`docs/SPEC.md` FR-3.1). Leave it at 100. A load test's `seed` and `import` send more than that per account, so raise it for their run (`docs/PERFORMANCE.md`). A change needs only `up -d` for `api`, which also starts every account's count afresh.
 
-**Tiles per minute.** `TILES_PER_MINUTE` (default 1200) is how many tile requests one account may make in a minute, across every map layer (`docs/SPEC.md` FR-4.11). Leave it at 1200. A load test's `browse` runs several visitors on each test account, so raise it for its run (`docs/PERFORMANCE.md`). A change needs only `up -d` for `api`.
+**Tiles per minute.** `TILES_PER_MINUTE` (default 1200) is how many tile requests one account may make in a minute, across every map layer (`docs/SPEC.md` FR-4.15). Leave it at 1200. A load test's `browse` runs several visitors on each test account, so raise it for its run (`docs/PERFORMANCE.md`). A change needs only `up -d` for `api`.
 
 **Signups per hour.** `SIGNUPS_PER_HOUR` (default 5) is how many accounts one address may create with an email and password in an hour (`docs/SPEC.md` FR-1.1). Leave it at 5. A load test's `signup` creates more than that from one machine, so raise it for that step (`docs/PERFORMANCE.md`). A change needs only `up -d` for `api`.
 

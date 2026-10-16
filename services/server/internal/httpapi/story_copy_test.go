@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md FR-14.8 (the copy).
+
 import (
 	"bytes"
 	"context"

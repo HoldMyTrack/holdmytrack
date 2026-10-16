@@ -376,7 +376,7 @@ Heatmap shares Fog's pipeline up to the stored tile — the same per-activity ma
 
 #### 4.2.4 Country/Region zoom tiers
 
-Below a threshold zoom, Fog's per-pixel raster is replaced by a whole-polygon reveal (SPEC FR-4.2 behavior 4, FR-4.15). Heatmap has no tiers: its circles draw the same way at every zoom (§4.2.2). **The tiers are switched purely by MapLibre `minzoom`/`maxzoom` on the layers, never layered together and never reconciled**: at country/region zoom there's no fine-grained detail visible to contradict, so the coarse reveal already is the whole truth at that scale. The web's `zoomTiers.ts` and Android's `MapOverlays.kt` hold the same constants and must change together; so must the level notice's `zoomTier`, which names the same bands (Fog's only: Heatmap's notice is one message at every zoom, `levelNoticeKey`).
+Below a threshold zoom, Fog's per-pixel raster is replaced by a whole-polygon reveal (SPEC FR-4.2, FR-4.15). Heatmap has no tiers: its circles draw the same way at every zoom (§4.2.2). **The tiers are switched purely by MapLibre `minzoom`/`maxzoom` on the layers, never layered together and never reconciled**: at country/region zoom there's no fine-grained detail visible to contradict, so the coarse reveal already is the whole truth at that scale. The web's `zoomTiers.ts` and Android's `MapOverlays.kt` hold the same constants and must change together; so must the level notice's `zoomTier`, which names the same bands (Fog's only: Heatmap's notice is one message at every zoom, `levelNoticeKey`).
 
 **Boundary data** is Overture Maps' land-clipped countries, dependencies and regions — OpenStreetMap's borders, ADR-0034 for the choice. `scripts/boundaries-extract.sh` cuts them out of one pinned Overture release with DuckDB, off the server, leaving out the code-less second drawing of a disputed region; the file goes into the app bucket by hand (`docs/DEPLOY.md` §6); `seed-admin-boundaries` replaces every outline and membership row in one transaction, re-matches every activity and bumps every account's tile version (§4.2.6). It refuses a file with too few countries or regions, since a cut-short file would otherwise erase the rest of the world. Each outline is stored simplified for drawing and in full detail for matching (§3.12); the simplification is under a pixel where each tier draws, and a country it would erase whole, like Vatican City, keeps its full outline.
 
@@ -400,7 +400,7 @@ An activity is Pending (`activities.edit_pending`) while an Edit track (§4.7.7)
 
 #### 4.2.6 Caching: one tile version per account
 
-Every per-user tile route can be kept by the browser or the app for good, keyed on the account's **tile version** (SPEC FR-4.11). None goes through a shared cache: the app's origin isn't behind Cloudflare (`docs/ARCHITECTURE.md` §1.2), and a tile points at where its owner lives.
+Every per-user tile route can be kept by the browser or the app for good, keyed on the account's **tile version**, which `GET /v1/coverage/status` returns as `tile_version`. A tile asked for with the account's own version is sent `Cache-Control: private, max-age=31536000, immutable`; without one, or with another account's, `private, no-cache`. None goes through a shared cache: the app's origin isn't behind Cloudflare (`docs/ARCHITECTURE.md` §1.2), and a tile points at where its owner lives. A change made on the page refetches its tiles at once; one made elsewhere (another device, a background sync) shows after a reload or the next app launch.
 
 **The version is a counter, `users.map_version`, bumped by `fog.BumpMapVersion` whenever what any of those tiles would return may have changed.** Not a timestamp, because it must never repeat: the latest `rendered_at` goes backwards when an account's tiles are deleted (the Demo Customer's reset does), and a key once used for one tile's content must never return for different content. **Every change to tile content must be followed by a bump:**
 - The worker bumps at the end of every render pass that stored anything, a failed one included, since its tiles are already overwritten. That covers ingest, delete, Edit track, Private locations, heatmap aging and the heatmap cap.
@@ -503,7 +503,7 @@ Both are client-side (`activityFacets.ts`) over the list the panel already holds
 
 #### 4.7.3 Selection and focus
 
-**The checkbox group and the focused row are two separate pieces of state** (FR-5.12, FR-5.13): emphasizing a group or flying on every tick reads as N selections at once, so no checkbox action moves the camera, and every fly skips hidden tracks.
+**The checkbox group and the focused row are two separate pieces of state** (FR-5.1): emphasizing a group or flying on every tick reads as N selections at once, so no checkbox action moves the camera, and every fly skips hidden tracks.
 
 **Hover goes through one function** (`setHoveredTrack`), fed by both a row's hover and the map's own, so the two sources can't overwrite each other's idea of what is hovered.
 
@@ -526,9 +526,9 @@ Both are client-side (`activityFacets.ts`) over the list the panel already holds
 
 **A group is deleted one request at a time, then refreshed once**, sequentially so several deletes don't each mark the same account's tiles at once.
 
-#### 4.7.6 Filter row and header toolbar (FR-5.2, FR-5.7, FR-5.12, FR-5.13)
+#### 4.7.6 Filter row and header toolbar (FR-5.1–FR-5.3)
 
-**The toolbar acts on the checked group when anything is checked, otherwise the focused row** (FR-5.12). Checked wins rather than the two being unioned, because a group is built one tick at a time while a row gets focused by looking at it, so a union would sweep whatever was last clicked into a Delete.
+**The toolbar acts on the checked group when anything is checked, otherwise the focused row** (FR-5.1). Checked wins rather than the two being unioned, because a group is built one tick at a time while a row gets focused by looking at it, so a union would sweep whatever was last clicked into a Delete.
 
 **Show/hide is a toggle over the target, not "show only these"**: an isolate would change unchecked rows too. Only the tracks layer reads the hidden set.
 
@@ -1105,30 +1105,6 @@ Being free means costs scale with users while donations scale with goodwill (`VI
 - `noDataState` is `OK` where an empty result is healthy (no 5xx series exists until the first 5xx) and `Alerting` where the series must always exist.
 - Grafana doesn't expand a summary's template for an alert in the no-data state; it mails the raw template. So the backup-age rules never go no-data: each falls back to a huge value, and the summary reads that as no record of a successful run.
 - The uptime rule averages over every probe location, so one location's network trouble doesn't page.
-
-### 5.9 Mobile browser support
-
-What a phone gets is `SPEC.md`'s. The Activities panel becomes a collapsible bottom sheet rather than a separate list screen, and core flows are fully touch-usable without parity for hover-only behavior.
-
-**One `@media (max-width: 768px)` layer, isolated at the end of `index.css`** (and a phone block in `pages.css`). Every rule above it is the desktop layout; keep phone rules inside it so desktop stays untouched.
-
-**The sheet is an overlay, so the map never resizes.** Under the breakpoint the Activities panel is `position: fixed`, out of the flex row, so the map's container never changes size with the sheet open or closed, no `map.resize()` is ever needed and a drag can't thrash it. The sheet's open state has no visible effect at desktop width, so JS needs no media query.
-
-**Fixed elements reserve their own space.** The collapsed sheet is fixed to the bottom, so a normal-flow element's position says nothing about what the sheet draws over it. The app body reserves the sheet's peek height in its own padding (via `:has`), so the map and its bottom controls end above the sheet.
-
-**The date slider leaves the sheet but stays the panel's own element.** Its wrapper is `position: fixed`, which escapes the sheet's `overflow: hidden` only because the sheet has no transform (one would make it the containing block).
-
-**The sheet collapses while the Edit window is open**, in CSS alone: the window makes the sheet inert, so it couldn't be collapsed again, and it drew over the window.
-
-**The panel's width is a custom property** rather than an inline `style.width`, so the phone layer can override it: an inline style beats any stylesheet rule short of `!important`.
-
-**Anything wider than the phone widens the whole page**: the layout viewport grows, and the sheet's `width: 100%` resolves against it. Fix the overflowing element at its source; `overflow-x: hidden` on `html`/`body` is only a backstop.
-
-**What phone emulation can't show.** Playwright's emulation has a fixed viewport, no browser toolbar, no iOS focus-zoom and a pointer-precise "tap", so the first pass verified clean there and was unusable on a phone. Four causes, each fixed at its source:
-1. **iOS zooms in on any text field under 16px** and doesn't zoom back out, pushing the fixed sheet off-screen, so text fields are 16px on phones.
-2. **`height: 100%` and `vh` can resolve to the toolbar-hidden viewport**, putting the bottom-anchored slider under the toolbar; the phone layout uses `dvh`.
-3. **The page rubber-banded and pulled to refresh** when a drag ran past its own scroll area: `overscroll-behavior: none`.
-4. **A fingertip misses a thin line**, and a miss clears the focus, so a touch click uses a wider hit box. A tap that did hit exposed a second trap: `scrollIntoView()` scrolls every scrollable ancestor, including the collapsed sheet, whose `overflow: hidden` clips but still scrolls programmatically, so its content slid out of its own box with no gesture able to bring it back. The focused row is scrolled on the list alone.
 
 ---
 

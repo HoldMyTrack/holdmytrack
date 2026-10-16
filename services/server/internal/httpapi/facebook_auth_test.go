@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md FR-1.10 (Sign in with Facebook).
+
 import (
 	"context"
 	"encoding/json"

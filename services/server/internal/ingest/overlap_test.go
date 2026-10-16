@@ -1,5 +1,7 @@
 package ingest
 
+// Covers docs/SPEC.md FR-3.7 (the overlap rule).
+
 import (
 	"testing"
 	"time"

@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md §1.5 (the JSON error shape).
+
 import (
 	"encoding/json"
 	"net/http"

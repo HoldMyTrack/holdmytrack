@@ -8,7 +8,7 @@ sealed interface RangeShift {
 }
 
 /**
- * Where the date slider's range-shift buttons move a selection (`docs/SPEC.md` FR-6.7) — the
+ * Where the date slider's range-shift buttons move a selection — the
  * web's `apps/web/src/ui/rangeShift.ts`, line for line: the same number of activity days,
  * packed right up against the old range on the side it moves toward.
  *

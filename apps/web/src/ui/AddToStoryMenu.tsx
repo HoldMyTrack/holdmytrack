@@ -20,7 +20,7 @@ export interface AddToStoryMenuProps {
 }
 
 /**
- * The Activities toolbar's Add to story (`SPEC.md` FR-5.16): the one place activities go into a
+ * The Activities toolbar's Add to story (`SPEC.md` FR-14): the one place activities go into a
  * Story — where they're picked. A menu over the toolbar's target: "New story…" (StoryDialog.tsx
  * in its create mode, a Story made of the target), then every Story, newest first, fetched each
  * time the menu opens (useStories). Clicking a Story adds the target to it with one

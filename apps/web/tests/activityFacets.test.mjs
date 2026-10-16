@@ -1,3 +1,4 @@
+// Covers docs/SPEC.md FR-5.2 and FR-5.3 (the Type and Distance filters).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 // Plain .mjs, like editTrackOps.test.mjs: Node strips the types from the imported .ts module.

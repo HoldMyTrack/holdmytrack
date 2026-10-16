@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md FR-5.17 (splitting and merging).
+
 import (
 	"context"
 	"encoding/json"

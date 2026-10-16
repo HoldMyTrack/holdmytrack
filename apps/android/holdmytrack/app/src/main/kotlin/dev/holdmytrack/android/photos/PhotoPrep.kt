@@ -17,7 +17,7 @@ import kotlin.math.roundToInt
 class UnreadablePhotoException : IOException("unreadable image")
 
 /**
- * Getting a picked photo ready for upload (`docs/SPEC.md` FR-16.6, ADR-0024), the web's
+ * Getting a picked photo ready for upload (`docs/SPEC.md` FR-16.1, ADR-0024), the web's
  * `apps/web/src/ui/photoPrep.ts`: read what its EXIF says about when and where it was taken
  * ([PhotoExifFields]), then redraw it at most [MAX_SIDE] px on its long side, plus a
  * [THUMB_SIDE] px thumbnail, as WebP. Redrawing re-encodes the pixels alone, so no EXIF field —

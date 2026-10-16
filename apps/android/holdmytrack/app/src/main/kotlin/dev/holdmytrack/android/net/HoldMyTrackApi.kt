@@ -360,7 +360,7 @@ class ApiException(val code: Int, message: String, val errorCode: String? = null
 object HoldMyTrackApi {
 
     /** [ApiException.errorCode] of a split that would leave a part entirely inside a Private
-     *  location (`docs/SPEC.md` FR-5.17 behavior 7) — asked about, then sent with allowHidden. */
+     *  location (`docs/SPEC.md` FR-5.17) — asked about, then sent with allowHidden. */
     const val SPLIT_HIDES_PART = "split_hides_part"
 
     private const val API_V1 = "/v1"

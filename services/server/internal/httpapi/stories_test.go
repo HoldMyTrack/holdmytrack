@@ -1,5 +1,7 @@
 package httpapi
 
+// Covers docs/SPEC.md FR-14.2–FR-14.5 (Stories).
+
 import (
 	"context"
 	"net/http"
