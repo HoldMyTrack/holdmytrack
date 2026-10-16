@@ -56,7 +56,7 @@ import dev.holdmytrack.android.panel.PrivateLocationEditor
 import dev.holdmytrack.android.panel.PanelState
 import dev.holdmytrack.android.panel.SyncTab
 import dev.holdmytrack.android.photos.PhotosController
-import dev.holdmytrack.android.sync.Candidate
+import dev.holdmytrack.android.sync.SyncCandidatesController
 import dev.holdmytrack.android.sync.SyncProgress
 import dev.holdmytrack.android.recording.RecordingController
 import dev.holdmytrack.android.recording.RecordingService
@@ -236,10 +236,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         showMap = { host?.showMap() },
     )
 
-    /** What the Sync tab has the map draw (`map/SyncCandidatesOverlay`), kept for a style
-     *  reload, which drops the layers. */
-    private var syncCandidates: List<Candidate> = emptyList()
-    private var syncHighlight: String? = null
+    /** What the Sync tab has the map draw. */
+    private val syncCandidates = SyncCandidatesController(style = { style?.takeIf { overlaysAttached } })
 
     /** The bottom bar's Sync came before the panel was built: it opens on Sync once it is. */
     private var pendingSync = false
@@ -370,7 +368,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             findViewById(R.id.panel_sync_content),
             requireActivity() as AppCompatActivity,
             scope = { viewLifecycleOwner.lifecycleScope },
-            onCandidates = ::drawSyncCandidates,
+            onCandidates = syncCandidates::set,
             onFrame = { candidates -> BoxUnion.of(candidates.map { it.bbox }.filter { it.isNotEmpty() })?.let { flyTo(it) } },
             onSynced = ::onSyncedFromPhone,
         )
@@ -610,7 +608,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             // A new style has none of the circles; draw them again if the editor has the map.
             privateEditor.onStyleReady()
             // Nor the Sync tab's lines, which the account's tracks still step aside for.
-            drawSyncCandidates(syncCandidates, syncHighlight)
+            syncCandidates.draw()
             MapOverlays.setSyncing(loaded, ::panel.isInitialized && panel.tab == PanelTab.SYNC, mode)
             if (isRecording()) MapOverlays.setRecording(loaded, true, mode)
             frameActivities()
@@ -873,14 +871,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         coverageWatch.watch()
     }
 
-    /** The Sync tab's lines over the map, or none as it leaves. */
-    private fun drawSyncCandidates(candidates: List<Candidate>, highlight: String?) {
-        syncCandidates = candidates
-        syncHighlight = highlight
-        val loaded = style?.takeIf { overlaysAttached } ?: return
-        if (candidates.isEmpty()) SyncCandidatesOverlay.clear(loaded) else SyncCandidatesOverlay.set(loaded, candidates, highlight)
-    }
-
     /** The Sync tab sent activities: the list, its days and the tiles catch up. */
     private fun onSyncedFromPhone() {
         activityDays.reload()
@@ -1035,8 +1025,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         if (!privateEditor.isShowing && !editWindow.isOpen && spots.tap(instance, point)) return true
         // The Sync tab's lines: one tapped is picked out on its list.
         if (::panel.isInitialized && panel.tab == PanelTab.SYNC && sheet.isVisible) {
-            SyncCandidatesOverlay.keyAt(instance, instance.projection.toScreenLocation(point), resources.displayMetrics.density)
-                ?.let(panel.syncTab::focus)
+            syncCandidates.keyAt(instance, point, resources.displayMetrics.density)?.let(panel.syncTab::focus)
             return true
         }
         if (!normalMode()) return false
