@@ -85,19 +85,21 @@ This tree is the canonical one; do not let a second tree exist anywhere else to 
 
 | Document | Read it when |
 | :-- | :-- |
-| [`docs/VISION.md`](docs/VISION.md) | Product scope, market rationale, funding model, milestones. |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System-level shape: the key decisions, the target architecture, the stack, and what's deliberately deferred. |
-| [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md) | Database schema, and each feature's own implementation detail — ingest, tile/fog workflows, accounts, deployment, engineering risks. |
-| [`docs/SPEC.md`](docs/SPEC.md) | A precise, testable statement of what the system currently does, independent of both the business rationale and the implementation. |
-| [`docs/ROADMAP.md`](docs/ROADMAP.md) | The remaining-work checklist — what's left to reach the product `VISION.md` describes. |
-| [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md) | Currently-open defects in already-shipped functionality — the opposite direction from `ROADMAP.md`'s planned work. |
-| [`docs/BRAINSTORM.md`](docs/BRAINSTORM.md) | Ideas raised but not yet decided — one level upstream of `ROADMAP.md`. |
-| [`docs/adr/`](docs/adr/) | Architecture Decision Records — why each consequential, hard-to-reverse decision was made, and what was rejected. |
-| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Running it locally, the verification checklist, gotchas worth not rediscovering, and the command reference. |
-| [`docs/DEPLOY.md`](docs/DEPLOY.md) | You're standing up an actual deployment. |
-| [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | Measured performance: each load test or benchmark session, how it ran and what it found. |
+| [`docs/VISION.md`](docs/VISION.md) | Product scope, market rationale, funding model, milestones: what ships and in what order. |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System-level shape: the key decisions, the architecture diagram, the stack, and what is deferred. Read it before `IMPLEMENTATION.md` for anything touching more than one feature. |
+| [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md) | How the built pieces work where the code can't say it: the schema, ingest and tile flows, invariants, reasons and traps. |
+| [`docs/SPEC.md`](docs/SPEC.md) | What a user or client can rely on, as numbered requirements (FR-N.M): limits, guarantees, cross-feature rules. |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | The remaining-work checklist toward the product `VISION.md` describes. |
+| [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md) | Open defects in shipped functionality. A bug found while building something goes here. |
+| [`docs/BRAINSTORM.md`](docs/BRAINSTORM.md) | Ideas raised but not decided, one level upstream of `ROADMAP.md`. |
+| [`docs/adr/`](docs/adr/) | Architecture Decision Records: why each hard-to-reverse decision was made, and what was rejected. |
+| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Running the stack, verifying a change, and gotchas already hit. |
+| [`docs/DEPLOY.md`](docs/DEPLOY.md) | Standing up an actual deployment. |
+| [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | Measured performance: each load test or benchmark session's target, method and results. A session you run gets its entry here. |
 | [`docs/DPIA.md`](docs/DPIA.md) | The data protection impact assessment: the personal data processed, its legal basis, the risks to users and the measures against them. |
-| [`AGENTS.md`](AGENTS.md) | You are a coding agent opening the repo cold — this same routing table, self-contained, plus the documentation and Markdown conventions these docs follow. |
+| [`services/server/api/`](services/server/api/) | The JSON API's contract: `openapi.yaml` indexes every path, `paths/` holds each area's operations and `components/` the shared shapes. The server's tests and Android's `WireContractTest` hold the code to it. |
+| [`apps/android/docs/`](apps/android/docs/) | The Android app's own `ARCHITECTURE.md`, `IMPLEMENTATION.md`, `SPEC.md` and `ROADMAP.md`, mirroring the root set. |
+| [`AGENTS.md`](AGENTS.md) | You are a coding agent: the product's boundaries and the documentation, commit and Markdown conventions. |
 
 ## License
 

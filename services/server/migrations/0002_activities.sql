@@ -1,5 +1,5 @@
--- Activities and what hangs off them: activities (IMPLEMENTATION.md §3.3), activity_streams
--- (§3.4), privacy_zones (§3.7) and connections (§3.2).
+-- Activities and what hangs off them: activities (IMPLEMENTATION.md §3.3), activity_streams,
+-- privacy_zones (§3.7) and connections (§3.2).
 
 -- §3.3 activities
 CREATE TABLE activities (
@@ -57,7 +57,7 @@ CREATE INDEX idx_activities_type        ON activities (user_id, activity_type);
 -- heatmap_aging.go's "still-in-window rows old enough to have aged out".
 CREATE INDEX idx_activities_in_heatmap_window ON activities (started_at) WHERE in_heatmap_window;
 
--- §3.4 activity_streams -- per-point sensor data, kept out of the hot query path.
+-- activity_streams -- per-point sensor data, kept out of the hot query path.
 CREATE TABLE activity_streams (
     activity_id  UUID PRIMARY KEY REFERENCES activities(id) ON DELETE CASCADE,
     point_count  INT NOT NULL,

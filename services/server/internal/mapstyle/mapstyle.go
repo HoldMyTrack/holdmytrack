@@ -6,7 +6,7 @@
 // apps/web/scripts/build-style.mjs renders that function to the JSON files embedded below,
 // one per label language and flavor (styles/<lang>/<flavor>.json).
 // Nothing in this package knows what a layer is, which is the point: a Go definition of the
-// style would be the second hand-maintained copy §2.1 exists to prevent. Regenerate with
+// style would be the second hand-maintained copy `ARCHITECTURE.md` §2.1 exists to prevent. Regenerate with
 // `npm run build:style` in apps/web; `npm run verify:style` fails the build if the committed
 // JSON has drifted from style.ts.
 //

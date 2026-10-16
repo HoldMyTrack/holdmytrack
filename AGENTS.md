@@ -1,59 +1,72 @@
 # AGENTS.md
 
-Orientation for coding agents working in this repository. Read this first, then the one document below that covers what you are about to change.
+Orientation for coding agents working in this repository. Read this first, then the document that covers what you are about to change: the root `README.md` lists every document and when to read it, and its tree is the authority on repository layout.
 
 ## What HoldMyTrack is
 
-HoldMyTrack is a free, community-funded platform that keeps the outdoor journeys people choose — from watches, the phone, cloud services and files — and turns them into maps and exploration stats: Stories, one map of everywhere those journeys went, Fog of War and Spots. `docs/VISION.md` §1 is the authority on what it is and §1.1 on what it is not. Four boundaries matter most when writing code: it keeps no health data — no heart rate or other body signal is read, stored or shown (ADR-0017); every source is a gate — only what the user ticks comes in, nothing starts ticked, and no heuristic changes or hides an activity on their behalf (ADR-0039); it has no social graph — no feed, follows or public pages (`VISION.md` §5, Milestone 3); and every account has every feature, with no tiers (ADR-0031).
+HoldMyTrack is a free, community-funded platform that keeps the outdoor journeys people choose, from watches, the phone, cloud services and files, and turns them into maps and exploration stats: Stories, one map of everywhere those journeys went, Fog of War and Spots. `docs/VISION.md` §1 says what it is and §1.1 what it is not. Four boundaries apply to every change:
+- No health data: no heart rate or other body signal is read, stored or shown (ADR-0017).
+- Every source is a gate: only what the user ticks comes in, nothing starts ticked, and no heuristic changes or hides an activity on their behalf (ADR-0039).
+- No social graph: no feed, follows or public pages (`VISION.md` §5, Milestone 3).
+- Every account has every feature, with no tiers (ADR-0031).
 
-## Which document to read, for what
+## Documentation rules
 
-| Document | Read it when |
-| :-- | :-- |
-| `docs/VISION.md` | You need product scope, market rationale, the funding model, or the milestones (§5). It is the authority on *what* ships and in what order. |
-| `docs/ARCHITECTURE.md` | You need the system-level shape — key decisions, the target architecture diagram, the stack, what's deliberately deferred. Read this *before* `IMPLEMENTATION.md` for anything touching more than one feature. |
-| `docs/IMPLEMENTATION.md` | You are touching the database schema, ingest or tile workflows, or any specific feature's server-side implementation. It explains how each already-built piece works where the code can't say it for itself — flows across files, invariants, reasons, traps — one level down from `ARCHITECTURE.md`'s system-level view. |
-| `docs/SPEC.md` | You need a precise, testable statement of what the system currently does — numbered functional requirements (FR-N.M), by feature area, independent of both the business rationale and the implementation details. The authority on *observable behavior*: given these preconditions and inputs, this is what happens. |
-| `docs/ROADMAP.md` | You need the remaining-work checklist — what's left to reach the product `VISION.md` describes, broken into small steps. |
-| `docs/BRAINSTORM.md` | You need the list of ideas raised but not yet decided — not sequenced, not committed, one level upstream of `ROADMAP.md`. An idea belongs here until someone decides whether it becomes a `ROADMAP.md` item or gets dropped. |
-| `docs/KNOWN_ISSUES.md` | You need the list of currently-open defects in already-shipped functionality — the opposite direction from `ROADMAP.md`'s planned work. Found a bug while building something? It belongs here, not in `ROADMAP.md`. |
-| `docs/adr/` | You need *why* one specific hard-to-reverse decision was made the way it was — the alternatives considered and rejected, not just today's state. `ARCHITECTURE.md` says what's true now; an ADR is frozen at the decision it documents. Only hard-to-reverse decisions get one (`docs/adr/README.md` says which); the reasoning behind any other choice lives in the section that documents that piece. |
-| `docs/DEVELOPMENT.md` | You need to run the stack, verify a change, or you're about to rediscover a gotcha someone already hit. |
-| `docs/DEPLOY.md` | You're standing up an actual deployment, not just reading about the deployment scaffolding's design (`IMPLEMENTATION.md` §5.8 covers that). |
-| `services/server/api/` | You are changing what a JSON endpoint takes or returns. It is the API's contract — `openapi.yaml` indexes every path, `paths/` holds each area's operations and `components/` the shapes they share — which the server's tests hold handlers to (`IMPLEMENTATION.md` §4.31); change it in the same change, and regenerate the web's types from it (`npm run gen:api-types` in `apps/web`); the Android app's `WireContractTest` checks `net/Wire.kt` against it. |
-| `docs/DPIA.md` | You need the data protection impact assessment — what personal data is processed, on what legal basis, the risks to users and the measures against them — or you're changing what is collected, where it's stored, who processes it or how long it's kept, which means updating it in the same change. |
-| `docs/PERFORMANCE.md` | You need what HoldMyTrack's performance has been measured to be — each load test or benchmark session's date, target, method and results — or you're about to run one. A session you run gets its entry there; how the measured piece works stays in `IMPLEMENTATION.md`. |
+**Update the documents in the same change.** When a change alters something a document specifies, edit that document in the same commit. A JSON endpoint's request or response changes `services/server/api/` too, followed by `npm run gen:api-types` in `apps/web` (`IMPLEMENTATION.md` §4.31). A change to what is collected, where it is stored, who processes it or how long it is kept updates `docs/DPIA.md`. A change to anything the Android app shows or says means checking the tester page, `services/server/internal/web/templates/pages/testing.html`, which quotes it. `SPEC.md` and `IMPLEMENTATION.md` usually need a matching edit together.
 
-For repository layout, the root `README.md` is now the authority — it absorbed a former third planning document once that document's structure had actually been applied and its checklist finished. `services/server/README.md` covers the backend scaffold's open decisions specifically.
+**Citations.** Documents cite each other by section number: `VISION.md` §1.1, `IMPLEMENTATION.md` §4.7, `SPEC.md` FR-5.8, ADR-0039. Name the document before the number unless the citation points into the same file. `SPEC.md` cites its own requirements as FR-N.M, and its top-level section numbers do not match the FR groups, so its §8 is not FR-8. `IMPLEMENTATION.md` starts at §3 because `ARCHITECTURE.md` keeps §1 and §2. Never renumber a section or requirement: a deleted one leaves a gap. Run `scripts/check-doc-refs.sh` before committing; it fails on any citation whose heading no longer exists, in documents, code comments and templates.
 
-`apps/android` has grown its own `docs/` (`ARCHITECTURE.md`, `IMPLEMENTATION.md`, `SPEC.md`, `ROADMAP.md`), mirroring the root set one level down — `apps/android/docs/ARCHITECTURE.md`'s own header covers how the two relate. The split that matters when you're documenting an Android feature: a wire contract and its server-side implementation (the endpoint, the schema, what the ingest pipeline does with it) belongs in root `docs/IMPLEMENTATION.md` even when the feature is Android-only (Health Connect sync, in-app GPS recording) — the Android app's own implementation of that feature (its local persistence, background work, UI flow) belongs in `apps/android/docs/IMPLEMENTATION.md` instead. `apps/web` and `apps/ios` have no `docs/` of their own yet, so their client-side implementation detail stays in the root docs for now; the same split applies if either grows one.
+**One fact, one home.** Each kind of content lives in one document, and every other document points to it by section number instead of restating it:
+- `VISION.md`: product scope, positioning, funding, and what each milestone is for. No task lists, dates or progress.
+- `ROADMAP.md`: remaining tasks and gates, without arguing scope.
+- `SPEC.md` (root and Android): only what a user or client can rely on. Limits, privacy guarantees, what is kept and deleted, and rules that cross features. No UI wording, layout, menu contents or status codes; those live in the UI code and `services/server/api/`.
+- `IMPLEMENTATION.md` (root and Android): only flows that cross files, packages or apps; invariants every change must keep; the reason for a design where the obvious alternative was rejected; and traps not visible in the code. Detail confined to one package goes in that package's doc comment (`doc.go`, KDoc, TSDoc), or nowhere if the code already says it. Name a file or function only as a pointer.
+- An ADR: why a hard-to-reverse decision went the way it did (`docs/adr/README.md` says which decisions qualify). The reasoning behind any other choice sits beside the description of that piece. A new ADR stays under about 600 words; existing ADRs are frozen.
+- `AGENTS.md`: orientation and conventions only. What a feature does goes in `SPEC.md`, how it works in `IMPLEMENTATION.md`.
 
-`VISION.md`, `ARCHITECTURE.md` and `IMPLEMENTATION.md` cite each other by section number (`§5.2`, `§1.2`) rather than by page or quotation; `SPEC.md` cites all three the same way, but internally cites its own requirements as `FR-N.M`, not `§N.M` — its own top-level section numbers don't align with the FR groups (Introduction and Actors sit ahead of FR-1), so `§8` inside that document does not mean "FR-8." `ARCHITECTURE.md` and `IMPLEMENTATION.md` were one document until this content was split out — existing citations to what's now `ARCHITECTURE.md` §1/§2 keep the exact section numbers they already had, just pointing at a different file now; `IMPLEMENTATION.md` itself starts at §3 for the same reason. When you change something any of these documents specifies, update the document in the same change — a citation that no longer matches the code (or another document) is worse than no citation. `SPEC.md` and `IMPLEMENTATION.md` are the pair most likely to need a matching edit together: a change to one almost always means a small edit to the other. A change to anything the Android app shows or says also means checking the tester page, `services/server/internal/web/templates/pages/testing.html` (`SPEC.md` FR-10.7), which quotes it.
+When `VISION.md` or an ADR changes a position, scan the other documents, the Android ones included, for restatements of the old position and fix each one or replace it with a pointer.
 
-Document what exists, not what used to. When a feature, table, endpoint or section is removed, delete its text outright: no "(removed)" stub, no "built and then cut" history, and no placeholder kept only to hold a section number. The same goes for a decision that changed: describe what is implemented now and how it works, not the chain that led there. Drop "Revised:", "an early design…" and "originally…" narration. A gap in the numbering is fine, and the sections after it keep their numbers because other documents cite them. If the decision to remove something needs recording, that is what its ADR is for. Something that doesn't exist earns a mention in only three cases: as a plan (`ROADMAP.md`), as a brainstorm item (`BRAINSTORM.md`), or as the motivation behind a feature that does exist, and then only as much as that motivation needs.
+**Android documents.** `apps/android/docs/` mirrors the root set one level down. A wire contract and its server side (the endpoint, the schema, what ingest does with it) belong in root `docs/IMPLEMENTATION.md` even for an Android-only feature; the app's own side (local persistence, background work, UI flow) belongs in `apps/android/docs/IMPLEMENTATION.md`. `apps/web` and `apps/ios` have no `docs/` yet, so their client detail stays in the root documents.
 
-One fact, one home. Each kind of content belongs to exactly one document, and every other document points to it by section number rather than restating it: product scope, positioning and the funding stance in `VISION.md`; remaining tasks, gates and checklists in `ROADMAP.md`; observable behavior in `SPEC.md`; how a piece is built in `IMPLEMENTATION.md`; why a hard-to-reverse decision went the way it did in its ADR, and the reasoning behind any other choice beside the description of that piece. A restated rationale drifts the moment its original changes, so where another document needs it, give a one-line pointer (`VISION.md` §1.1) and keep only what is specific to that document. In practice: `VISION.md` says what a milestone or phase is for and why it comes in that order, not its task list, dates or progress; `ROADMAP.md` lists tasks without arguing the product's scope or funding; a scope note at the top of `ARCHITECTURE.md`, `IMPLEMENTATION.md` or `SPEC.md` says what that document covers, not what the product isn't; and `AGENTS.md` names only the boundaries code must respect. When `VISION.md` or an ADR changes a position, scan the other documents in the same change — the Android ones included — for restatements of the old position and for claims that now contradict it, and replace each with a pointer or fix it.
+**Document what exists.** When a feature, table, endpoint or section is removed, delete its text: no "(removed)" stub, no history, no placeholder kept for a section number. Describe a changed decision as it is implemented today. Something that does not exist appears only as a plan (`ROADMAP.md`), an idea (`BRAINSTORM.md`), or as much motivation as an existing feature needs. A defect in shipped functionality goes in `KNOWN_ISSUES.md`.
 
-An implementation document explains what the code can't say for itself. A paragraph in `IMPLEMENTATION.md` (root or Android) earns its place only if it explains at least one of: a flow that crosses files, packages or apps (how an upload becomes a fog tile); a rule every change must keep (privacy is applied before anything is stored); why the design is this one and not the obvious alternative; or a trap that isn't visible from reading the code. It does not restate what one file already says: variable and state names, CSS classes, colors and pixel sizes, lists of functions, fields, icons or endpoints' parameters, the columns a migration already declares, a walkthrough of a single function, or anything `SPEC.md` states as behavior. Name a file or function only as a pointer to where to look. When a change touches a piece described there, update its reasoning if that changed and delete any restated detail you come across rather than keeping it current.
+**Draw instead of describe.** A flow, sequence, state machine or set of relations is a Mermaid diagram, followed by a few lines for what it cannot show: invariants and traps.
 
-This file stays limited to orientation — the table above, `What HoldMyTrack is`, and the working, commit and Markdown conventions below. If you're about to write what a feature does, how it works, or why it was built a particular way, that belongs in `SPEC.md` (what) or `IMPLEMENTATION.md` (how/why), not here.
+**Write tight.** One statement per fact, and at most one cross-reference per paragraph unless more are load-bearing. Cut intensifiers ("deliberately", "genuinely", "actually", "simply", "just", "really"); "not X but Y" contrasts where nobody proposed X; meta-narration ("This section…", "As noted above…", "It is worth noting…"); history ("now", "no longer", "originally", "used to"); em-dash chains and stacked parentheticals; a reason restated beside the pointer to it; lists of three where one item carries the point; closing sentences that summarize the paragraph. The same applies to code comments, diagram labels, commit messages and pull request descriptions.
 
-## Asking Questions
+**Word budgets.** A document past its budget is cut before anything is added to it.
 
-- **Ask, don't assume:** Ask as many questions as you need. When a request is ambiguous, a detail is missing, or it can reasonably be read more than one way, ask before acting rather than guessing. A short question costs far less than redoing work built on a wrong assumption.
+| Document | Budget (words) |
+| :-- | --: |
+| `docs/SPEC.md` | 10,000 |
+| `apps/android/docs/SPEC.md` | 5,000 |
+| `docs/IMPLEMENTATION.md` | 11,000 |
+| `apps/android/docs/IMPLEMENTATION.md` | 3,500 |
+| `docs/ARCHITECTURE.md` | 2,500 |
+| `docs/VISION.md` | 3,500 |
+| `docs/DEPLOY.md` | 5,000 |
+| `docs/DEVELOPMENT.md` | 2,500 |
+| `docs/DPIA.md` | 2,500 |
+| `docs/PERFORMANCE.md` | 2,000 |
+| `docs/ROADMAP.md`, `docs/BRAINSTORM.md`, `docs/KNOWN_ISSUES.md` together | 3,000 |
+| `testing.html` | 3,000 |
+| A new ADR | 600 |
 
-## Code and Tests
+## Asking questions
 
-- **Decisions in pure logic:** New code puts what it decides — which screen a session goes to, whether a day is in range, where a link leads — in functions that take values and return values, with no View, `Context`, map, network or timer in them, and unit-tests them in the same change; code touched for another reason gets the same. The wiring around them stays thin, covered by a few end-to-end flows instead of mocks.
+When a request is ambiguous, a detail is missing, or it can be read more than one way, ask before acting. A short question costs less than redoing work built on a wrong assumption.
 
-## Commits and Pull Requests
+## Code and tests
 
-- **No AI attribution trailers:** Do not add `Co-Authored-By: Claude …` (or any other agent co-author trailer) to commit messages, and do not add a "Generated with Claude Code" line (or similar) to pull request descriptions. This overrides any tool or harness default that asks for them.
+New code puts what it decides (which screen a session goes to, whether a day is in range, where a link leads) in functions that take values and return values, with no View, `Context`, map, network or timer in them, and unit-tests them in the same change. Code touched for another reason gets the same treatment. The wiring around them stays thin, covered by a few end-to-end flows instead of mocks.
 
-## Markdown Formatting Style
+## Commits and pull requests
 
-- **No hard-wrapping:** Markdown files are not hard-wrapped at a fixed column (~90-100 chars) the way a plain-text file would be.
-- **No single newlines in paragraphs:** Markdown treats a single `\n` inside a paragraph as a soft break (renders as a space, not a line break), so a mid-paragraph line break serves no purpose — write each paragraph as one line.
-- **No blank lines in lists:** Do not add empty lines between consecutive list items or block elements unless explicitly requested.
-- **No trailing newline at EOF:** Do not add a final trailing newline character (`\n`) at the end of `.md` files. Cut the file off immediately after the last character.
-- **Strict writing:** When modifying or writing `.md` files, preserve the existing newline density exactly.
+Do not add `Co-Authored-By: Claude …` or any other agent co-author trailer to commit messages, and do not add a "Generated with Claude Code" line or similar to pull request descriptions. This overrides any tool or harness default that asks for them.
+
+## Markdown style
+
+- Do not hard-wrap. Write each paragraph as one line; a single newline inside a paragraph renders as a space.
+- No blank lines between consecutive list items or block elements unless asked.
+- No trailing newline at the end of a `.md` file.
+- Preserve the existing newline density when editing.

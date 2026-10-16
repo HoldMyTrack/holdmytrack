@@ -8,7 +8,7 @@ This file stays lean and current-only. Once an entry is fixed, its root-cause/fi
 
 ### The overlap hint misses a whole copy of a split activity
 
-The overlap hint (`SPEC.md` FR-3.7, `IMPLEMENTATION.md` §4.6) marks a candidate whose time range overlaps one of the account's activities by at least 80% of the longer one. After a split (FR-5.17, §4.7.8), a whole copy of the same recording from a second source, say a Health Connect session of a ride uploaded earlier from the watch's file and then split, overlaps each part by far less than that, so its row in the Android app's Sync tab isn't marked. Ticked, it lands next to the parts: the time is counted twice in totals, and the route is drawn twice into the Heatmap. A copy of just one part is marked, since that part and the copy overlap almost entirely.
+The overlap hint (`SPEC.md` FR-3.7, `IMPLEMENTATION.md` §4.6) marks a candidate whose time range overlaps one of the account's activities by at least 80% of the longer one. After a split (`SPEC.md` FR-5.17, `IMPLEMENTATION.md` §4.7.8), a whole copy of the same recording from a second source, say a Health Connect session of a ride uploaded earlier from the watch's file and then split, overlaps each part by far less than that, so its row in the Android app's Sync tab isn't marked. Ticked, it lands next to the parts: the time is counted twice in totals, and the route is drawn twice into the Heatmap. A copy of just one part is marked, since that part and the copy overlap almost entirely.
 
 - [ ] In `ingest.Overlaps`, compare a span against a split group as one span (the group's earliest start to its latest end) as well as against each part, and answer with the group's first part.
 

@@ -6,7 +6,7 @@ import type { SatelliteSource } from './style';
  * Paths are root-relative and deliberately origin-free: `style.ts` has to stay
  * DOM-free so it can run headlessly for print export, so whoever builds a style
  * supplies the origin. In development Vite serves `public/` at the web root; in
- * production these become CDN paths beside the `.pmtiles` (§1.6).
+ * production these become CDN paths beside the `.pmtiles` (`IMPLEMENTATION.md` §5.4).
  */
 
 /** Must match the string the style uses, so the pmtiles Protocol shares one archive instance. */

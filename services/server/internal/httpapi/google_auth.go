@@ -234,9 +234,9 @@ func (s *Server) exchangeGoogleCode(ctx context.Context, code, verifier string) 
 	return parseGoogleIDToken(tok.IDToken, s.google.ClientID, time.Now())
 }
 
-// parseGoogleIDToken decodes an id_token's payload and applies OpenID Connect Core
-// §3.1.3.7's checks that still apply when the token came straight from the token endpoint over
-// TLS: issuer, audience, expiry — plus email_verified, since the email is what an existing
+// parseGoogleIDToken decodes an id_token's payload and applies the checks of
+// OpenID Connect Core §3.1.3.7 that still apply when the token came straight from the token
+// endpoint over TLS: issuer, audience, expiry — plus email_verified, since the email is what an existing
 // account gets linked by (resolveGoogleUser) and an unverified one proves nothing.
 func parseGoogleIDToken(idToken, clientID string, now time.Time) (googleClaims, error) {
 	segs := strings.Split(idToken, ".")

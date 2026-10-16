@@ -92,9 +92,9 @@ If `git pull --ff-only` refuses, the server checkout has drifted: stop and show 
 Then the one-time steps the plan found, each from DEPLOY.md §6, after maintenance is off unless §6 says otherwise. Each writes to the production database, so list them in the step 1 confirmation and ask before running them:
 
 - **A new or changed `geo.TimezonesKey`**: download that release's `timezones-with-oceans.geojson.zip` to `/tmp` on the server, `rclone copyto` it into the app bucket under the key, run `run --rm api seed-timezones`, then delete the `/tmp` copy. Without it `tz_parts` stays empty and every activity keeps its account's zone, which nothing else reports: check `select count(*) from tz_parts` is non-zero afterwards.
-- **A new or changed `geo.BoundariesKey`**: the file is made off the server (`scripts/boundaries-extract.sh`), so ask the user for it, copy it into the bucket the same way, and run `seed-admin-boundaries`, behind a backup and maintenance mode (§6).
+- **A new or changed `geo.BoundariesKey`**: the file is made off the server (`scripts/boundaries-extract.sh`), so ask the user for it, copy it into the bucket the same way, and run `seed-admin-boundaries`, behind a backup and maintenance mode (`DEPLOY.md` §6).
 - **Changed `demo_data/`**: `run --rm api seed-demo-customer --reset`.
-- **Changed `internal/fog` or `internal/tilemath`**: `run --rm api rerender-coverage`, with `--masks` when the stroke or which tiles a track reaches changed (§6). Say which commits touched it and what they change, so the user can decide whether existing tiles look different.
+- **Changed `internal/fog` or `internal/tilemath`**: `run --rm api rerender-coverage`, with `--masks` when the stroke or which tiles a track reaches changed (`DEPLOY.md` §6). Say which commits touched it and what they change, so the user can decide whether existing tiles look different.
 
 ## 4. Android APK (only if the app changed)
 

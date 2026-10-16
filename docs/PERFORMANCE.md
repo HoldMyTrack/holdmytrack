@@ -219,7 +219,7 @@ The decision behind the 128 px tile size (`IMPLEMENTATION.md` §4.2). One dev ac
 
 ### 2026-10-10 — dev stack, the render lane and masks in Postgres
 
-The laptop's dev stack, first with a worker and API built from `main`, then from the branch that gives renders their own lane (`IMPLEMENTATION.md` §3.8), moves masks into Postgres (§3.11), draws 128 px tiles (§4.2) and keeps the Country and Region outlines per tile (§4.2.4). Both workers reached the object store through `delayproxy` at 80 ms a round trip and ran `WORKER_CONCURRENCY=2`, so two accounts' renders could fill the main lane as four did in production; the branch's also ran `WORKER_RENDER_CONCURRENCY=2`. Two accounts each imported a 1,000-track set (`gen 2 1000`, `import 2`); a third probed. On the branch, `rerender-coverage --masks` first redrew both accounts' masks into Postgres.
+The laptop's dev stack, first with a worker and API built from `main`, then from the branch that gives renders their own lane (`IMPLEMENTATION.md` §3.8), moves masks into Postgres (`IMPLEMENTATION.md` §3.11), draws 128 px tiles (`IMPLEMENTATION.md` §4.2) and keeps the Country and Region outlines per tile (`IMPLEMENTATION.md` §4.2.4). Both workers reached the object store through `delayproxy` at 80 ms a round trip and ran `WORKER_CONCURRENCY=2`, so two accounts' renders could fill the main lane as four did in production; the branch's also ran `WORKER_RENDER_CONCURRENCY=2`. Two accounts each imported a 1,000-track set (`gen 2 1000`, `import 2`); a third probed. On the branch, `rerender-coverage --masks` first redrew both accounts' masks into Postgres.
 
 | | `main` | Branch |
 | :-- | :-- | :-- |
@@ -244,7 +244,7 @@ The laptop's dev stack, first with a worker and API built from `main`, then from
 
 ### 2026-10-10 — production, `535cec9`, the render lane
 
-The same VPS after the deploy of renders in a lane of their own (`IMPLEMENTATION.md` §3.8, two render loops beside four main ones), activity masks in Postgres (§3.11), 128 px tiles (§4.2), Country and Region outlines kept per tile (§4.2.4) and Postgres's cache at 1 GB (`DEPLOY.md` §6). The deploy's `rerender-coverage --masks` redrew the 5,777 masks of 780 activities into Postgres, 502 bytes each on average, and their renders took at most 110 s. 21 test accounts; the bypass was on for about 14 s, and `api` ran with `UPLOADS_PER_HOUR=100000` until the cleanup.
+The same VPS after the deploy of renders in a lane of their own (`IMPLEMENTATION.md` §3.8, two render loops beside four main ones), activity masks in Postgres (`IMPLEMENTATION.md` §3.11), 128 px tiles (`IMPLEMENTATION.md` §4.2), Country and Region outlines kept per tile (`IMPLEMENTATION.md` §4.2.4) and Postgres's cache at 1 GB (`DEPLOY.md` §6). The deploy's `rerender-coverage --masks` redrew the 5,777 masks of 780 activities into Postgres, 502 bytes each on average, and their renders took at most 110 s. 21 test accounts; the bypass was on for about 14 s, and `api` ran with `UPLOADS_PER_HOUR=100000` until the cleanup.
 
 | Users | Map views/s | Requests/s | Fog p95 | Heatmap p95 | Tracks p95 | Region p95 | Country p95 | Errors |
 | :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- |

@@ -5,7 +5,7 @@
  *
  * Generating rather than hand-writing these is the whole point: `buildStyle()` stays the
  * single definition of the style, and a Go reimplementation of 71 layers is exactly the
- * divergence §2.1 exists to prevent. The `.json` files this writes are build output, not a
+ * divergence `ARCHITECTURE.md` §2.1 exists to prevent. The `.json` files this writes are build output, not a
  * second source — edit `src/map/style.ts` and re-run; never edit the JSON.
  *
  * `origin` is baked as a placeholder rather than a real host because one built artifact has

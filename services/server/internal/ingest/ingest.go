@@ -2,7 +2,7 @@
 // work-mode half of the ingestion pipeline — plus step 4's dirty-marking and, since the
 // per-activity fog/heatmap mask redesign, the actual per-activity rendering too (internal/
 // fog.RenderActivityMasks): raw points are already in memory here, pre-simplification,
-// exactly why §1.1 says coverage can't be derived from the simplified display trajectory,
+// exactly why ARCHITECTURE.md §1.1 says coverage can't be derived from the simplified display trajectory,
 // and exactly why rendering one activity's own masks belongs here rather than in a
 // re-fetch-and-reparse step in internal/fog. The user-wide aggregate rebuild (compositing
 // every activity's masks touching a tile, and the z13..z0 pyramid above it) still lives in

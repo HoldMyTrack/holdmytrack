@@ -592,7 +592,7 @@ The Profile page at `/profile` (FR-7): a retrospective, not a control — unlike
 
 ### 4.10 The no-signup demo
 
-**A real, read-only account behind §4.9's ordinary sessions, not a client-side imitation.** `VISION.md` §8.2's demo (FR-2) reuses the whole auth, upload, ingest and fog pipeline; a from-scratch in-browser parse-and-render path would mean a second parser and fog rasterizer, in another language, kept in sync forever.
+**A real, read-only account behind §4.9's ordinary sessions, not a client-side imitation.** `VISION.md` §8.2's demo (`SPEC.md` FR-2) reuses the whole auth, upload, ingest and fog pipeline; a from-scratch in-browser parse-and-render path would mean a second parser and fog rasterizer, in another language, kept in sync forever.
 
 **One shared account, recognized by its fixed id** (`DemoCustomerUserID`), never a fresh row per visitor. That id makes an account the demo: the session lookup compares against it, which makes it read-only and exempt from verification, and every query that must skip the demo — password reset, Google's email match, a Story's recipient, `set-admin` — excludes the same id. Its email is a synthetic `.invalid` placeholder that never reaches a client.
 
