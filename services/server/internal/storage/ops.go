@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/metrics"
+	"github.com/HoldMyTrack/platform/services/server/internal/metrics"
 )
 
 // Op classes as R2 bills them (IMPLEMENTATION.md §5.7): Class A are writes and listings,

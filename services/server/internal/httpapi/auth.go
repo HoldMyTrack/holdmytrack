@@ -16,8 +16,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
+	"github.com/HoldMyTrack/platform/services/server/internal/i18n"
+	"github.com/HoldMyTrack/platform/services/server/internal/web"
 )
 
 // Email+password auth, server-side sessions (migrations/0001_users_and_auth.sql) — resolved toward

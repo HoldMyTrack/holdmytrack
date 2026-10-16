@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
+	"github.com/HoldMyTrack/platform/services/server/internal/ingest"
 )
 
 // Six points a minute apart, 10:00 to 10:05.

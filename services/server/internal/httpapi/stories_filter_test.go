@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/tilemath"
+	"github.com/HoldMyTrack/platform/services/server/internal/tilemath"
 )
 
 // `story` narrows the activity list, the summary, the histogram (both modes and `earliest`)

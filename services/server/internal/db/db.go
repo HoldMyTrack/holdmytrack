@@ -15,7 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/migrations"
+	"github.com/HoldMyTrack/platform/services/server/migrations"
 )
 
 var migrationsFS = migrations.FS

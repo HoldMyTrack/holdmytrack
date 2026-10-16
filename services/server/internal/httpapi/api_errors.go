@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
+	"github.com/HoldMyTrack/platform/services/server/internal/i18n"
 )
 
 // Every error the JSON API and the tiles send is one shape (ADR-0045): `error`, a stable code a

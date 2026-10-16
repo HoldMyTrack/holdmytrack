@@ -5,7 +5,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
+	"github.com/HoldMyTrack/platform/services/server/internal/storage"
 )
 
 // loadMaskPNG fetches a stored fog_tiles tile's PNG as it is, or nil when there is nothing

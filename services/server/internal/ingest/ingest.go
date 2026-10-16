@@ -19,11 +19,11 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/geo"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/tilemath"
+	"github.com/HoldMyTrack/platform/services/server/internal/fog"
+	"github.com/HoldMyTrack/platform/services/server/internal/geo"
+	"github.com/HoldMyTrack/platform/services/server/internal/parse"
+	"github.com/HoldMyTrack/platform/services/server/internal/storage"
+	"github.com/HoldMyTrack/platform/services/server/internal/tilemath"
 )
 
 // simplifyToleranceDeg is ST_SimplifyPreserveTopology's tolerance for the display trajectory

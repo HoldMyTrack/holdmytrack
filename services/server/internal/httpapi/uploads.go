@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
+	"github.com/HoldMyTrack/platform/services/server/internal/i18n"
 )
 
 // defaultUploadsLimit matches the upload panel's own page size — 5 rows at a time.

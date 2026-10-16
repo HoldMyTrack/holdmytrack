@@ -11,10 +11,10 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/budget"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/export"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
+	"github.com/HoldMyTrack/platform/services/server/internal/budget"
+	"github.com/HoldMyTrack/platform/services/server/internal/export"
+	"github.com/HoldMyTrack/platform/services/server/internal/i18n"
+	"github.com/HoldMyTrack/platform/services/server/internal/web"
 )
 
 // Downloading your data (SPEC FR-1.12, IMPLEMENTATION.md §4.29): a request makes an exports

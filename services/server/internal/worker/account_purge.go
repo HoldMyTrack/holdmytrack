@@ -8,9 +8,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parallel"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
+	"github.com/HoldMyTrack/platform/services/server/internal/ingest"
+	"github.com/HoldMyTrack/platform/services/server/internal/parallel"
+	"github.com/HoldMyTrack/platform/services/server/internal/storage"
 )
 
 // purgeParallelism is how many of an account's storage prefixes purgeAccount removes at once.

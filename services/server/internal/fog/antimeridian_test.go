@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/tilemath"
+	"github.com/HoldMyTrack/platform/services/server/internal/parse"
+	"github.com/HoldMyTrack/platform/services/server/internal/tilemath"
 )
 
 // A track continuing past 180 (ingest's unwrapLons) draws into the tiles on both sides of the

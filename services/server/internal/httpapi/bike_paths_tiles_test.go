@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/tilemath"
+	"github.com/HoldMyTrack/platform/services/server/internal/tilemath"
 )
 
 // The bike-path tiles (§4.24) carry each way with its kind and name from zoom 9 up, and leave a

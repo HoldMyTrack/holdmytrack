@@ -7,7 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
+	"github.com/HoldMyTrack/platform/services/server/internal/storage"
 )
 
 // RemoveUnreferencedPhotoFiles removes the image and thumbnail at each of keys that no

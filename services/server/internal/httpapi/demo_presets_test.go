@@ -12,7 +12,7 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
+	"github.com/HoldMyTrack/platform/services/server/internal/parse"
 )
 
 // The committed demo_data/ must always seed: every file parseable, every manifest entry

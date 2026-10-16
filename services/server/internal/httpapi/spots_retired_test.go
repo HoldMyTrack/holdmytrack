@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/tilemath"
+	"github.com/HoldMyTrack/platform/services/server/internal/tilemath"
 )
 
 // A retired place (§4.25): flagged in the tiles, returned by "Show in this area" and

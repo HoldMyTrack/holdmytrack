@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
+	"github.com/HoldMyTrack/platform/services/server/internal/parse"
 )
 
 func lons(points []parse.Point) []float64 {

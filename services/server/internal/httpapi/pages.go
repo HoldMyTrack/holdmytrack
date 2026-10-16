@@ -5,9 +5,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
+	"github.com/HoldMyTrack/platform/services/server/internal/fog"
+	"github.com/HoldMyTrack/platform/services/server/internal/i18n"
+	"github.com/HoldMyTrack/platform/services/server/internal/web"
 )
 
 // The server-rendered pages (ADR-0012, IMPLEMENTATION.md §4.19): internal/web renders them,

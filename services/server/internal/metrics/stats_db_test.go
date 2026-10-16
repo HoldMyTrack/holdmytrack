@@ -10,7 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/db"
+	"github.com/HoldMyTrack/platform/services/server/internal/db"
 )
 
 // The gauges report the newest day's rows and nothing from an older day. Runs in a transaction

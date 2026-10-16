@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/ingest"
+	"github.com/HoldMyTrack/platform/services/server/internal/ingest"
 )
 
 // maxOverlapSpans bounds one `POST /v1/activities/overlaps` request: what the Android Sync tab

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/i18n"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/web"
+	"github.com/HoldMyTrack/platform/services/server/internal/i18n"
+	"github.com/HoldMyTrack/platform/services/server/internal/web"
 )
 
 // The sign-in, sign-up, password-reset and email-verification pages (ADR-0012,

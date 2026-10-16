@@ -12,7 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/db"
+	"github.com/HoldMyTrack/platform/services/server/internal/db"
 )
 
 // testTx is a transaction on TEST_DATABASE_URL, rolled back when the test ends (skipped without

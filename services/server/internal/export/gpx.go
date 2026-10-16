@@ -10,7 +10,7 @@ import (
 
 	"encoding/xml"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/parse"
+	"github.com/HoldMyTrack/platform/services/server/internal/parse"
 )
 
 // WriteGPX writes points as a one-segment GPX 1.1 track with everything parse.ParseGPX reads

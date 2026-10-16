@@ -9,7 +9,7 @@ import (
 	"image/png"
 	"testing"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/fog"
+	"github.com/HoldMyTrack/platform/services/server/internal/fog"
 )
 
 // A heat-points tile is made from the account's stored count tile one zoom up: points where it

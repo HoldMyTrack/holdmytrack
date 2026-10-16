@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage"
-	"github.com/HoldMyTrack/holdmytrack/services/server/internal/storage/storagetest"
+	"github.com/HoldMyTrack/platform/services/server/internal/storage"
+	"github.com/HoldMyTrack/platform/services/server/internal/storage/storagetest"
 )
 
 func TestPurgeDeletedAccountRemovesItsObjectsAndRows(t *testing.T) {
