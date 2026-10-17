@@ -33,7 +33,8 @@ type stat struct {
 // doesn't refer to p.
 const queryHead = `WITH p AS (SELECT $1::timestamptz AS d0, $2::timestamptz AS d1, $3::uuid AS demo),
 acct AS (
-	SELECT u.id, u.email_verified, u.password_hash IS NOT NULL AS has_password, u.locale, u.country, u.last_seen_at
+	SELECT u.id, u.email_verified, u.password_hash IS NOT NULL AS has_password, u.locale, u.country, u.last_seen_at,
+	       u.web_seen_at, u.android_seen_at, u.android_build
 	FROM users u, p WHERE u.deleted_at IS NULL AND u.id <> p.demo
 )
 `
@@ -43,8 +44,17 @@ var sources = []string{"upload", "healthconnect", "healthkit", "recorded"}
 
 // activeSince is the SQL for "last seen in the n days ending with D".
 func activeSince(n int) string {
-	return fmt.Sprintf(`last_seen_at >= (SELECT d0 FROM p) - make_interval(days => %d)`, n-1)
+	return seenSince("last_seen_at", n)
 }
+
+// seenSince is the condition that column, one of acct's *_seen_at, falls in the n days up to
+// the snapshot's day, as activeSince counts them.
+func seenSince(column string, n int) string {
+	return fmt.Sprintf(`%s >= (SELECT d0 FROM p) - make_interval(days => %d)`, column, n-1)
+}
+
+// clients are the client census's groups (internal/httpapi's client_seen.go).
+var clients = []string{"web_only", "android_only", "both"}
 
 var catalogue = []stat{
 	// Accounts and activity.
@@ -55,6 +65,15 @@ var catalogue = []stat{
 	{key: "active_1d", kind: state, query: `SELECT count(*) FROM acct WHERE ` + activeSince(1)},
 	{key: "active_7d", kind: state, query: `SELECT count(*) FROM acct WHERE ` + activeSince(7)},
 	{key: "active_30d", kind: state, query: `SELECT count(*) FROM acct WHERE ` + activeSince(30)},
+
+	// Clients: who used the website, the Android app or both in the last 30 days, and which
+	// Android builds, so MIN_ANDROID_BUILD can be raised once none below it is left.
+	{prefix: "clients_30d", kind: state, groups: clients, query: `
+		, c AS (SELECT ` + seenSince("web_seen_at", 30) + ` AS web, ` + seenSince("android_seen_at", 30) + ` AS app FROM acct)
+		SELECT CASE WHEN web AND app THEN 'both' WHEN web THEN 'web_only' ELSE 'android_only' END, count(*)
+		FROM c WHERE web OR app GROUP BY 1`},
+	{prefix: "android_builds_30d", kind: state, query: `
+		SELECT android_build::text, count(*) FROM acct WHERE ` + seenSince("android_seen_at", 30) + ` GROUP BY 1`},
 	{prefix: "signin_method", kind: state, groups: []string{"password", "google", "facebook"}, query: `
 		SELECT 'password', count(*) FROM acct WHERE has_password
 		UNION ALL
