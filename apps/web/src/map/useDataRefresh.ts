@@ -26,6 +26,14 @@ export interface DataRefresh {
    * server drains.
    */
   afterPrivateLocations: () => void;
+  /**
+   * A row entered Pending (usePendingPoll.ts): the tracks refetch and the coverage watch starts,
+   * since the server clears Pending just before its last render.
+   */
+  pendingStarted: () => void;
+  /** A row left Pending with new points: tracks, days, the open Story, the bands and coverage
+   *  refresh; the camera stays (FR-5.15). */
+  pendingFinished: () => void;
 }
 
 /** What the map reads again when activities change under it. The header's Upload menu
@@ -60,5 +68,19 @@ export function useDataRefresh(map: MapLibreMap | null, inputs: DataRefreshInput
     });
   }, [refreshTracks, reloadActivities, reloadDays, reloadStory, watchCoverage, bumpMetrics]);
 
-  return { refreshTracks, afterImport, afterPrivateLocations };
+  const pendingStarted = useCallback(() => {
+    refreshTracks();
+    watchCoverage();
+  }, [refreshTracks, watchCoverage]);
+
+  const pendingFinished = useCallback(() => {
+    refreshTracks();
+    // Includes the Country/Region tiers: an edit can un-visit a region.
+    watchCoverage();
+    reloadDays();
+    reloadStory();
+    bumpMetrics();
+  }, [refreshTracks, watchCoverage, reloadDays, reloadStory, bumpMetrics]);
+
+  return { refreshTracks, afterImport, afterPrivateLocations, pendingStarted, pendingFinished };
 }

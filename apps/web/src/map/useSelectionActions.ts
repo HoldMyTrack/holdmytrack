@@ -2,8 +2,16 @@ import { useCallback, type Dispatch } from 'react';
 import type { MapSessionEvent } from './session';
 import { invertedChecks } from './selection';
 import type { Activity } from '../api';
+import type { DistanceRange } from '../ui/activityFacets';
 
 export interface SelectionActions {
+  toggleChecked: (id: string) => void;
+  /** The toolbar's Show/Hide over its target. */
+  toggleGroupVisibility: () => void;
+  /** A toggle: the type stays in the dropdown either way, so it can be turned back on without Reset filters. */
+  toggleType: (activityType: string) => void;
+  resetFilters: () => void;
+  setDistanceFilter: (filter: DistanceRange | null) => void;
   /** Focuses one activity and flies to it, unless it's hidden (an empty fit is a no-op). With
    *  Focus on map, the only fly to an activity. */
   focus: (id: string) => void;
@@ -35,6 +43,11 @@ export function useSelectionActions(
     },
     [dispatch, activities, mapHiddenIds, fitTo],
   );
+  const toggleChecked = useCallback((id: string) => dispatch({ type: 'checkToggled', id }), [dispatch]);
+  const toggleGroupVisibility = useCallback(() => dispatch({ type: 'visibilityToggled' }), [dispatch]);
+  const toggleType = useCallback((activityType: string) => dispatch({ type: 'typeToggled', activityType }), [dispatch]);
+  const resetFilters = useCallback(() => dispatch({ type: 'filtersReset' }), [dispatch]);
+  const setDistanceFilter = useCallback((filter: DistanceRange | null) => dispatch({ type: 'distanceSet', filter }), [dispatch]);
   const clearFocus = useCallback(() => dispatch({ type: 'focused', id: null }), [dispatch]);
   const clearChecked = useCallback(() => dispatch({ type: 'checkedSet', ids: [] }), [dispatch]);
   const checkAll = useCallback(() => dispatch({ type: 'checkedSet', ids: listed.map((a) => a.id) }), [dispatch, listed]);
@@ -43,5 +56,5 @@ export function useSelectionActions(
     () => fitTo(activities.filter((a) => target.has(a.id) && !mapHiddenIds.has(a.id))),
     [activities, target, mapHiddenIds, fitTo],
   );
-  return { focus, clearFocus, clearChecked, checkAll, invertChecked, showTarget };
+  return { toggleChecked, toggleGroupVisibility, toggleType, resetFilters, setDistanceFilter, focus, clearFocus, clearChecked, checkAll, invertChecked, showTarget };
 }

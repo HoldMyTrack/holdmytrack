@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { storiesTabParam, storyParam, urlWithStory } from '../src/map/storyUrl.ts';
+import { initialPanelTab, storiesTabParam, storyParam, urlWithStory } from '../src/map/storyUrl.ts';
 
 test('the Story and the Stories tab are read from the query', () => {
   assert.equal(storyParam('?story=abc&x=1'), 'abc');
@@ -14,4 +14,12 @@ test('setting and removing the Story keeps the hash and other parameters', () =>
   const location = { pathname: '/', search: '?x=1', hash: '#12/59.4/24.7' };
   assert.equal(urlWithStory(location, 's1'), '/?x=1&story=s1#12/59.4/24.7');
   assert.equal(urlWithStory({ ...location, search: '?story=s1' }, null), '/#12/59.4/24.7');
+});
+
+test('the panel opens on the tab the URL names, an arriving activity first', () => {
+  assert.equal(initialPanelTab('?story=s1', true, true), 'activities');
+  assert.equal(initialPanelTab('?story=s1', false, true), 'stories');
+  assert.equal(initialPanelTab('?tab=stories', false, false), 'stories');
+  assert.equal(initialPanelTab('', false, true), 'private');
+  assert.equal(initialPanelTab('', false, false), 'activities');
 });

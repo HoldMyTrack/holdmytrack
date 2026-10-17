@@ -6,7 +6,7 @@ import { defaultRange } from './defaultRange';
 import type { MapMode } from './mapMode';
 import { initialSession, mapSessionReducer } from './session';
 import { toolbarTarget } from './selection';
-import { storiesTabParam, storyParam } from './storyUrl';
+import { initialPanelTab, storyParam } from './storyUrl';
 import type { SpotCategory } from './spots';
 import { useCoverageRefresh } from './useCoverageRefresh';
 import { useDataRefresh } from './useDataRefresh';
@@ -29,17 +29,11 @@ import { useTrackMetrics } from './useTrackMetrics';
 import { useViewOnMap } from './useViewOnMap';
 import type { Activity } from '../api';
 import { useAuth } from '../auth/AuthContext';
-import type { DistanceRange } from '../ui/activityFacets';
 import { ActivitiesPanel, type PanelTab } from '../ui/ActivitiesPanel';
 import { EditActivityWindow, type EditWindowResult } from '../ui/EditActivityWindow';
-import { MapModeToggle } from '../ui/MapModeToggle';
-import { ExportControl } from '../ui/ExportControl';
-import { ExportViewfinder } from '../ui/ExportViewfinder';
-import { OverlaysMenu } from '../ui/OverlaysMenu';
-import { BasemapToggle } from '../ui/BasemapToggle';
+import { MapControls } from '../ui/MapControls';
+import { MapExport } from '../ui/MapExport';
 import { PhotoPopup } from '../ui/PhotoPopup';
-import { ShowInArea } from '../ui/ShowInArea';
-import { ZoomLevelNotice } from '../ui/ZoomLevelNotice';
 import { SpotPopup } from '../ui/SpotPopup';
 import { todayLocal, type DateRange } from '../ui/dateMath';
 import { useUnitSystem } from '../ui/units';
@@ -87,26 +81,14 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
 
   // The panel's tab lives here so `/?private-locations` (FR-8.1) and `/?story=` (FR-14.6) can open
   // on it, and so it survives the panel unmounting in Fog and Heatmap.
-  const [panelTab, setPanelTab] = useState<PanelTab>(
-    initialActivity !== null
-      ? 'activities'
-      : storyParam(window.location.search) !== null || storiesTabParam(window.location.search)
-        ? 'stories'
-        : initialPrivateLocationsOpen
-          ? 'private'
-          : 'activities',
+  const [panelTab, setPanelTab] = useState<PanelTab>(() =>
+    initialPanelTab(window.location.search, initialActivity !== null, initialPrivateLocationsOpen),
   );
 
   const storyState = useStory(storyId);
   const storiesList = useStories(panelTab === 'stories');
 
-  const toggleActivityChecked = useCallback((id: string) => dispatch({ type: 'checkToggled', id }), []);
   const toolbarTargetIds = useMemo(() => toolbarTarget(checkedActivityIds, focusedActivityId), [checkedActivityIds, focusedActivityId]);
-  const toggleGroupVisibility = useCallback(() => dispatch({ type: 'visibilityToggled' }), []);
-  // A toggle: the type stays in the dropdown either way, so it can be turned back on without Reset filters.
-  const toggleType = useCallback((activityType: string) => dispatch({ type: 'typeToggled', activityType }), []);
-  const resetActivityFilters = useCallback(() => dispatch({ type: 'filtersReset' }), []);
-  const setDistanceFilter = useCallback((filter: DistanceRange | null) => dispatch({ type: 'distanceSet', filter }), []);
   const changeSelectedRange = useCallback((range: DateRange) => dispatch({ type: 'rangePicked', range }), []);
 
   // A Story or the date range, never both.
@@ -268,24 +250,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     onActivityRemoved: (id) => setHoveredActivityId((hovered) => (hovered === id ? null : hovered)),
   });
 
-  // A row that leaves Pending has new points: the track, the days, the open Story and the bands
-  // refresh. The camera stays (FR-5.15). Fog and Heatmap go through the coverage watch, because the
-  // server clears Pending just before its last render; a row that enters Pending starts the same watch.
-  const awaitEdit = usePendingPoll(pendingIds, {
-    reload: reloadActivities,
-    onStarted: () => {
-      refresh.refreshTracks();
-      watchCoverage();
-    },
-    onFinished: () => {
-      refresh.refreshTracks();
-      // Includes the Country/Region tiers: an edit can un-visit a region.
-      watchCoverage();
-      reloadDays();
-      storyState.reload();
-      bumpMetrics();
-    },
-  });
+  const awaitEdit = usePendingPoll(pendingIds, { reload: reloadActivities, onStarted: refresh.pendingStarted, onFinished: refresh.pendingFinished });
 
   const openEditWindow = useCallback(
     (group: Activity[]) => {
@@ -313,13 +278,6 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     },
     [edit.close, awaitEdit, reloadActivities, photoLayer.photos.reload],
   );
-  const editWindowActivities = edit.activities;
-  const editTrackUnavailable = edit.trackBlocker === null ? null : t(edit.trackBlocker);
-  const editPhotosUnavailable = edit.photosBlocker === null ? null : t(edit.photosBlocker);
-  const setEditTab = edit.setTab;
-  const photoState = photoLayer.photos;
-  const { storiesPanel, changePanelTab, openCreatedStory, handleStoryAdded } = stories;
-  const handlePrivateLocationsChanged = refresh.afterPrivateLocations;
 
   useMapLayers(map, {
     initialFlavor: initial.flavor,
@@ -350,16 +308,16 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               error={activitiesError}
               facets={facets}
               excludedTypes={excludedTypes}
-              onToggleType={toggleType}
+              onToggleType={select.toggleType}
               distanceBounds={activityDistanceBounds}
               distanceFilter={distanceFilter}
-              onChangeDistance={setDistanceFilter}
-              onResetFilters={resetActivityFilters}
+              onChangeDistance={select.setDistanceFilter}
+              onResetFilters={select.resetFilters}
               checked={checkedActivityIds}
               targetIds={toolbarTargetIds}
               focusedId={focusedActivityId}
               hoveredId={hoveredActivityId}
-              onToggle={toggleActivityChecked}
+              onToggle={select.toggleChecked}
               onFocus={focusActivity}
               onClearFocus={clearFocus}
               onHoverActivity={setHoveredActivityId}
@@ -368,16 +326,16 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               onInvertSelection={select.invertChecked}
               onShowSelected={select.showTarget}
               hiddenIds={hiddenActivityIds}
-              onToggleGroupVisibility={toggleGroupVisibility}
+              onToggleGroupVisibility={select.toggleGroupVisibility}
               onActivitiesDeleted={handleActivitiesDeleted}
               onEdit={openEditWindow}
-              onStoryCreated={openCreatedStory}
-              onStoryAdded={handleStoryAdded}
-              stories={storiesPanel}
+              onStoryCreated={stories.openCreatedStory}
+              onStoryAdded={stories.handleStoryAdded}
+              stories={stories.storiesPanel}
               tab={panelTab}
-              onTabChange={changePanelTab}
+              onTabChange={stories.changePanelTab}
               map={map}
-              onPrivateLocationsChanged={handlePrivateLocationsChanged}
+              onPrivateLocationsChanged={refresh.afterPrivateLocations}
               dateRange={{
                 days: visibleDays,
                 onPan: panBy,
@@ -402,37 +360,17 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
             </div>
           )}
           <div ref={container} className="map-canvas" data-testid="map-canvas" />
-          {map && <ExportControl map={map} active={exporter.flow.stage !== 'idle'} onOpen={exporter.toggle} />}
-          {map && exporter.flow.stage !== 'idle' && (
-            <ExportViewfinder
-              map={map}
-              containerRef={container}
-              preset={exporter.flow.preset}
-              customSize={exporter.flow.customSize}
-              maxSidePx={exporter.maxSidePx}
-              window={exporter.flow.window}
-              busy={exporter.flow.stage === 'capturing'}
-              error={exporter.error}
-              onWindowChange={exporter.moveWindow}
-              onChoiceChange={exporter.changeChoice}
-              onCapture={() => void exporter.capture()}
-              onCancel={exporter.cancel}
-            />
-          )}
-          {map && editWindowActivities && (
+          {map && <MapExport map={map} container={container} exporter={exporter} />}
+          {map && edit.activities && (
             <EditActivityWindow
               map={map}
-              activities={editWindowActivities}
+              activities={edit.activities}
               knownTypes={facets}
-              trackUnavailable={editTrackUnavailable}
+              trackUnavailable={edit.trackBlocker === null ? null : t(edit.trackBlocker)}
               onStartTrack={startEditTrack}
-              photosUnavailable={editPhotosUnavailable}
-              photos={{
-                photos: photoState.photos,
-                error: photoState.error,
-                onOverlay: photoLayer.setOverlay,
-              }}
-              onTabChange={setEditTab}
+              photosUnavailable={edit.photosBlocker === null ? null : t(edit.photosBlocker)}
+              photos={{ photos: photoLayer.photos.photos, error: photoLayer.photos.error, onOverlay: photoLayer.setOverlay }}
+              onTabChange={edit.setTab}
               onClose={closeEditWindow}
             />
           )}
@@ -446,27 +384,21 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
             />
           )}
           {!editOpen && (
-            <div className="map-toggles">
-              <MapModeToggle mode={mapMode} onChange={changeMapMode} />
-              {/* Layers switch on and off over any mode; they're not a fourth mode. */}
-              <OverlaysMenu overlays={overlays} onChange={changeOverlays} flavor={flavor} />
-              {satelliteAvailable && (
-                <BasemapToggle satellite={overlays.satellite} onChange={(on) => changeOverlays({ ...overlays, satellite: on })} />
-              )}
-              {/* On lines of their own under the toggles, however many rows they wrap to. */}
-              {mapMode !== 'normal' && coverageRendering && (
-                <div className="coverage-notice" role="status" data-testid="coverage-notice">
-                  <span className="coverage-notice__pill">{t('map.coverage_updating')}</span>
-                </div>
-              )}
-              {map && <ZoomLevelNotice map={map} mode={mapMode} />}
-            </div>
+            <MapControls
+              map={map}
+              mode={mapMode}
+              onModeChange={changeMapMode}
+              overlays={overlays}
+              onOverlaysChange={changeOverlays}
+              flavor={flavor}
+              satelliteAvailable={satelliteAvailable}
+              coverageRendering={coverageRendering}
+              spotsShown={spotsShown}
+            />
           )}
-          {map && !editOpen && <ShowInArea map={map} categories={spotsShown} />}
           {map && spots.openSpot && <SpotPopup map={map} spot={spots.openSpot} capturedAt={spots.capturedAt(spots.openSpot.id)} onClose={spots.closeSpot} />}
         </div>
       </div>
-
     </div>
   );
 }
