@@ -2,12 +2,10 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { activityQuery as queryFor } from './activityQuery';
 import { flyToBBox, unionBBox } from './bbox';
-import { satelliteSource } from './config';
 import { defaultRange } from './defaultRange';
 import type { MapMode } from './mapMode';
-import { loadOverlays, saveOverlays, type Overlays } from './overlays';
 import { initialSession, mapSessionReducer } from './session';
-import { invertedChecks, mapHiddenIds as hiddenOnMap, toolbarTarget } from './selection';
+import { toolbarTarget } from './selection';
 import { storiesTabParam, storyParam } from './storyUrl';
 import type { SpotCategory } from './spots';
 import { useCoverageRefresh } from './useCoverageRefresh';
@@ -16,20 +14,25 @@ import { useEditWindow } from './useEditWindow';
 import { useExportFlow } from './useExportFlow';
 import { useFileDrop } from './useFileDrop';
 import { useHashSync, useInitialView } from './useInitialView';
+import { useListView } from './useListView';
 import { useListFlight } from './useListFlight';
 import { useMapInstance } from './useMapInstance';
 import { useMapLayers } from './useMapLayers';
+import { useOverlays } from './useOverlays';
 import { usePendingPoll } from './usePendingPoll';
 import { usePhotoLayer } from './usePhotoLayer';
+import { useSelectionActions } from './useSelectionActions';
 import { useSelectionLayers } from './useSelectionLayers';
 import { useSpots } from './useSpots';
 import { useStoryNav } from './useStoryNav';
 import { useTrackMetrics } from './useTrackMetrics';
+import { useViewOnMap } from './useViewOnMap';
 import type { Activity } from '../api';
 import { useAuth } from '../auth/AuthContext';
-import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
+import type { DistanceRange } from '../ui/activityFacets';
 import { ActivitiesPanel, type PanelTab } from '../ui/ActivitiesPanel';
 import { EditActivityWindow, type EditWindowResult } from '../ui/EditActivityWindow';
+import { MapModeToggle } from '../ui/MapModeToggle';
 import { ExportControl } from '../ui/ExportControl';
 import { ExportViewfinder } from '../ui/ExportViewfinder';
 import { OverlaysMenu } from '../ui/OverlaysMenu';
@@ -70,23 +73,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   const [session, dispatch] = useReducer(mapSessionReducer, null, () => initialSession(storyParam(window.location.search)));
   const { range: selectedRange, storyId, mode: mapMode } = session;
   const { checked: checkedActivityIds, focused: focusedActivityId, hidden: hiddenActivityIds, excludedTypes, distanceFilter } = session.selection;
-  // The Satellite button and the Layers menu's paths and Spots categories, remembered per browser (overlays.ts).
-  const [overlays, setOverlays] = useState<Overlays>(loadOverlays);
-  const changeOverlays = useCallback((next: Overlays) => {
-    saveOverlays(next);
-    setOverlays(next);
-  }, []);
-  const paths = useMemo(
-    () => ({
-      bikePaths: overlays.enabled && overlays.bikePaths,
-      sharedPaths: overlays.enabled && overlays.sharedPaths,
-      mtbTrails: overlays.enabled && overlays.mtbTrails,
-    }),
-    [overlays.enabled, overlays.bikePaths, overlays.sharedPaths, overlays.mtbTrails],
-  );
-  // Satellite imagery (FR-4.14) only when the deployment configures some, whatever was saved.
-  const satelliteAvailable = satelliteSource() !== null;
-  const satellite = satelliteAvailable && overlays.satellite;
+  const { overlays, change: changeOverlays, paths, satelliteAvailable, satellite } = useOverlays();
 
   const today = useMemo(() => todayLocal(), []);
 
@@ -169,26 +156,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     // visibleDays isn't a dependency; see above.
   }, [session.userPicked, daysReady, earliest, historyGeneration, today, editOpen]);
 
-  // Rows with a reprocess pending (a track edit or a Private location change). A Pending track isn't drawn (FR-5.15).
-  const pendingIds = useMemo(() => activities.filter((a) => a.pending).map((a) => a.id), [activities]);
-
-  const activityDistanceBounds = useMemo(() => distanceBounds(activities), [activities]);
-  // The distance slider shows only while the activities span a range. A band left set after that
-  // would keep filtering with nothing on screen to clear it.
-  const distanceSliderShown = activityDistanceBounds !== null && activityDistanceBounds.min < activityDistanceBounds.max;
-  useEffect(() => {
-    if (!distanceSliderShown) setDistanceFilter(null);
-  }, [distanceSliderShown]);
-  const facets = useMemo(() => typeFacets(activities, distanceFilter), [activities, distanceFilter]);
-  const filteredActivities = useMemo(
-    () => activities.filter((a) => passesFilters(a, excludedTypes, distanceFilter)),
-    [activities, excludedTypes, distanceFilter],
-  );
-  // The tile already omits a Pending activity; this hides it before the refetch lands.
-  const mapHiddenIds = useMemo(
-    () => hiddenOnMap(activities, excludedTypes, distanceFilter, hiddenActivityIds, pendingIds),
-    [activities, excludedTypes, distanceFilter, hiddenActivityIds, pendingIds],
-  );
+  const { pendingIds, distanceBounds: activityDistanceBounds, facets, listed: filteredActivities, mapHiddenIds } = useListView(activities, session.selection, dispatch);
 
   const unitSystem = useUnitSystem();
   const map = useMapInstance({
@@ -230,71 +198,10 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
 
   // A mode change never moves the camera.
   const changeMapMode = useCallback((mode: MapMode) => dispatch({ type: 'modeChanged', mode }), []);
-
-  // Focuses one activity and flies to it, unless it's hidden (an empty fit is a no-op). With the
-  // toolbar's Focus on map, the only fly to an activity.
-  const focusActivity = useCallback(
-    (id: string) => {
-      dispatch({ type: 'focused', id });
-      const target = activities.filter((a) => a.id === id && !mapHiddenIds.has(a.id));
-      fitToSelection(target);
-    },
-    [activities, mapHiddenIds, fitToSelection],
-  );
-
-  // "View on map" (`/?activity=&day=`). If the activity's day is outside the selected range, the
-  // range narrows to that day and the focus waits for the new list (the effect below). The day is
-  // the activity's local day, as the server reads a bare from/to (IMPLEMENTATION.md §4.30); a UTC
-  // day would miss an evening activity west of Greenwich. Returns to Normal first, since only it focuses.
-  const pendingFocusIdRef = useRef<string | null>(null);
-  const viewActivityOnDay = useCallback(
-    (activityId: string, day: string) => {
-      if (mapMode !== 'normal') changeMapMode('normal');
-      // The slider's window moves to the day too, or its knobs would sit off its edges.
-      revealDay(day);
-      if (selectedRange !== null && day >= selectedRange.from && day <= selectedRange.to) {
-        focusActivity(activityId);
-        return;
-      }
-      pendingFocusIdRef.current = activityId;
-      dispatch({ type: 'dayViewed', day });
-    },
-    [mapMode, changeMapMode, selectedRange, focusActivity, revealDay],
-  );
-  // `/?activity=&day=`, once, on arrival: before any range of the user's own, so the default never replaces it.
-  const arrivedOnActivityRef = useRef(false);
-  useEffect(() => {
-    if (initialActivity === null || arrivedOnActivityRef.current) return;
-    arrivedOnActivityRef.current = true;
-    viewActivityOnDay(initialActivity.id, initialActivity.day);
-  }, [initialActivity, viewActivityOnDay]);
-  // Waits for the map too: on arrival the list can land before the map has loaded.
-  useEffect(() => {
-    const pending = pendingFocusIdRef.current;
-    if (pending === null || !map) return;
-    if (activities.some((a) => a.id === pending)) {
-      pendingFocusIdRef.current = null;
-      focusActivity(pending);
-    }
-  }, [map, activities, focusActivity]);
-
-  // A click on empty list space, the counterpart of clicking away from every track. The checked group stays.
-  const clearFocus = useCallback(() => dispatch({ type: 'focused', id: null }), []);
-  // The master checkbox while fully checked: empties the group; the focus stays.
-  const clearSelection = useCallback(() => dispatch({ type: 'checkedSet', ids: [] }), []);
-  // The master checkbox while unchecked or partial: checks every row listed, so never a row the
-  // filters hide. No fly; Focus on map does that.
-  const selectAll = useCallback(() => dispatch({ type: 'checkedSet', ids: filteredActivities.map((a) => a.id) }), [filteredActivities]);
-  // Inverts the check over the listed rows; a checked row the filters hide is dropped. No fly.
-  const invertSelection = useCallback(
-    () => dispatch({ type: 'checkedSet', ids: invertedChecks(filteredActivities, checkedActivityIds) }),
-    [filteredActivities, checkedActivityIds],
-  );
-  // Focus on map: flies to the toolbar's target, hidden tracks excluded. The one way to look at a checked group.
-  const showSelected = useCallback(() => {
-    const visible = activities.filter((a) => toolbarTargetIds.has(a.id) && !mapHiddenIds.has(a.id));
-    fitToSelection(visible);
-  }, [activities, toolbarTargetIds, mapHiddenIds, fitToSelection]);
+  const select = useSelectionActions(dispatch, activities, filteredActivities, checkedActivityIds, toolbarTargetIds, mapHiddenIds, fitToSelection);
+  const focusActivity = select.focus;
+  const clearFocus = select.clearFocus;
+  useViewOnMap(map, initialActivity, { mode: mapMode, range: selectedRange, activities }, dispatch, focusActivity, revealDay);
 
   useListFlight(map, {
     activities,
@@ -458,10 +365,10 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
               onFocus={focusActivity}
               onClearFocus={clearFocus}
               onHoverActivity={setHoveredActivityId}
-              onClear={clearSelection}
-              onSelectAll={selectAll}
-              onInvertSelection={invertSelection}
-              onShowSelected={showSelected}
+              onClear={select.clearChecked}
+              onSelectAll={select.checkAll}
+              onInvertSelection={select.invertChecked}
+              onShowSelected={select.showTarget}
               hiddenIds={hiddenActivityIds}
               onToggleGroupVisibility={toggleGroupVisibility}
               onActivitiesDeleted={handleActivitiesDeleted}
@@ -542,34 +449,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
           )}
           {!editOpen && (
             <div className="map-toggles">
-              <div className="map-mode-toggle" role="group" aria-label={t('map.mode')} data-testid="map-mode-toggle">
-                <button
-                  type="button"
-                  className={mapMode === 'normal' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
-                  aria-pressed={mapMode === 'normal'}
-                  onClick={() => changeMapMode('normal')}
-                >
-                  {t('map.mode_normal')}
-                </button>
-                {/* Normal on one side, the two coverage views on the other. */}
-                <span className="map-mode-toggle__divider" aria-hidden="true" />
-                <button
-                  type="button"
-                  className={mapMode === 'fog' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
-                  aria-pressed={mapMode === 'fog'}
-                  onClick={() => changeMapMode('fog')}
-                >
-                  {t('map.mode_fog')}
-                </button>
-                <button
-                  type="button"
-                  className={mapMode === 'heatmap' ? 'map-mode-toggle__btn map-mode-toggle__btn--active' : 'map-mode-toggle__btn'}
-                  aria-pressed={mapMode === 'heatmap'}
-                  onClick={() => changeMapMode('heatmap')}
-                >
-                  {t('map.mode_heatmap')}
-                </button>
-              </div>
+              <MapModeToggle mode={mapMode} onChange={changeMapMode} />
               {/* Layers switch on and off over any mode; they're not a fourth mode. */}
               <OverlaysMenu overlays={overlays} onChange={changeOverlays} flavor={flavor} />
               {satelliteAvailable && (
