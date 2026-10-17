@@ -21,7 +21,6 @@ import dev.holdmytrack.android.MainActivity
 import dev.holdmytrack.android.net.Session
 import org.junit.AfterClass
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.BeforeClass
 import org.junit.FixMethodOrder
@@ -44,10 +43,10 @@ class MapFlowsTest {
     fun a_newRangeClearsTheCheckedGroupAndHiddenTracks() {
         signIn()
         expandSheet()
-        val tiles = atLeast(id("activity_tile_target"), 2)
-        tiles[0].click()
-        device.waitForIdle()
-        device.findObjects(id("activity_tile_target"))[1].click()
+        atLeast(id("activity_tile_target"), 2)
+        for (row in 0..1) {
+            tapUntil({ device.findObjects(id("activity_tile_target"))[row] }) { checkedRows() > row }
+        }
         need(id("selection_bar"))
         need(id("panel_visibility")).click()
         assertTrue("two rows hidden", device.wait(Until.findObjects(id("activity_hidden")), TIMEOUT_MS).orEmpty().size == 2)
@@ -55,7 +54,7 @@ class MapFlowsTest {
         need(id("date_range_shift_earlier")).click()
         assertTrue("selection bar gone", device.wait(Until.gone(id("selection_bar")), TIMEOUT_MS))
         assertFalse("no row hidden", device.hasObject(id("activity_hidden")))
-        assertFalse("no row checked", device.hasObject(By.descStartsWith("Remove ")))
+        assertFalse("no row checked", checkedRows() > 0)
     }
 
     @Test
@@ -71,6 +70,8 @@ class MapFlowsTest {
         device.pressBack()
         assertTrue("Story closed", device.wait(Until.gone(By.text(STORY)), TIMEOUT_MS))
         need(id("date_range_label"))
+        // Back to the map collapses the sheet; until it has, the handle still offers Collapse.
+        need(id("panel_handle").descStartsWith("Expand"))
         expandSheet()
         assertTrue("the range's rows", device.wait(Until.hasObject(id("activity_text")), TIMEOUT_MS))
     }
@@ -120,22 +121,33 @@ class MapFlowsTest {
             walker.join()
             runCatching { locations.removeTestProvider(LocationManager.GPS_PROVIDER) }
         }
-        need(id("nav_sync")).click()
+        need(id("date_range_label"))
+        // The tap can land while the Save screen's activity is still leaving; tap until the sheet answers.
+        tapUntil({ need(id("nav_sync")) }) { device.hasObject(id("panel_handle")) }
         expandSheet()
-        val row = device.wait(Until.findObject(By.textContains(WALK)), SHORT_MS)
-            ?: device.findObjects(By.scrollable(true)).firstNotNullOfOrNull { it.scrollUntil(Direction.DOWN, Until.findObject(By.textContains(WALK))) }
-        if (row == null) device.dumpWindowHierarchy(java.io.File(context.getExternalFilesDir(null), "sync-sheet.xml"))
-        assertNotNull("the recording on the Sync sheet", row)
+        // The row sits below the source notes. Half-expanded, the sheet's bottom is past the
+        // screen's, so the list has nothing to scroll: the sheet is dragged up by its handle,
+        // slowly as a finger would, and then the list scrolls.
+        if (device.wait(Until.hasObject(By.textContains(WALK)), SHORT_MS)) return
+        val handle = need(id("panel_handle")).visibleBounds
+        device.swipe(handle.centerX(), handle.centerY(), handle.centerX(), device.displayHeight / 6, SWIPE_STEPS)
+        repeat(SCROLLS) {
+            if (device.wait(Until.hasObject(By.textContains(WALK)), SHORT_MS)) return
+            retrying { need(id("sync_list")).scroll(Direction.DOWN, 1f) }
+        }
+        need(By.textContains(WALK))
     }
 
     private fun need(selector: BySelector): UiObject2 =
-        device.wait(Until.findObject(selector), TIMEOUT_MS) ?: run {
-            // What was on screen instead, for whoever reads the failure (adb pull it).
-            val dir = context.getExternalFilesDir(null)
-            device.takeScreenshot(java.io.File(dir, "failure.png"))
-            device.dumpWindowHierarchy(java.io.File(dir, "failure.xml"))
-            throw AssertionError("not on screen: $selector")
-        }
+        device.wait(Until.findObject(selector), TIMEOUT_MS) ?: fail("not on screen: $selector")
+
+    /** Fails with what was on screen saved for whoever reads the failure (adb pull it). */
+    private fun fail(message: String): Nothing {
+        val dir = context.getExternalFilesDir(null)
+        device.takeScreenshot(java.io.File(dir, "failure.png"))
+        device.dumpWindowHierarchy(java.io.File(dir, "failure.xml"))
+        throw AssertionError(message)
+    }
 
     /** At least [count] of [selector] on screen. */
     private fun atLeast(selector: BySelector, count: Int): List<UiObject2> {
@@ -148,11 +160,26 @@ class MapFlowsTest {
         }
     }
 
+    private fun checkedRows(): Int = device.findObjects(By.descStartsWith("Remove ")).size
+
+    /** Taps what [target] finds until [done] holds, for taps the app can drop while it settles. */
+    private fun tapUntil(target: () -> UiObject2, done: () -> Boolean) {
+        for (attempt in 1..3) {
+            retrying { target().click() }
+            val deadline = SystemClock.uptimeMillis() + SHORT_MS
+            while (SystemClock.uptimeMillis() < deadline) {
+                if (done()) return
+                Thread.sleep(250)
+            }
+        }
+        fail("tapped three times, nothing changed")
+    }
+
     /** The Activities sheet open full height, so its rows are on screen. */
     private fun expandSheet() {
-        val handle = need(id("panel_handle"))
-        if (handle.contentDescription?.startsWith("Expand") == true) handle.click()
-        device.waitForIdle()
+        val expanded = { device.hasObject(id("panel_handle").descStartsWith("Collapse")) }
+        need(id("panel_handle"))
+        if (!expanded()) tapUntil({ need(id("panel_handle")) }, expanded)
     }
 
     /** Runs [action] again if the view it found was replaced meanwhile. */
@@ -188,6 +215,9 @@ class MapFlowsTest {
         // Generous: an emulator on a busy machine takes seconds to draw a screen.
         const val TIMEOUT_MS = 60_000L
         const val SHORT_MS = 5_000L
+        const val SCROLLS = 3
+        /** About a second per swipe: a fling would snap the sheet back. */
+        const val SWIPE_STEPS = 200
         const val SIGN_IN_MS = 15_000L
         const val RECORDING_MS = 70_000L
         const val STORY = "Flows trip"
