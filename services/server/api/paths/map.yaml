@@ -25,13 +25,18 @@ map_style_flavor:
             schema:
               type: object
               description: A MapLibre style (its own specification), not one of this API's shapes.
-              required: [version, sources, layers]
+              required: [version, sources, layers, metadata]
               properties:
                 version: { type: integer, enum: [8] }
                 sources: { type: object }
                 layers:
                   type: array
                   items: { type: object }
+                metadata:
+                  type: object
+                  required: ["holdmytrack:overlays"]
+                  properties:
+                    "holdmytrack:overlays": { $ref: "../components/schemas.yaml#/CoverageOverlays" }
       "304":
         description: Unchanged since the If-None-Match ETag
       "404": { $ref: "../components/responses.yaml#/Error" }

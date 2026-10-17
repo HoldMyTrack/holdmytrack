@@ -30,8 +30,9 @@ const heatCellsPerSide = TileSize / 2
 // counts are per pixel, and a pixel's counts can't be added up into a bigger area's activities.
 const HeatActivityMaxZoom = Zoom - 6
 
-// heatRadiusCells is the clients' circle radius in cells (apps/web/src/map/heatPoints.ts'
-// RADIUS_PER_CELL, Android's heatPointsRadiusStops) — what weighNeighbours undoes the overlap of.
+// heatRadiusCells is the clients' circle radius in cells, as the served style draws it
+// (apps/web/src/map/coverageStyle.ts' RADIUS_PER_CELL, held to it by TestServedOverlaysMatchTheTiles)
+// — what weighNeighbours undoes the overlap of.
 const heatRadiusCells = 1.6
 
 // heatCounts counts, per pixel, the activities whose stroke covers it in one z14 tile. Each

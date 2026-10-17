@@ -7,12 +7,12 @@ import dev.holdmytrack.android.R
 /**
  * Names the level Fog draws at (`docs/SPEC.md` FR-4.2), the web's `ui/ZoomLevelNotice.tsx`: whole
  * countries, then whole states or provinces, then exactly where you've been
- * ([MapOverlays.zoomTier]). Nothing else on the map says which is in view, and a veil lifted from
+ * (the served style's tiers, [CoverageLayers.tier]). Nothing else on the map says which is in view, and a veil lifted from
  * a whole country reads as a bug when you don't know that's the level you're at. Heatmap reads the
  * same way at every zoom, so it gets one message ([levelNoticeText]).
  *
  * Shown on entering either mode and whenever a zoom lands where the message changes, faded out after
- * [SHOW_MS]. MapFragment passes the zoom when the camera comes to rest ([onCameraIdle]), not
+ * [SHOW_MS]. MapFragment passes the tier when the camera comes to rest ([onCameraIdle]), not
  * mid-gesture, so a pinch through two levels names only where it lands. Never in Normal, which
  * draws tracks at every zoom, nor while the modes are away ([render]'s `active`).
  */
@@ -27,8 +27,8 @@ class ZoomLevelNotice(private val view: TextView) {
 
     private val fadeOut = Runnable { hide() }
 
-    fun onCameraIdle(zoom: Double) {
-        tier = MapOverlays.zoomTier(zoom)
+    fun onCameraIdle(tier: ZoomTier) {
+        this.tier = tier
         update()
     }
 

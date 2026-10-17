@@ -1,6 +1,6 @@
 /**
- * The account's tile version, sent as `cv` on every Fog/Heatmap/Country/Region tile URL (fog.ts,
- * heatmap.ts) and on the tracks URL (tracks.ts). The server marks a tile carrying it cacheable
+ * The account's tile version, sent as `cv` on every Fog/Heatmap/Country/Region tile URL
+ * (coverageLayers.ts) and on the tracks URL (tracks.ts). The server marks a tile carrying it cacheable
  * for good (IMPLEMENTATION.md §4.2.6): anything that changes a tile also changes the
  * version, so each change is a new URL, and a revisited area or a reload is answered from the
  * browser's cache instead of the server.

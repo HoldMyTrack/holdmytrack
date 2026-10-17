@@ -276,7 +276,7 @@ describe('basemap foundation', () => {
 
     // Every path paints over Fog's veil and under the activity tracks (FR-4.13).
     const order = await page.evaluate(() => window.__holdmytrack.getStyle().layers.map((layer) => layer.id));
-    const fogAt = order.indexOf('fog-raster');
+    const fogAt = order.indexOf('fog-veil');
     const tracksAt = order.indexOf('tracks-casing');
     for (const id of [...BASE_PATHS, ...PICKS]) {
       const at = order.indexOf(id);
@@ -410,5 +410,41 @@ describe('basemap foundation', () => {
 
     if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
     await page.locator('#overlay-spots-playground').uncheck();
+  });
+
+  // Fog and Heatmap come from the style's own overlays (coverageStyle.ts, FR-4.2 to FR-4.4): each
+  // mode applies its view as the style describes it, here on a live map.
+  it('11. Fog and Heatmap apply the views the style carries', async () => {
+    const state = () =>
+      page.evaluate(() => {
+        const m = window.__holdmytrack;
+        const shown = (id) => m.getLayoutProperty(id, 'visibility') ?? 'visible';
+        return {
+          veil: shown('fog-veil'),
+          edge: shown('fog-edge'),
+          heat: shown('heat-points-circles'),
+          dim: shown('heatmap-dim'),
+          label: m.getPaintProperty('places_locality', 'text-opacity'),
+          veilColor: m.getPaintProperty('fog-veil', 'fill-color'),
+          imagery: Boolean(m.getLayer('satellite')) && m.getLayoutProperty('satellite', 'visibility') === 'visible',
+          fogTiles: m.getStyle().sources['fog-vector'].tiles[0],
+        };
+      });
+    const mode = (name) => page.getByRole('button', { name, exact: true }).click();
+
+    await mode('Fog');
+    const fog = await state();
+    assert.deepEqual([fog.veil, fog.edge, fog.heat, fog.dim, fog.label], ['visible', 'visible', 'none', 'none', 0.4], 'Fog: veil shown, labels muted');
+    // Imagery reads dark, so it takes the cream veil the dark flavors have.
+    assert.equal(fog.veilColor, fog.imagery ? '#f7f4ec' : '#202b25', `the veil for the light flavor, imagery ${fog.imagery}`);
+    assert.match(fog.fogTiles, /\/tiles\/v1\/fog-vector\/\{z\}\/\{x\}\/\{y\}\.mvt/, 'the source on the API, from the style');
+
+    await mode('Heatmap');
+    const heat = await state();
+    assert.deepEqual([heat.veil, heat.heat, heat.dim, heat.label], ['none', 'visible', 'visible', 1], 'Heatmap: heat shown over its wash');
+
+    await mode('Normal');
+    const normal = await state();
+    assert.deepEqual([normal.veil, normal.heat, normal.dim, normal.label], ['none', 'none', 'none', 1], 'Normal: neither');
   });
 });

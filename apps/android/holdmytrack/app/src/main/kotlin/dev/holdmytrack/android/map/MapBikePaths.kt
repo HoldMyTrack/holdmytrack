@@ -108,7 +108,7 @@ object MapBikePaths {
      * Fetches the tiles again at the current [Session.tileVersion], after an import moved it.
      * MapLibre Native can't change a vector source's URL in place, so the source and its layers
      * are replaced, back where they were in the stack and with the visibility they had — the same
-     * way `MapSpots.refresh` and `MapOverlays.refreshCoverage` do. A no-op before [add].
+     * way `MapSpots.refresh` and `CoverageLayers.refresh` do. A no-op before [add].
      */
     fun refresh(style: Style) {
         if (style.getSource(SOURCE_ID) == null) return

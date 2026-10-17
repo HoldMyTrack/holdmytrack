@@ -146,7 +146,7 @@ Removing or renaming takes two releases: stop using it, then drop it. A migratio
 scripts/check-doc-refs.sh                                         # citation check
 scripts/check-file-size.sh                                        # soft size warnings
 cd apps/web && npm run gen:api-types                              # after a contract change
-cd apps/web && npm run build:style                                # after src/map/style.ts changes
+cd apps/web && npm run build:style                                # after src/map/style.ts or coverageStyle.ts changes
 cd apps/android/holdmytrack && ./gradlew :app:testDebugUnitTest   # Android JUnit tests
 ```
 

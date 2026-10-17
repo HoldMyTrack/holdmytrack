@@ -7,6 +7,7 @@ import type {
   StyleSpecification,
 } from 'maplibre-gl';
 import { GLYPHS_PATH, PMTILES_PATH, SPRITE_BASE_PATH } from './config';
+import { buildOverlays, OVERLAYS_METADATA } from './coverageStyle';
 import { globeProjection } from './globe';
 import { satelliteRoadLayerIds } from './satelliteRoads';
 
@@ -36,7 +37,8 @@ export function isDarkFlavor(flavor: Flavor): boolean {
 }
 
 /** The flavors drawn light-on-dark, or satellite imagery under any flavor: it reads dark, so it
- *  gets the same fog veil and watermark colors a dark flavor does (docs/SPEC.md FR-4.14). */
+ *  gets the same watermark colors a dark flavor does, as the overlays' satellite views take the
+ *  dark veil (coverageStyle.ts, docs/SPEC.md FR-4.14). */
 export function isDarkBase(flavor: Flavor, satellite: boolean): boolean {
   return satellite || isDarkFlavor(flavor);
 }
@@ -299,14 +301,19 @@ export function buildStyle(options: BuildStyleOptions): StyleSpecification {
       },
       ...(satellite && { [SATELLITE_SOURCE]: satelliteSourceSpec(satellite) }),
     },
-    ...(satellite && {
-      metadata: {
+    metadata: {
+      // Fog and Heatmap, for every client to apply as they come (coverageStyle.ts).
+      [OVERLAYS_METADATA]: buildOverlays(
+        isDarkFlavor(flavor),
+        vector.filter((layer) => layer.type === 'symbol').map((layer) => layer.id),
+      ),
+      ...(satellite && {
         [SATELLITE_HIDES_METADATA]: hidden,
         [SATELLITE_DIMS_METADATA]: dimmed,
         [SATELLITE_ROAD_OPACITY_METADATA]: SATELLITE_ROAD_OPACITY,
         [SATELLITE_ROADS_METADATA]: satelliteRoadLayerIds(vector, BASEMAP_SOURCE),
-      },
-    }),
+      }),
+    },
     layers: satellite ? withSatelliteLayer(vector, hidden, dimmed, satelliteOn) : vector,
     ...(globe && { projection: globeProjection() }),
   };

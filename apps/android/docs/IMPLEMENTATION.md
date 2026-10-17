@@ -96,13 +96,13 @@ The shared client's interceptors apply to the map's requests too:
 
 ### 3.1 Layers and the style
 
-The style is `GET /v1/map/style/{flavor}?lang=`, unmodified (root `docs/ARCHITECTURE.md` §2.1).
+The style is `GET /v1/map/style/{flavor}?lang=`, unmodified (root `docs/ARCHITECTURE.md` §2.1). Fog and Heatmap are its overlays, which `CoverageLayers` builds by type and property name: MapLibre Native can't add a layer from JSON.
 
 **A style reload discards every custom layer and image**, so everything that adds to the style is idempotent and re-adds on each load: `MapOverlays`, `MapPaths`/`MapBikePaths`, `MapSatellite`, `MapSpots` with its badge bitmaps, the Sync candidates and the Private location circles. `syncSession()` attaches them once the session is verified.
 
-**Order, bottom to top, matches the web's layer by layer**: Fog or Heatmap coverage, the trails and tracks lifted out of the basemap's roads, the bike paths, the account's tracks, all under the basemap's first symbol layer; Spots over everything. MapLibre Native has no `moveLayer`, so lifting a layer is remove and re-add, and a coverage refresh re-adds its layers under whatever sat over them.
+**Order, bottom to top, matches the web's layer by layer**: Fog or Heatmap coverage, the trails and tracks lifted out of the basemap's roads, the bike paths, the account's tracks, all under the basemap's first symbol layer; Spots over everything. MapLibre Native has no `moveLayer`, so lifting a layer is remove and re-add, as is a coverage refresh.
 
-- **`setMode` changes properties only**, so a switch is instant and a reload re-applies it. Trap: MapLibre Native never redraws a background layer once hidden, so Heatmap's basemap wash is switched by opacity.
+- **`setMode` applies the style's view**, properties only, so a switch is instant and a reload re-applies it.
 - **Only the tracks URL carries a filter**: the date range or the open Story. Type, Distance and the hidden set are layer filters. `VectorSource` can't change its URL, so a range change replaces the layer and source, carrying visibility over.
 - **The selected track is two extra layers** filtered to the selected or checked ids, since MapLibre Native Android has no feature-state.
 
@@ -112,7 +112,7 @@ Tiles are cached by URL, so refreshing means a new URL (root `docs/IMPLEMENTATIO
 
 ### 3.3 Logic ported from the web
 
-Where the web has a rule, the app ports it as a pure Kotlin class with the web's test cases, and a change to one side needs the other: `PanelState` and `ActivityFacets`, `ActivityDays`, `DateRangeSlider`, `RangeShift`, `ZoomTier`, `TrackBands`, `EditTrackOps`, `BoxUnion`, `CoverageWatch`, `Viewfinder`, the `photos/` rules, `SpotText`, and `sync/Similar`, whose test runs the server's overlap cases both ways round. `MapSession`, `DefaultRange`, `PendingDiff`, `PanelRules` and `PhotoMarkerScope` run the web's own JSON cases (`testdata/map-session`). `MapPaths`' legend colors and dashes must match the web's `style.ts`.
+Where the web has a rule, the app ports it as a pure Kotlin class with the web's test cases, and a change to one side needs the other: `PanelState` and `ActivityFacets`, `ActivityDays`, `DateRangeSlider`, `RangeShift`, `TrackBands`, `EditTrackOps`, `BoxUnion`, `CoverageWatch`, `Viewfinder`, the `photos/` rules, `SpotText`, and `sync/Similar`, whose test runs the server's overlap cases both ways round. `MapSession`, `DefaultRange`, `PendingDiff`, `PanelRules` and `PhotoMarkerScope` run the web's own JSON cases (`testdata/map-session`). `MapPaths`' legend colors and dashes must match the web's `style.ts`.
 
 ### 3.4 The panel, editors and touches
 

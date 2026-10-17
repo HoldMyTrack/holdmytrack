@@ -149,6 +149,7 @@ type satelliteStyle struct {
 		Hides       []string `json:"holdmytrack:satellite-hides"`
 		Dims        []string `json:"holdmytrack:satellite-dims"`
 		RoadOpacity float64  `json:"holdmytrack:satellite-road-opacity"`
+		Overlays    any      `json:"holdmytrack:overlays"`
 	} `json:"metadata"`
 	Layers []struct {
 		ID     string         `json:"id"`
@@ -234,8 +235,10 @@ func TestDocumentStripsSatelliteUnconfigured(t *testing.T) {
 		if _, ok := s.Sources["satellite"]; ok {
 			t.Errorf("%s: satellite source served with no imagery configured", flavor)
 		}
-		if s.Metadata != nil {
-			t.Errorf("%s: metadata = %v, want none", flavor, s.Metadata)
+		if m := s.Metadata; m == nil || m.Hides != nil || m.Dims != nil || m.RoadOpacity != 0 {
+			t.Errorf("%s: metadata = %v, want the satellite keys gone", flavor, s.Metadata)
+		} else if m.Overlays == nil {
+			t.Errorf("%s: the overlays went with the satellite keys", flavor)
 		}
 		for _, l := range s.Layers {
 			if l.ID == "satellite" {

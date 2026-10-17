@@ -58,6 +58,8 @@ When a request is ambiguous, a detail is missing, or it can be read more than on
 
 ## Code and tests
 
+The server decides what the map shows, how it looks and every rule about the data, and sends it to the clients as data; a client decides only what needs the device (ADR-0047).
+
 New code puts what it decides (which screen a session goes to, whether a day is in range, where a link leads) in functions that take values and return values, with no View, `Context`, map, network or timer in them, and unit-tests them in the same change. Code touched for another reason gets the same treatment. The wiring around them stays thin, covered by a few end-to-end flows instead of mocks.
 
 A file past about 600 lines is a split candidate: when adding to one, move the touched feature out first. This is not a blocker, and an API client or a parser can stay long; `scripts/check-file-size.sh` flags growth on a pull request without failing it.

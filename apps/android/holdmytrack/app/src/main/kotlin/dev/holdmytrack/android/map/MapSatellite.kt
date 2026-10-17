@@ -1,7 +1,10 @@
 package dev.holdmytrack.android.map
 
 import android.content.Context
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
@@ -44,18 +47,16 @@ object MapSatellite {
     fun apply(style: Style, on: Boolean, mode: MapMode) {
         if (!isAvailable(style)) return
         style.getLayer(LAYER_ID)?.setProperties(PropertyFactory.visibility(if (on) Property.VISIBLE else Property.NONE))
-        val metadata = runCatching { JSONObject(style.json).optJSONObject("metadata") }.getOrNull() ?: return
+        val metadata = StyleMetadata.of(style)
         val fills = PropertyFactory.visibility(if (on) Property.NONE else Property.VISIBLE)
         ids(metadata, HIDES_METADATA).forEach { id -> style.getLayer(id)?.setProperties(fills) }
         // Off is the default opacity, 1: the dimmed roads are the ones that set none of their own.
-        val opacity = if (on) metadata.optDouble(ROAD_OPACITY_METADATA, 1.0).toFloat() else 1f
+        val opacity = if (on) (metadata[ROAD_OPACITY_METADATA] as? JsonPrimitive)?.doubleOrNull?.toFloat() ?: 1f else 1f
         ids(metadata, DIMS_METADATA).forEach { id -> style.getLayer(id)?.setProperties(PropertyFactory.lineOpacity(opacity)) }
         val roads = PropertyFactory.visibility(if (roadsHiddenOverImagery(on, mode)) Property.NONE else Property.VISIBLE)
         ids(metadata, ROADS_METADATA).forEach { id -> style.getLayer(id)?.setProperties(roads) }
     }
 
-    private fun ids(metadata: JSONObject, key: String): List<String> {
-        val ids = metadata.optJSONArray(key) ?: return emptyList()
-        return (0 until ids.length()).map(ids::getString)
-    }
+    private fun ids(metadata: JsonObject, key: String): List<String> =
+        (metadata[key] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }.orEmpty()
 }

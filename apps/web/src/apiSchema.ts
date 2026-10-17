@@ -1783,6 +1783,9 @@ export interface paths {
                             version: 8;
                             sources: Record<string, never>;
                             layers: Record<string, never>[];
+                            metadata: {
+                                "holdmytrack:overlays": components["schemas"]["CoverageOverlays"];
+                            };
                         };
                     };
                 };
@@ -3378,6 +3381,43 @@ export interface components {
                     number
                 ];
             };
+        };
+        CoverageView: {
+            /** @description By layer id, the layout properties to set. */
+            layout: Record<string, never>;
+            /** @description By layer id, the paint properties to set. */
+            paint: Record<string, never>;
+        };
+        CoverageViews: {
+            normal: components["schemas"]["CoverageView"];
+            fog: components["schemas"]["CoverageView"];
+            heatmap: components["schemas"]["CoverageView"];
+        };
+        /** @description Fog of War and Heatmap (IMPLEMENTATION.md §4.2), for the client to apply as they come. Every view sets the same properties, so switching views never undoes one. */
+        CoverageOverlays: {
+            /** @description By source id, each a vector source of this account's tiles. */
+            sources: {
+                [key: string]: {
+                    /** @description A path on the API's origin with {z}/{x}/{y}; the client adds its base URL and the tile version as cv. */
+                    tiles: string;
+                    minzoom: number;
+                    maxzoom: number;
+                    attribution?: string;
+                };
+            };
+            /** @description MapLibre layers in paint order, inserted beneath the first symbol layer. Every array in a filter, layout or paint value is an expression. */
+            layers: Record<string, never>[];
+            /** @description The layout and paint every overlay and label layer takes in each mode, over satellite imagery or not. */
+            views: {
+                plain: components["schemas"]["CoverageViews"];
+                satellite: components["schemas"]["CoverageViews"];
+            };
+            /** @description The zoom tiers Fog draws at, in order; a tier is in view below its `below`, the last at every zoom past. */
+            tiers: {
+                /** @enum {string} */
+                tier: "country" | "region" | "city";
+                below?: number;
+            }[];
         };
         Photo: {
             /** Format: uuid */

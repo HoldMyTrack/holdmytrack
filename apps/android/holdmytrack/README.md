@@ -76,7 +76,8 @@ Everything is under `app/src/main/kotlin/dev/holdmytrack/android/`:
 - `SignInActivity.kt` — sign in, create an account, or start a demo account.
 - `net/Session.kt` — the session token, held process-wide and mirrored to private `SharedPreferences`.
 - `net/HoldMyTrackApi.kt` — the whole HTTP surface: the shared `OkHttpClient`, the interceptor that attaches the token to HoldMyTrack's own origin and nowhere else, and the five calls the app makes.
-- `map/MapOverlays.kt` — the tracks, fog and heatmap layers, their ordering beneath the basemap's labels, and the three-way mode toggle.
+- `map/MapOverlays.kt` — the tracks layers, their ordering beneath the basemap's labels, and the three-way mode toggle.
+- `map/CoverageStyle.kt`, `map/CoverageLayers.kt` — Fog and Heatmap as the served style describes them, read and put on the map.
 - `map/MapModeButton.kt` — a Normal, Fog or Heatmap button, read by TalkBack as one choice of three.
 - `map/SyncCandidatesOverlay.kt` — the Sync tab's candidates on the map, dashed, the picked one solid.
 - `SyncActivity.kt` — Health Connect's setup on its own, registered for `ACTION_SHOW_PERMISSIONS_RATIONALE`, so Health Connect opens it as the app's own explanation of what it reads.

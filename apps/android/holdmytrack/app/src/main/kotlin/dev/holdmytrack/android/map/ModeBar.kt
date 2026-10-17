@@ -102,7 +102,7 @@ class ModeBar(root: View, onPick: (MapMode) -> Unit, private val state: () -> Mo
         if (text != null) chip.setText(text)
     }
 
-    fun onCameraIdle(zoom: Double) = zoomLevelNotice.onCameraIdle(zoom)
+    fun onCameraIdle(tier: ZoomTier) = zoomLevelNotice.onCameraIdle(tier)
 
     /**
      * At a large font size only the active mode keeps its label; the others show icons

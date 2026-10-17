@@ -2,14 +2,13 @@ import { useCallback, useEffect, useRef } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { ensureBikePathLayers, setBikePathsVisible, type BikePathOverlays } from './bikePaths';
 import { basemapOrigin, satelliteSource } from './config';
-import { ensureFogLayer } from './fog';
-import { ensureHeatmapLayer } from './heatmap';
+import { ensureCoverageLayers } from './coverageLayers';
 import { labelInsertionPoint } from './layers';
 import { setMapMode, type MapMode } from './mapMode';
 import { raisePathLayers } from './paths';
 import { setSatelliteVisible } from './satellite';
 import { ensureSpotsLayer, type SpotCategory } from './spots';
-import { buildStyle, isDarkBase, type Flavor } from './style';
+import { buildStyle, type Flavor } from './style';
 import { ensureBandLayer, setTrackBands } from './trackBands';
 import { ensureTrackLayer, refreshTrackLayer, setHiddenTracks, setSelectedTracks } from './tracks';
 import type { ActivityQuery, ActivityTrackMetrics } from '../api';
@@ -49,10 +48,8 @@ export function useMapLayers(map: MapLibreMap | null, inputs: MapLayersInputs): 
     (instance: MapLibreMap) => {
       const beforeId = labelInsertionPoint(instance);
       // Layer order matters: MapLibre paints later layers on top, all beneath the basemap labels
-      // (layers.ts). Fog and heatmap first, so tracks show through the veil. Satellite imagery
-      // reads dark, so it takes the dark flavors' veil (style.ts's isDarkBase).
-      ensureFogLayer(instance, beforeId, isDarkBase(flavor, satellite));
-      ensureHeatmapLayer(instance, beforeId, isDarkBase(flavor, satellite));
+      // (layers.ts). Fog and heatmap first, so tracks show through the veil.
+      ensureCoverageLayers(instance, beforeId);
       // Trails and paths over the veil and under the activity tracks (paths.ts, bikePaths.ts).
       raisePathLayers(instance, beforeId);
       ensureBikePathLayers(instance, beforeId, flavor);
@@ -66,7 +63,7 @@ export function useMapLayers(map: MapLibreMap | null, inputs: MapLayersInputs): 
       // Re-applied because new layers start hidden or unfiltered: without these, a style load
       // mid-mode would drop to Normal and un-hide every hidden track. Both diff against the layer's
       // current value first (docs/DEVELOPMENT.md, the setFilter/setLayoutProperty gotcha).
-      setMapMode(instance, mode, editingTrack);
+      setMapMode(instance, mode, satellite, editingTrack);
       setBikePathsVisible(instance, paths);
       setSatelliteVisible(instance, satellite, mode);
       setHiddenTracks(instance, [...mapHiddenIds]);
@@ -104,8 +101,8 @@ export function useMapLayers(map: MapLibreMap | null, inputs: MapLayersInputs): 
   // Mode, paths and satellite changes between style loads flip the layers in place.
   useEffect(() => {
     if (!map) return;
-    setMapMode(map, mode, editingTrack);
-  }, [map, mode, editingTrack]);
+    setMapMode(map, mode, satellite, editingTrack);
+  }, [map, mode, satellite, editingTrack]);
 
   useEffect(() => {
     if (!map) return;

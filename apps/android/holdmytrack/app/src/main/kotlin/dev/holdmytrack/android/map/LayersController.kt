@@ -58,9 +58,11 @@ class LayersController(
     fun isNight(): Boolean =
         fragment.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
 
-    /** Whether the basemap reads dark (dark flavor or satellite), which picks Fog's veil and
-     *  Heatmap's wash (`MapOverlays.setDarkVeil`). */
-    fun darkBase(style: Style): Boolean = isNight() || (MapSatellite.isOn(context) && MapSatellite.isAvailable(style))
+    /** Whether the basemap reads dark (dark flavor or satellite), which picks the export frame's colors. */
+    fun darkBase(style: Style): Boolean = isNight() || satelliteDrawn(style)
+
+    /** Satellite imagery is drawn on [style], which picks Fog's and Heatmap's view over it. */
+    fun satelliteDrawn(style: Style): Boolean = MapSatellite.isOn(context) && MapSatellite.isAvailable(style)
 
     /** Satellite imagery is drawn: the deployment serves some and it's switched on. */
     val satelliteOn: Boolean get() = satelliteAvailable && MapSatellite.isOn(context)
@@ -97,6 +99,6 @@ class LayersController(
         MapSatellite.set(context, on)
         val loaded = style() ?: return
         MapSatellite.apply(loaded, on, mode())
-        if (attached()) MapOverlays.setDarkVeil(loaded, darkBase(loaded))
+        if (attached()) CoverageLayers.setSatellite(loaded, satelliteDrawn(loaded))
     }
 }

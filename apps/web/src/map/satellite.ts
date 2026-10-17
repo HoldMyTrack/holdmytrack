@@ -3,10 +3,10 @@ import type { MapMode } from './mapMode';
 import { roadsHiddenOverImagery } from './satelliteRoads';
 import {
   SATELLITE_DIMS_METADATA,
+  SATELLITE_HIDES_METADATA,
   SATELLITE_LAYER_ID,
   SATELLITE_ROAD_OPACITY,
   SATELLITE_ROADS_METADATA,
-  satelliteHiddenLayerIds,
 } from './style';
 
 /**
@@ -26,9 +26,13 @@ export function setSatelliteVisible(map: MapLibreMap, on: boolean, mode: MapMode
     if (map.getLayoutProperty(id, 'visibility') !== next) map.setLayoutProperty(id, 'visibility', next);
   };
   set(SATELLITE_LAYER_ID, on);
-  const style = map.getStyle();
-  for (const id of satelliteHiddenLayerIds(style.layers)) set(id, !on);
-  const metadata = style.metadata as Record<string, unknown> | undefined;
+  const metadata = map.getStyle().metadata as Record<string, unknown> | undefined;
+  // From the metadata, not satelliteHiddenLayerIds over the live map: that would take every
+  // background layer, Heatmap's wash among them (coverageStyle.ts), and show it in every mode.
+  const hidden = metadata?.[SATELLITE_HIDES_METADATA];
+  for (const id of Array.isArray(hidden) ? (hidden as string[]) : []) {
+    if (map.getLayer(id)) set(id, !on);
+  }
   // From the metadata, not satelliteDimmedLayerIds: a road already dimmed sets an opacity, which
   // is exactly what that function leaves out. Off resets to the default, which those layers had.
   const dimmed = metadata?.[SATELLITE_DIMS_METADATA];

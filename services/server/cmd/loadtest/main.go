@@ -366,7 +366,7 @@ func tileXY(lat, lon float64, z int) (int, int) {
 	return x, y
 }
 
-// The web client's tiers (apps/web/src/map/zoomTiers.ts and the layers' own zoom ranges): Fog
+// The served style's tiers (apps/web/src/map/coverageStyle.ts and the layers' own zoom ranges): Fog
 // draws whole countries below z3 and whole regions below z7, its raster from z7; Heatmap draws
 // heat points at every zoom; Normal draws tracks from z4. Every tile source stops at z14 and is
 // stretched past it, except heat points, at z15.

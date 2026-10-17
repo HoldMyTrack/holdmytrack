@@ -103,7 +103,7 @@ The API, track and fog tiles and every page come from one origin through Caddy. 
 
 `GET /v1/map/style/{flavor}` (`services/server/internal/mapstyle`) answers with that document. The Go side holds no style definition: `apps/web/scripts/build-style.mjs` renders `buildStyle()` to one JSON file per label language and flavor, embedded with `go:embed` and picked by `?lang=`, and `npm run verify:style` fails if the committed JSON has drifted from `style.ts`. Asset URLs carry a placeholder origin the server fills from `BASEMAP_ORIGIN` per request, so one artifact serves a deployment that bundles the archive and one that reads it from a CDN. The satellite source is filled from `SATELLITE_*` or removed. The endpoint is unauthenticated, since the document carries no per-user data, and answers `If-None-Match` with `304`, so a phone re-fetches ~100 KB only when the document changed. The web client calls `buildStyle()` in-process, since it has the function and a round trip before first paint buys nothing.
 
-The fog inversion is baked server-side (`IMPLEMENTATION.md` §4.2) for the same reason: a custom WebGL shader would be written twice, against two MapLibre bindings, and kept pixel-identical.
+**Fog and Heatmap travel in the same document** (ADR-0047), as `metadata["holdmytrack:overlays"]` defined in `coverageStyle.ts`: the sources, the layers, a view per mode with and without imagery, and the zoom tiers. Each client, the web included, adds the account's sources at its tile version, puts the layers beneath the labels and switches views, holding no Fog or Heatmap value of its own.
 
 ---
 
@@ -129,7 +129,7 @@ The Android app is Path 2 (ADR-0001), reading Health Connect in the foreground; 
 ### 3.2 Stack
 
 * **Build**: Kotlin through AGP 9.4.0's built-in support (compiler 2.2), Gradle 9.7.1 through the wrapper, JDK 17 or 21, `compileSdk` and `targetSdk` 37. On the host, not in a container: the SDK, `adb` and the physical device Health Connect testing needs live there (`apps/android/README.md`).
-* **Map**: MapLibre Native 13.6.1, which reads `pmtiles://` natively (since 11.8.0), so the served style (§2.1) is consumed unmodified, archive URL included, with no client-side PMTiles reader. Fog arrives as veil polygons the server traced (`IMPLEMENTATION.md` §4.2), so this client has no shader either.
+* **Map**: MapLibre Native 13.7.1, which reads `pmtiles://` natively (since 11.8.0), so the served style (§2.1) is consumed unmodified, archive URL included, with no client-side PMTiles reader. Fog arrives as veil polygons the server traced (`IMPLEMENTATION.md` §4.2), so this client has no shader either.
 * **Network**: OkHttp 4.12.0, declared directly because the app hands its own client to MapLibre, and pinned to what MapLibre resolves. Bodies are `kotlinx.serialization` classes held to the API contract by a unit test.
 * **Health data**: `androidx.health.connect:connect-client` 1.1.0, the version the device measurements ran against.
 * **UI**: Material Components 1.13.0.

@@ -265,7 +265,7 @@ flowchart LR
 
 The raster route (`tint.go`) remains for Android builds from before the vector veil (`ROADMAP.md`). Either way the inversion is the server's because MapLibre can't invert a raster (no `raster-color`), and a shader would otherwise be written twice.
 
-**Veils** (`fog.LightVeil`, `fog.DarkVeil`) are each opposite in lightness to their basemap, at 0.82 opacity: at 0.6 the cream veil left satellite imagery too clear to tell fogged ground from revealed. The fog is designed over the vector basemap, with imagery optional (§4.26). The web (`fog.ts`) and Android (`MapOverlays.kt`) hold the same colour and opacity pairs for the veil and the Country/Region fills, and change together. The veil goes beneath the first symbol layer, so labels stay on top.
+**Veils** (`fog.LightVeil`, `fog.DarkVeil`) are each opposite in lightness to their basemap, at 0.82 opacity: at 0.6 the cream veil left satellite imagery too clear to tell fogged ground from revealed. The fog is designed over the vector basemap, with imagery optional (§4.26). The clients draw the veil, the Country/Region fills and Heatmap as the served style's overlays (`ARCHITECTURE.md` §2.1), beneath the first symbol layer, so labels stay on top.
 
 #### 4.2.2 Heatmap mode
 
@@ -275,7 +275,7 @@ Heatmap shares Fog's masks, `fog_tiles` row, dirty flag and render; the server s
 
 **Served** as MapLibre heatmap circles from `/tiles/v1/heat-points/`: a point per non-empty cell, 64 to a tile side, weighted `log1p(count) / log1p(scale)`, log because most ground is crossed once or twice and a few places a hundred times. Up to z8 (`fog.HeatActivityMaxZoom`) a cell is a z14 tile or larger and counts distinct activities, read live from the mask rows; from z9 it counts the busiest pixel of the count tile one zoom up, since per-pixel counts can't be added up into a larger area's activities. Zooms up to z8 scale against their own busiest cell (`users.heat_point_caps`, stored by every render), never below `heatmap_cap`; finer zooms against `heatmap_cap`.
 
-**Each point is weighted for its neighbours** (`weighNeighbours`). MapLibre adds overlapping circles and its kernel peaks at about 0.4 of a weight, so a lone place read faint and a route hot. Dividing by what the neighbours add under MapLibre's kernel, `exp(-½ (3d/r)²)` at the clients' radius of 1.6 cells, with the clients' intensity of 2.5, makes each circle peak at its own weight. **`heatPoints.ts` and Android's `MapOverlays.kt` hold the radius, intensity and ramp the server assumes.**
+**Each point is weighted for its neighbours** (`weighNeighbours`). MapLibre adds overlapping circles and its kernel peaks at about 0.4 of a weight, so a lone place read faint and a route hot. Dividing by what the neighbours add under MapLibre's kernel, `exp(-½ (3d/r)²)` at the clients' radius of 1.6 cells, with the clients' intensity of 2.5, makes each circle peak at its own weight. **The radius and intensity are the served style's (`coverageStyle.ts`), and a test in `internal/fog` holds the radius to `heatRadiusCells`.**
 
 **One query a tile**: up to z8 a grouped read of the account's own mask rows; from z9 the row and one object read, counted against the R2 budget. The MVT is encoded in Go, saving a round trip on the database the load tests found to be the bottleneck. The old `/heatmap/` raster route answers a transparent tile for old Android builds, since a stored raster would keep showing deleted or newly private activity.
 
@@ -291,7 +291,7 @@ Both rasters are composited from per-activity masks (§3.11), drawn at ingest fr
 
 #### 4.2.4 Country/Region zoom tiers
 
-Below exact coverage, Fog reveals whole countries, then regions (FR-4.2). The tiers switch only by layer `minzoom`/`maxzoom`, never blended. The web's `zoomTiers.ts`, Android's `MapOverlays.kt` and the level notice's `zoomTier` hold the same bands.
+Below exact coverage, Fog reveals whole countries, then regions (FR-4.2). The tiers switch only by layer `minzoom`/`maxzoom`, never blended. The served style's overlays carry the bands, for the layers and the level notice alike.
 
 **Boundaries**: `scripts/boundaries-extract.sh` cuts countries, dependencies and regions from a pinned Overture release with DuckDB, off the server, dropping the code-less duplicate drawing of a disputed region. `seed-admin-boundaries` replaces them in one transaction, re-matches every activity and bumps every account's tile version. It refuses a file with too few countries or regions, which would erase the rest of the world. Simplification stays under a pixel at each tier, and a country it would erase (Vatican City) keeps its full outline. Matching runs once per activity at ingest (`geo.MatchActivity`) against the full-detail pieces, the trajectory wrapped into −180…180.
 

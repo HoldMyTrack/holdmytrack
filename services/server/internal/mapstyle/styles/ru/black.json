@@ -19,6 +19,867 @@
     }
   },
   "metadata": {
+    "holdmytrack:overlays": {
+      "sources": {
+        "fog-vector": {
+          "tiles": "/tiles/v1/fog-vector/{z}/{x}/{y}.mvt",
+          "minzoom": 0,
+          "maxzoom": 14
+        },
+        "country-fog": {
+          "tiles": "/tiles/v1/country-fog/{z}/{x}/{y}.mvt",
+          "minzoom": 0,
+          "maxzoom": 3,
+          "attribution": "<a href=\"https://overturemaps.org\">Overture Maps</a>"
+        },
+        "region-fog": {
+          "tiles": "/tiles/v1/region-fog/{z}/{x}/{y}.mvt",
+          "minzoom": 3,
+          "maxzoom": 7,
+          "attribution": "<a href=\"https://overturemaps.org\">Overture Maps</a>"
+        },
+        "heat-points": {
+          "tiles": "/tiles/v1/heat-points/{z}/{x}/{y}.mvt",
+          "minzoom": 0,
+          "maxzoom": 15
+        }
+      },
+      "layers": [
+        {
+          "id": "heatmap-dim",
+          "type": "background",
+          "layout": {
+            "visibility": "none"
+          },
+          "paint": {
+            "background-color": "#000000",
+            "background-opacity": 0.35
+          }
+        },
+        {
+          "id": "fog-veil",
+          "type": "fill",
+          "source": "fog-vector",
+          "source-layer": "fog",
+          "minzoom": 7,
+          "filter": [
+            "==",
+            [
+              "get",
+              "kind"
+            ],
+            "veil"
+          ],
+          "layout": {
+            "visibility": "none"
+          },
+          "paint": {
+            "fill-color": "#f7f4ec",
+            "fill-opacity": 0.82
+          }
+        },
+        {
+          "id": "fog-edge",
+          "type": "line",
+          "source": "fog-vector",
+          "source-layer": "fog",
+          "minzoom": 7,
+          "filter": [
+            "==",
+            [
+              "get",
+              "kind"
+            ],
+            "edge"
+          ],
+          "layout": {
+            "line-join": "round",
+            "line-cap": "butt",
+            "visibility": "none"
+          },
+          "paint": {
+            "line-width": [
+              "interpolate",
+              [
+                "exponential",
+                2
+              ],
+              [
+                "zoom"
+              ],
+              10,
+              1,
+              13,
+              5,
+              15,
+              14,
+              18,
+              20
+            ],
+            "line-blur": [
+              "interpolate",
+              [
+                "exponential",
+                2
+              ],
+              [
+                "zoom"
+              ],
+              10,
+              1,
+              13,
+              5,
+              15,
+              14,
+              18,
+              20
+            ],
+            "line-color": "#f7f4ec",
+            "line-opacity": 0.82
+          }
+        },
+        {
+          "id": "country-fog-fill",
+          "type": "fill",
+          "source": "country-fog",
+          "source-layer": "countries",
+          "minzoom": 0,
+          "maxzoom": 3,
+          "layout": {
+            "visibility": "none"
+          },
+          "paint": {
+            "fill-color": "#f7f4ec",
+            "fill-opacity": 0.82
+          }
+        },
+        {
+          "id": "region-fog-fill",
+          "type": "fill",
+          "source": "region-fog",
+          "source-layer": "regions",
+          "minzoom": 3,
+          "maxzoom": 7,
+          "layout": {
+            "visibility": "none"
+          },
+          "paint": {
+            "fill-color": "#f7f4ec",
+            "fill-opacity": 0.82
+          }
+        },
+        {
+          "id": "heat-points-circles",
+          "type": "heatmap",
+          "source": "heat-points",
+          "source-layer": "heat",
+          "paint": {
+            "heatmap-weight": [
+              "get",
+              "w"
+            ],
+            "heatmap-intensity": 2.5,
+            "heatmap-radius": [
+              "interpolate",
+              [
+                "exponential",
+                2
+              ],
+              [
+                "zoom"
+              ],
+              0,
+              12.8,
+              0.999,
+              25.6,
+              1,
+              12.8,
+              1.999,
+              25.6,
+              2,
+              12.8,
+              2.999,
+              25.6,
+              3,
+              12.8,
+              3.999,
+              25.6,
+              4,
+              12.8,
+              4.999,
+              25.6,
+              5,
+              12.8,
+              5.999,
+              25.6,
+              6,
+              12.8,
+              6.999,
+              25.6,
+              7,
+              12.8,
+              7.999,
+              25.6,
+              8,
+              12.8,
+              8.999,
+              25.6,
+              9,
+              12.8,
+              9.999,
+              25.6,
+              10,
+              12.8,
+              10.999,
+              25.6,
+              11,
+              12.8,
+              11.999,
+              25.6,
+              12,
+              12.8,
+              12.999,
+              25.6,
+              13,
+              12.8,
+              13.999,
+              25.6,
+              14,
+              12.8,
+              14.999,
+              25.6,
+              15,
+              12.8,
+              24,
+              6553.6
+            ],
+            "heatmap-color": [
+              "interpolate",
+              [
+                "linear"
+              ],
+              [
+                "heatmap-density"
+              ],
+              0,
+              "rgba(60,200,40,0)",
+              0.05,
+              "rgba(60,200,40,0)",
+              0.1,
+              "rgb(90,210,40)",
+              0.3,
+              "rgb(170,225,30)",
+              0.5,
+              "rgb(250,220,0)",
+              0.68,
+              "rgb(250,120,0)",
+              0.8,
+              "rgb(230,30,30)",
+              1,
+              "rgb(230,30,30)"
+            ]
+          },
+          "layout": {
+            "visibility": "none"
+          }
+        }
+      ],
+      "views": {
+        "plain": {
+          "normal": {
+            "layout": {
+              "heatmap-dim": {
+                "visibility": "none"
+              },
+              "fog-veil": {
+                "visibility": "none"
+              },
+              "fog-edge": {
+                "visibility": "none"
+              },
+              "country-fog-fill": {
+                "visibility": "none"
+              },
+              "region-fog-fill": {
+                "visibility": "none"
+              },
+              "heat-points-circles": {
+                "visibility": "none"
+              }
+            },
+            "paint": {
+              "heatmap-dim": {
+                "background-color": "#000000",
+                "background-opacity": 0.35
+              },
+              "fog-veil": {
+                "fill-color": "#f7f4ec",
+                "fill-opacity": 0.82
+              },
+              "fog-edge": {
+                "line-color": "#f7f4ec",
+                "line-opacity": 0.82
+              },
+              "country-fog-fill": {
+                "fill-color": "#f7f4ec",
+                "fill-opacity": 0.82
+              },
+              "region-fog-fill": {
+                "fill-color": "#f7f4ec",
+                "fill-opacity": 0.82
+              },
+              "address_label": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "water_waterway_label": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "roads_oneway": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "roads_labels_minor": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "water_label_ocean": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "earth_label_islands": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "water_label_lakes": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "roads_shields": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "roads_labels_major": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "places_subplace": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "places_region": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "places_locality": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "places_country": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              }
+            }
+          },
+          "fog": {
+            "layout": {
+              "heatmap-dim": {
+                "visibility": "none"
+              },
+              "fog-veil": {
+                "visibility": "visible"
+              },
+              "fog-edge": {
+                "visibility": "visible"
+              },
+              "country-fog-fill": {
+                "visibility": "visible"
+              },
+              "region-fog-fill": {
+                "visibility": "visible"
+              },
+              "heat-points-circles": {
+                "visibility": "none"
+              }
+            },
+            "paint": {
+              "heatmap-dim": {
+                "background-color": "#000000",
+                "background-opacity": 0.35
+              },
+              "fog-veil": {
+                "fill-color": "#f7f4ec",
+                "fill-opacity": 0.82
+              },
+              "fog-edge": {
+                "line-color": "#f7f4ec",
+                "line-opacity": 0.82
+              },
+              "country-fog-fill": {
+                "fill-color": "#f7f4ec",
+                "fill-opacity": 0.82
+              },
+              "region-fog-fill": {
+                "fill-color": "#f7f4ec",
+                "fill-opacity": 0.82
+              },
+              "address_label": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "water_waterway_label": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "roads_oneway": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "roads_labels_minor": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "water_label_ocean": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "earth_label_islands": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "water_label_lakes": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "roads_shields": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "roads_labels_major": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "places_subplace": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "places_region": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "places_locality": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "places_country": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              }
+            }
+          },
+          "heatmap": {
+            "layout": {
+              "heatmap-dim": {
+                "visibility": "visible"
+              },
+              "fog-veil": {
+                "visibility": "none"
+              },
+              "fog-edge": {
+                "visibility": "none"
+              },
+              "country-fog-fill": {
+                "visibility": "none"
+              },
+              "region-fog-fill": {
+                "visibility": "none"
+              },
+              "heat-points-circles": {
+                "visibility": "visible"
+              }
+            },
+            "paint": {
+              "heatmap-dim": {
+                "background-color": "#000000",
+                "background-opacity": 0.35
+              },
+              "fog-veil": {
+                "fill-color": "#f7f4ec",
+                "fill-opacity": 0.82
+              },
+              "fog-edge": {
+                "line-color": "#f7f4ec",
+                "line-opacity": 0.82
+              },
+              "country-fog-fill": {
+                "fill-color": "#f7f4ec",
+                "fill-opacity": 0.82
+              },
+              "region-fog-fill": {
+                "fill-color": "#f7f4ec",
+                "fill-opacity": 0.82
+              },
+              "address_label": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "water_waterway_label": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "roads_oneway": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "roads_labels_minor": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "water_label_ocean": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "earth_label_islands": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "water_label_lakes": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "roads_shields": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "roads_labels_major": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "places_subplace": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "places_region": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "places_locality": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "places_country": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              }
+            }
+          }
+        },
+        "satellite": {
+          "normal": {
+            "layout": {
+              "heatmap-dim": {
+                "visibility": "none"
+              },
+              "fog-veil": {
+                "visibility": "none"
+              },
+              "fog-edge": {
+                "visibility": "none"
+              },
+              "country-fog-fill": {
+                "visibility": "none"
+              },
+              "region-fog-fill": {
+                "visibility": "none"
+              },
+              "heat-points-circles": {
+                "visibility": "none"
+              }
+            },
+            "paint": {
+              "heatmap-dim": {
+                "background-color": "#000000",
+                "background-opacity": 0.35
+              },
+              "fog-veil": {
+                "fill-color": "#f7f4ec",
+                "fill-opacity": 0.82
+              },
+              "fog-edge": {
+                "line-color": "#f7f4ec",
+                "line-opacity": 0.82
+              },
+              "country-fog-fill": {
+                "fill-color": "#f7f4ec",
+                "fill-opacity": 0.82
+              },
+              "region-fog-fill": {
+                "fill-color": "#f7f4ec",
+                "fill-opacity": 0.82
+              },
+              "address_label": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "water_waterway_label": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "roads_oneway": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "roads_labels_minor": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "water_label_ocean": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "earth_label_islands": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "water_label_lakes": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "roads_shields": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "roads_labels_major": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "places_subplace": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "places_region": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "places_locality": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "places_country": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              }
+            }
+          },
+          "fog": {
+            "layout": {
+              "heatmap-dim": {
+                "visibility": "none"
+              },
+              "fog-veil": {
+                "visibility": "visible"
+              },
+              "fog-edge": {
+                "visibility": "visible"
+              },
+              "country-fog-fill": {
+                "visibility": "visible"
+              },
+              "region-fog-fill": {
+                "visibility": "visible"
+              },
+              "heat-points-circles": {
+                "visibility": "none"
+              }
+            },
+            "paint": {
+              "heatmap-dim": {
+                "background-color": "#000000",
+                "background-opacity": 0.35
+              },
+              "fog-veil": {
+                "fill-color": "#f7f4ec",
+                "fill-opacity": 0.82
+              },
+              "fog-edge": {
+                "line-color": "#f7f4ec",
+                "line-opacity": 0.82
+              },
+              "country-fog-fill": {
+                "fill-color": "#f7f4ec",
+                "fill-opacity": 0.82
+              },
+              "region-fog-fill": {
+                "fill-color": "#f7f4ec",
+                "fill-opacity": 0.82
+              },
+              "address_label": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "water_waterway_label": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "roads_oneway": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "roads_labels_minor": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "water_label_ocean": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "earth_label_islands": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "water_label_lakes": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "roads_shields": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "roads_labels_major": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "places_subplace": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "places_region": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "places_locality": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              },
+              "places_country": {
+                "text-opacity": 0.4,
+                "icon-opacity": 0.4
+              }
+            }
+          },
+          "heatmap": {
+            "layout": {
+              "heatmap-dim": {
+                "visibility": "visible"
+              },
+              "fog-veil": {
+                "visibility": "none"
+              },
+              "fog-edge": {
+                "visibility": "none"
+              },
+              "country-fog-fill": {
+                "visibility": "none"
+              },
+              "region-fog-fill": {
+                "visibility": "none"
+              },
+              "heat-points-circles": {
+                "visibility": "visible"
+              }
+            },
+            "paint": {
+              "heatmap-dim": {
+                "background-color": "#000000",
+                "background-opacity": 0.35
+              },
+              "fog-veil": {
+                "fill-color": "#f7f4ec",
+                "fill-opacity": 0.82
+              },
+              "fog-edge": {
+                "line-color": "#f7f4ec",
+                "line-opacity": 0.82
+              },
+              "country-fog-fill": {
+                "fill-color": "#f7f4ec",
+                "fill-opacity": 0.82
+              },
+              "region-fog-fill": {
+                "fill-color": "#f7f4ec",
+                "fill-opacity": 0.82
+              },
+              "address_label": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "water_waterway_label": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "roads_oneway": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "roads_labels_minor": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "water_label_ocean": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "earth_label_islands": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "water_label_lakes": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "roads_shields": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "roads_labels_major": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "places_subplace": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "places_region": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "places_locality": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              },
+              "places_country": {
+                "text-opacity": 1,
+                "icon-opacity": 1
+              }
+            }
+          }
+        }
+      },
+      "tiers": [
+        {
+          "tier": "country",
+          "below": 3
+        },
+        {
+          "tier": "region",
+          "below": 7
+        },
+        {
+          "tier": "city"
+        }
+      ]
+    },
     "holdmytrack:satellite-hides": [
       "background",
       "earth",

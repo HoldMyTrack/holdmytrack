@@ -7,10 +7,7 @@ import dev.holdmytrack.android.net.TrackMetricPoint
 import dev.holdmytrack.android.recording.RecordedPoint
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
-import org.maplibre.android.style.layers.BackgroundLayer
 import org.maplibre.android.style.layers.CircleLayer
-import org.maplibre.android.style.layers.FillLayer
-import org.maplibre.android.style.layers.HeatmapLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
@@ -36,8 +33,8 @@ enum class MapMode { NORMAL, FOG, HEATMAP }
 enum class ZoomTier { COUNTRY, REGION, CITY }
 
 /**
- * The three user layers that sit on top of the served basemap: the live tracks MVT layer, Fog's
- * veil and Heatmap's points.
+ * The user layers on top of the served basemap: the live tracks MVT layer, and Fog's veil and
+ * Heatmap's points as the style describes them ([CoverageLayers]).
  *
  * All three are behind `requireAuth` (`services/server/internal/httpapi/server.go`), which is
  * why they are attached only once the stored session is verified rather than at style load —
@@ -67,56 +64,8 @@ object MapOverlays {
     /** Must match `ST_AsMVT(t, 'tracks', ...)` in the backend's own tile query. */
     private const val TRACKS_SOURCE_LAYER = "tracks"
 
-    private const val FOG_SOURCE_ID = "fog-vector"
-    private const val FOG_LAYER_ID = "fog-veil"
-    private const val FOG_EDGE_LAYER_ID = "fog-edge"
-    private const val FOG_SOURCE_LAYER = "fog"
-
-    private const val COUNTRY_FOG_SOURCE_ID = "country-fog"
-    private const val COUNTRY_FOG_LAYER_ID = "country-fog-fill"
-    private const val REGION_FOG_SOURCE_ID = "region-fog"
-    private const val REGION_FOG_LAYER_ID = "region-fog-fill"
-
-    /** Heatmap below city zoom: the server's heat points drawn as heatmap circles, the web's
-     *  `heat-points` (`docs/IMPLEMENTATION.md` §4.2.2). */
-    private const val HEAT_POINTS_SOURCE_ID = "heat-points"
-    private const val HEAT_POINTS_LAYER_ID = "heat-points-circles"
-    /** Must match `ST_AsMVT(t, 'heat', ...)` in the backend's heat-points query. */
-    private const val HEAT_POINTS_SOURCE_LAYER = "heat"
-
-    /** The Country/Region sources' credit, the web's `zoomTiers.ts` `BOUNDARIES_ATTRIBUTION`: their
-     *  outlines are Overture Maps' divisions, built from OpenStreetMap (ODbL, root ADR-0034). */
-    private const val BOUNDARIES_ATTRIBUTION = "<a href=\"https://overturemaps.org\">Overture Maps</a>"
-
-    /** Heatmap mode's wash over the basemap, beneath the heat — the web's `heatmap-dim`. */
-    private const val HEATMAP_DIM_LAYER_ID = "heatmap-dim"
-
-    /** Must match `ST_AsMVT(t, 'countries'/'regions', ...)` in the backend's own tile queries. */
-    private const val COUNTRIES_SOURCE_LAYER = "countries"
-    private const val REGIONS_SOURCE_LAYER = "regions"
-
     /**
-     * The three zoom-dependent tiers Fog falls back to below city zoom (`docs/IMPLEMENTATION.md`
-     * §4.2.4), mirroring `apps/web/src/map/zoomTiers.ts` exactly so the boundary can't drift
-     * between the two clients. Heatmap draws the same way at every zoom. Adopted starting bands, tunable
-     * visually, not scientifically derived.
-     */
-    private const val COUNTRY_MAX_ZOOM = 3f
-    private const val REGION_MIN_ZOOM = 3f
-    private const val REGION_MAX_ZOOM = 7f
-    private const val CITY_MIN_ZOOM = 7f
-
-    /** Which [ZoomTier] Fog draws at [zoom] — the same bands the layers switch on (a
-     *  layer shows at minZoom <= zoom < maxZoom), the web's `zoomTier`, for what has to name the
-     *  level in view (`ZoomLevelNotice`). */
-    fun zoomTier(zoom: Double): ZoomTier = when {
-        zoom < COUNTRY_MAX_ZOOM -> ZoomTier.COUNTRY
-        zoom < REGION_MAX_ZOOM -> ZoomTier.REGION
-        else -> ZoomTier.CITY
-    }
-
-    /**
-     * Tracks draw from z4 inward — not [CITY_MIN_ZOOM]: Normal mode has no Country/Region
+     * Tracks draw from z4 inward, not from Fog's city tier (z7): Normal mode has no Country/Region
      * fallback, so hiding tracks below z7 left an empty map, and a road trip too long to fit
      * at z7 had nothing drawn once the camera fit it. Mirrors `apps/web/src/map/tracks.ts`'s
      * `TRACKS_MIN_ZOOM` (`docs/IMPLEMENTATION.md` §5.3 has the tile-size measurement).
@@ -124,8 +73,8 @@ object MapOverlays {
     const val TRACKS_MIN_ZOOM = 4f
 
     /**
-     * The basemap archive's own maximum zoom (`docs/SPEC.md` FR-4.15), and the same
-     * ceiling the server renders fog and heatmap tiles to. MapLibre overzooms past a declared
+     * The basemap archive's own maximum zoom (`docs/SPEC.md` FR-4.15), and the tracks tiles'.
+     * MapLibre overzooms past a declared
      * maximum rather than stopping, so the layers stay drawn as the user keeps zooming in.
      */
     private const val MAX_ZOOM = 14f
@@ -178,71 +127,8 @@ object MapOverlays {
      *  what's on offer (`SyncCandidatesOverlay`), not a slice of what's already synced. */
     private var syncing = false
 
-    /** Every Fog and Heatmap layer and the source under it — what [refreshCoverage] replaces. */
-    private val COVERAGE_LAYERS = listOf(
-        FOG_LAYER_ID to FOG_SOURCE_ID,
-        FOG_EDGE_LAYER_ID to FOG_SOURCE_ID,
-        COUNTRY_FOG_LAYER_ID to COUNTRY_FOG_SOURCE_ID,
-        HEAT_POINTS_LAYER_ID to HEAT_POINTS_SOURCE_ID,
-        REGION_FOG_LAYER_ID to REGION_FOG_SOURCE_ID,
-    )
-
-    /** The same two veils as the server's (`internal/fog/raster.go`'s LightVeil and
-     *  DarkVeil), each the opposite of the basemap under it: dark ink over the light flavor, a
-     *  cream mist over the dark one. */
-    private const val FOG_FILL_COLOR = "#202b25"
-    private const val FOG_FILL_OPACITY = 0.82f
-    private const val FOG_FILL_COLOR_DARK = "#f7f4ec"
-    private const val FOG_FILL_OPACITY_DARK = 0.82f
-
-    /** Whether the style [attach] last drew on is the dark flavor — which veil and wash
-     *  [addCoverage] uses, and keeps using across a [refreshCoverage]. */
-    private var darkVeil = false
-
-    /** The circles' colour by density, the web's `HEAT_RAMP`: green where the account went once,
-     *  through yellow and orange to red at its busiest. */
-    private val HEAT_RAMP = listOf(
-        0f to Expression.rgba(60, 200, 40, 0),
-        0.05f to Expression.rgba(60, 200, 40, 0),
-        0.1f to Expression.rgb(90, 210, 40),
-        0.3f to Expression.rgb(170, 225, 30),
-        0.5f to Expression.rgb(250, 220, 0),
-        0.68f to Expression.rgb(250, 120, 0),
-        0.8f to Expression.rgb(230, 30, 30),
-        1f to Expression.rgb(230, 30, 30),
-    )
-
-    /** The web's `HEAT_POINTS_INTENSITY`: lifts MapLibre's circle, which peaks at about 0.4 of
-     *  its weight, back to the weight, which the server has already divided by its neighbours'
-     *  overlap — so lone places, routes and busy areas all read their own counts. */
-    private const val HEAT_POINTS_INTENSITY = 2.5f
-
-    private fun heatPointsRadius(): Expression = Expression.interpolate(
-        Expression.exponential(2f), Expression.zoom(),
-        *heatPointsRadiusStops().map { (zoom, radius) -> Expression.stop(zoom, radius) }.toTypedArray(),
-    )
-
-    /** The wash's two colors, the web's `LIGHT_DIM` and `DARK_DIM` (`heatmap.ts`): the heat
-     *  reads against a quieter map, as Fog mode quiets the labels. Cream on the light flavor,
-     *  black on the dark one and satellite — the fog veils' own pairing, lightened. */
-    private const val HEATMAP_DIM_COLOR = "#f7f4ec"
-    private const val HEATMAP_DIM_OPACITY = 0.45f
-    private const val HEATMAP_DIM_COLOR_DARK = "#000000"
-    private const val HEATMAP_DIM_OPACITY_DARK = 0.35f
-
-    /** Whether the wash is drawn. It's shown and hidden by its opacity, not its visibility:
-     *  MapLibre Native draws a background layer that has once been hidden no more when it's
-     *  made visible again (measured on the emulator: the second switch to Heatmap had none). */
-    private var dimShown = false
-
-    /** How far Fog mode mutes basemap labels — the web's `FOG_LABEL_OPACITY`: dim enough to
-     *  recede behind the veil, still readable enough to orient by. */
-    private const val FOG_LABEL_OPACITY = 0.4f
-
-    /** Every user layer [attach] adds — what [setRecording] hides wholesale. */
-    private val USER_LAYER_IDS = listOf(
-        FOG_LAYER_ID, FOG_EDGE_LAYER_ID, COUNTRY_FOG_LAYER_ID, REGION_FOG_LAYER_ID, HEAT_POINTS_LAYER_ID,
-    ) + TRACK_LAYER_IDS + BAND_LAYER_ID
+    /** The tracks and their bands — what [setRecording] hides with the overlays. */
+    private val USER_LAYER_IDS = TRACK_LAYER_IDS + BAND_LAYER_ID
 
     private const val LIVE_TRACK_SOURCE_ID = "live-track"
     private const val LIVE_TRACK_LAYER_ID = "live-track-line"
@@ -263,20 +149,20 @@ object MapOverlays {
      * (`docs/SPEC.md` FR-4.2, FR-4.3). The Activities panel's TYPE/DISTANCE filters, hidden
      * set and selection are applied on the client, as layer filters ([setTrackFilter]).
      *
-     * [dark] says the basemap reads dark — the dark flavor, or satellite imagery — so Fog gets
-     * the cream veil and Heatmap the black wash ([setDarkVeil]); [story] is
-     * the open Story, or null ([setTrackStory]).
+     * Fog and Heatmap are the served style's ([CoverageLayers]); [satellite] says imagery is
+     * drawn, which picks their view over it. [story] is the open Story, or null ([setTrackStory]).
      */
-    fun attach(style: Style, mode: MapMode, range: DateRange?, dark: Boolean, night: Boolean, story: String?) {
-        darkVeil = dark
+    fun attach(style: Style, mode: MapMode, range: DateRange?, satellite: Boolean, night: Boolean, story: String?) {
         trackStory = story
         val beforeId = labelInsertionPoint(style)
-        addCoverage(style, beforeId)
+        CoverageLayers.load(style)
+        CoverageLayers.add(style, beforeId)
         // Every path over the veil and the heat, under the tracks (`docs/SPEC.md` FR-4.13).
         MapPaths.raise(style, beforeId)
         MapBikePaths.add(style, beforeId, night)
         addTracks(style, beforeId, range)
         addBands(style, beforeId)
+        CoverageLayers.apply(style, mode, satellite)
         setMode(style, mode)
     }
 
@@ -314,100 +200,10 @@ object MapOverlays {
 
     fun clearTrackBands(style: Style) = setTrackBands(style, emptyList())
 
-    /** Fog and Heatmap at every tier, each inserted below [beforeId] — Heatmap's wash first,
-     *  so every heat layer added after it lands above it. */
-    private fun addCoverage(style: Style, beforeId: String?) {
-        if (style.getLayer(HEATMAP_DIM_LAYER_ID) == null) {
-            val dim = BackgroundLayer(HEATMAP_DIM_LAYER_ID).withProperties(
-                PropertyFactory.backgroundColor(if (darkVeil) HEATMAP_DIM_COLOR_DARK else HEATMAP_DIM_COLOR),
-            )
-            insert(style, dim, beforeId)
-            setDim(style, dimShown)
-        }
-        val fogColor = if (darkVeil) FOG_FILL_COLOR_DARK else FOG_FILL_COLOR
-        val fogOpacity = if (darkVeil) FOG_FILL_OPACITY_DARK else FOG_FILL_OPACITY
-        addFogVeil(style, beforeId, fogColor, fogOpacity)
-        addFill(
-            style, COUNTRY_FOG_SOURCE_ID, COUNTRY_FOG_LAYER_ID, COUNTRIES_SOURCE_LAYER,
-            coverageUrl("country-fog", "mvt"), beforeId, 0f, COUNTRY_MAX_ZOOM, fogColor, fogOpacity,
-        )
-        addFill(
-            style, REGION_FOG_SOURCE_ID, REGION_FOG_LAYER_ID, REGIONS_SOURCE_LAYER,
-            coverageUrl("region-fog", "mvt"), beforeId, REGION_MIN_ZOOM, REGION_MAX_ZOOM, fogColor, fogOpacity,
-        )
-        addHeatPoints(style, beforeId)
-    }
-
-    /** Heatmap: the server's weighted points as heatmap circles at every zoom, the web's
-     *  `ensureHeatmapLayer` (`docs/IMPLEMENTATION.md` §4.2.2). */
-    private fun addHeatPoints(style: Style, beforeId: String?) {
-        if (style.getSource(HEAT_POINTS_SOURCE_ID) == null) {
-            val tiles = tileSet(coverageUrl("heat-points", "mvt")).apply {
-                minZoom = 0f
-                maxZoom = HEAT_POINTS_MAX_ZOOM.toFloat()
-            }
-            style.addSource(VectorSource(HEAT_POINTS_SOURCE_ID, tiles))
-        }
-        if (style.getLayer(HEAT_POINTS_LAYER_ID) == null) {
-            val layer = HeatmapLayer(HEAT_POINTS_LAYER_ID, HEAT_POINTS_SOURCE_ID)
-                .withSourceLayer(HEAT_POINTS_SOURCE_LAYER)
-                .withProperties(
-                    PropertyFactory.visibility(Property.NONE),
-                    PropertyFactory.heatmapWeight(Expression.get("w")),
-                    PropertyFactory.heatmapIntensity(HEAT_POINTS_INTENSITY),
-                    PropertyFactory.heatmapRadius(heatPointsRadius()),
-                    PropertyFactory.heatmapColor(
-                        Expression.interpolate(
-                            Expression.linear(), Expression.heatmapDensity(),
-                            *HEAT_RAMP.map { (at, color) -> Expression.stop(at, color) }.toTypedArray(),
-                        ),
-                    ),
-                )
-            insert(style, layer, beforeId)
-        }
-    }
-
-    /**
-     * Switches Fog to the other veil, and Heatmap to the other wash, when the basemap under it changes lightness without a
-     * style reload — satellite imagery (`MapSatellite`) reads dark, so it takes the dark
-     * flavor's cream veil, like the web's `isDarkBase`. Re-adds the coverage layers the way
-     * [refreshCoverage] does, since their colors and tile URLs are fixed when added.
-     */
-    fun setDarkVeil(style: Style, dark: Boolean) {
-        if (darkVeil == dark) return
-        darkVeil = dark
-        refreshCoverage(style)
-    }
-
     /** The tracks tiles fetched again for [range] — after a delete, or a reprocess landing. */
     fun refreshTracks(style: Style, range: DateRange?) {
         tracksVersion += 1
         setTrackRange(style, range)
-    }
-
-    /**
-     * Every Fog and Heatmap tile fetched again, once the server has re-rendered them
-     * (`CoverageWatch`) — the web's `refreshFogLayers`/`refreshHeatmapLayers`. Replaced, not
-     * updated, for the same reason as [setTrackRange], each at the same place in the stack —
-     * under the paths and the tracks — and with its old visibility (the wash, with [dimShown]).
-     */
-    fun refreshCoverage(style: Style) {
-        if (style.getLayer(FOG_LAYER_ID) == null) return
-        val visibility = COVERAGE_LAYERS.associate { (layer, _) -> layer to style.getLayer(layer)?.visibility?.value }
-        // Back where they were: under whatever sat right over them — the paths, which paint over
-        // the veil, or the tracks.
-        val coverage = COVERAGE_LAYERS.map { it.first } + HEATMAP_DIM_LAYER_ID
-        val order = style.layers.map { it.id }
-        val beforeId = order.drop(order.indexOfLast { it in coverage } + 1).firstOrNull { it !in coverage }
-            ?: labelInsertionPoint(style)
-        // Every layer before any source: Fog's veil and edge share theirs.
-        COVERAGE_LAYERS.forEach { (layer, _) -> style.getLayer(layer)?.let(style::removeLayer) }
-        COVERAGE_LAYERS.map { it.second }.distinct().forEach { style.removeSource(it) }
-        style.getLayer(HEATMAP_DIM_LAYER_ID)?.let(style::removeLayer)
-        addCoverage(style, beforeId)
-        visibility.forEach { (layer, value) ->
-            if (value != null) style.getLayer(layer)?.setProperties(PropertyFactory.visibility(value))
-        }
     }
 
     /**
@@ -474,31 +270,13 @@ object MapOverlays {
         setMode(style, mode)
     }
 
+    /** [mode]'s view of Fog and Heatmap, labels included ([CoverageLayers]), and the tracks,
+     *  which only Normal draws. */
     fun setMode(style: Style, mode: MapMode) {
-        setVisible(style, FOG_LAYER_ID, mode == MapMode.FOG)
-        setVisible(style, FOG_EDGE_LAYER_ID, mode == MapMode.FOG)
-        setVisible(style, COUNTRY_FOG_LAYER_ID, mode == MapMode.FOG)
-        setVisible(style, REGION_FOG_LAYER_ID, mode == MapMode.FOG)
-        setDim(style, mode == MapMode.HEATMAP)
-        setVisible(style, HEAT_POINTS_LAYER_ID, mode == MapMode.HEATMAP)
+        CoverageLayers.apply(style, mode)
         val tracks = mode == MapMode.NORMAL && !editingTrack && !syncing
         TRACK_LAYER_IDS.forEach { setVisible(style, it, tracks) }
         setVisible(style, BAND_LAYER_ID, tracks)
-        setLabelOpacity(style, if (mode == MapMode.FOG) FOG_LABEL_OPACITY else 1f)
-    }
-
-    /**
-     * Basemap labels stay above the veil so they're legible, but at full strength they read
-     * brighter than the fog itself and pull the eye off what's actually been cleared — so Fog
-     * mode mutes them, as the web does (`apps/web/src/map/mapMode.ts`). Every symbol layer on
-     * the map is the basemap's own except the Spots badges ([MapSpots.BADGE_LAYER_IDS]), which
-     * Fog must not dim, and the served style never sets text-/icon-opacity, so 1 restores
-     * exactly its default.
-     */
-    private fun setLabelOpacity(style: Style, opacity: Float) {
-        style.layers.filterIsInstance<SymbolLayer>().filter { it.id !in MapSpots.BADGE_LAYER_IDS }.forEach {
-            it.setProperties(PropertyFactory.textOpacity(opacity), PropertyFactory.iconOpacity(opacity))
-        }
     }
 
     /**
@@ -510,8 +288,7 @@ object MapOverlays {
     fun setRecording(style: Style, recording: Boolean, mode: MapMode) {
         if (recording) {
             USER_LAYER_IDS.forEach { setVisible(style, it, false) }
-            setDim(style, false)
-            setLabelOpacity(style, 1f)
+            CoverageLayers.apply(style, MapMode.NORMAL)
         } else {
             setMode(style, mode)
         }
@@ -570,84 +347,6 @@ object MapOverlays {
     private fun labelInsertionPoint(style: Style): String? =
         style.layers.firstOrNull { it is SymbolLayer }?.id
 
-    /** Fog from city zoom in, the web's `ensureFogLayer` (`docs/IMPLEMENTATION.md` §4.2): the
-     *  veil the server traces from the account's coverage, as a fill, crisp at every zoom, and
-     *  a blurred line along its edges, so it fades into each cleared corridor. */
-    private fun addFogVeil(style: Style, beforeId: String?, color: String, opacity: Float) {
-        if (style.getSource(FOG_SOURCE_ID) == null) {
-            // The coverage stops at z14; its outlines are enlarged past it, staying crisp.
-            style.addSource(VectorSource(FOG_SOURCE_ID, tileSet(coverageUrl("fog-vector", "mvt"))))
-        }
-        if (style.getLayer(FOG_LAYER_ID) == null) {
-            val layer = FillLayer(FOG_LAYER_ID, FOG_SOURCE_ID)
-                .withSourceLayer(FOG_SOURCE_LAYER)
-                .withFilter(Expression.eq(Expression.get("kind"), "veil"))
-                .withProperties(PropertyFactory.fillColor(color), PropertyFactory.fillOpacity(opacity))
-                .apply { setMinZoom(CITY_MIN_ZOOM) }
-            insert(style, layer, beforeId)
-        }
-        if (style.getLayer(FOG_EDGE_LAYER_ID) == null) {
-            val width = Expression.interpolate(
-                Expression.exponential(2f), Expression.zoom(),
-                *FOG_EDGE_WIDTH_STOPS.map { (zoom, px) -> Expression.stop(zoom, px) }.toTypedArray(),
-            )
-            val layer = LineLayer(FOG_EDGE_LAYER_ID, FOG_SOURCE_ID)
-                .withSourceLayer(FOG_SOURCE_LAYER)
-                .withFilter(Expression.eq(Expression.get("kind"), "edge"))
-                .withProperties(
-                    // Butt ends: the server carries each edge just past the tile, where the next
-                    // tile's own takes over, so a cap would double up at the join.
-                    PropertyFactory.lineCap(Property.LINE_CAP_BUTT),
-                    PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
-                    PropertyFactory.lineColor(color),
-                    PropertyFactory.lineOpacity(opacity),
-                    PropertyFactory.lineWidth(width),
-                    PropertyFactory.lineBlur(width),
-                )
-                .apply { setMinZoom(CITY_MIN_ZOOM) }
-            insert(style, layer, beforeId)
-        }
-    }
-
-    /**
-     * Adds one Country/Region tier fill layer — a flat colour fill over whichever polygons the
-     * given endpoint returns (locked countries/regions for Fog, unlocked ones for Heatmap; see
-     * `services/server/internal/httpapi/admin_country_tiles.go`/`admin_region_tiles.go`), gated
-     * to [minZoom]/[maxZoom] so it and the tier it hands off to never both paint
-     * at the same zoom.
-     */
-    private fun addFill(
-        style: Style,
-        sourceId: String,
-        layerId: String,
-        sourceLayer: String,
-        url: String,
-        beforeId: String?,
-        minZoom: Float,
-        maxZoom: Float,
-        color: String,
-        opacity: Float,
-    ) {
-        if (style.getSource(sourceId) == null) {
-            val tiles = tileSet(url).apply {
-                this.minZoom = minZoom
-                this.maxZoom = maxZoom
-                attribution = BOUNDARIES_ATTRIBUTION
-            }
-            style.addSource(VectorSource(sourceId, tiles))
-        }
-        if (style.getLayer(layerId) == null) {
-            val layer = FillLayer(layerId, sourceId)
-                .withSourceLayer(sourceLayer)
-                .withProperties(
-                    PropertyFactory.fillColor(color),
-                    PropertyFactory.fillOpacity(opacity),
-                )
-                .apply { setMinZoom(minZoom); setMaxZoom(maxZoom) }
-            insert(style, layer, beforeId)
-        }
-    }
-
     private fun addTracks(style: Style, beforeId: String?, range: DateRange?) {
         if (style.getSource(TRACKS_SOURCE_ID) == null) {
             val params = buildList {
@@ -691,13 +390,6 @@ object MapOverlays {
         if (beforeId != null) style.addLayerBelow(layer, beforeId) else style.addLayer(layer)
     }
 
-    /** See [dimShown]. */
-    private fun setDim(style: Style, shown: Boolean) {
-        dimShown = shown
-        val opacity = if (darkVeil) HEATMAP_DIM_OPACITY_DARK else HEATMAP_DIM_OPACITY
-        style.getLayer(HEATMAP_DIM_LAYER_ID)?.setProperties(PropertyFactory.backgroundOpacity(if (shown) opacity else 0f))
-    }
-
     private fun setVisible(style: Style, layerId: String, visible: Boolean) {
         val layer = style.getLayer(layerId) ?: return
         layer.setProperties(PropertyFactory.visibility(if (visible) Property.VISIBLE else Property.NONE))
@@ -711,24 +403,4 @@ object MapOverlays {
 
     private fun tileUrl(kind: String, extension: String): String =
         "${BuildConfig.API_BASE_URL}$TILES_V1/$kind/{z}/{x}/{y}.$extension"
-
-    private fun coverageUrl(kind: String, extension: String): String =
-        tileUrl(kind, extension) + Session.tileVersion.let { if (it.isEmpty()) "" else "?cv=${Uri.encode(it)}" }
-}
-
-/** The web's `FOG_EDGE_WIDTH`, as (zoom, px), interpolated exponentially: Fog's blurred edge, as
- *  wide as it is blurred — about a cleared corridor's own width zoomed out, where a wider one
- *  would smudge it, to 14 px close in. */
-val FOG_EDGE_WIDTH_STOPS: List<Pair<Float, Float>> = listOf(10f to 1f, 13f to 5f, 15f to 14f, 18f to 20f)
-
-/** The last zoom the server makes heat-points tiles for, the web's `HEAT_POINTS_MAX_ZOOM`. */
-const val HEAT_POINTS_MAX_ZOOM = 15
-
-/** The web's `heatPointsRadius` stops, as (zoom, radius px): a cell is 8 px across at its tile's
- *  own zoom and 16 one zoom in, a circle 1.6 cells, so the radius doubles across each zoom and
- *  drops back where the next zoom's cells take over; past the last zoom it keeps growing. */
-fun heatPointsRadiusStops(): List<Pair<Float, Float>> {
-    val r = 8f * 1.6f
-    return (0 until HEAT_POINTS_MAX_ZOOM).flatMap { z -> listOf(z.toFloat() to r, z + 0.999f to 2 * r) } +
-        listOf(HEAT_POINTS_MAX_ZOOM.toFloat() to r, HEAT_POINTS_MAX_ZOOM + 9f to r * 512f)
 }

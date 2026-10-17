@@ -90,8 +90,8 @@ function positiveOr(value: unknown, fallback: number): number {
 // Tracks draw from z4 — a few states on screen — down to street level. Below that a track is a
 // few pixels long; above it the only cost is tile payload, and ST_AsMVTGeom's 4096-unit grid
 // already bounds that: measured with the demo's 611 activities and no date filter, the tile
-// over Cleveland is 40KB at z4 against 44KB at z8 (IMPLEMENTATION.md §5.3). Not Fog/Heatmap's
-// CITY_MIN_ZOOM (z7): those switch to Country/Region fills below it, but Normal mode has no
+// over Cleveland is 40KB at z4 against 44KB at z8 (IMPLEMENTATION.md §5.3). Not Fog's city
+// tier (z7, coverageStyle.ts): Fog switches to Country/Region fills below it, but Normal mode has no
 // such fallback, so tracks hidden there left an empty map — and a focused road trip too long
 // to fit at z7 flew to a view with nothing drawn on it.
 export const TRACKS_MIN_ZOOM = 4;
