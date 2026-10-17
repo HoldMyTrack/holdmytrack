@@ -263,9 +263,9 @@ flowchart LR
 
 **Serving.** `/tiles/v1/fog-vector/` (`fogvector.go`) traces the stored PNG per request into veil polygons and edge lines (~0.2 ms a tile), which clients draw as a fill and a blurred line: a crisp outline at every zoom, where a 128 px raster shown at 512 px was blocky or blurred. Neighbouring tiles' outlines meet within a fraction of a pixel only because no point within a pixel of the side moves, and the clients draw the edge with butt caps so the overlap doesn't double.
 
-The raster route (`tint.go`) remains for Android builds from before the vector veil (`ROADMAP.md`). Either way the inversion is the server's because MapLibre can't invert a raster (no `raster-color`), and a shader would otherwise be written twice.
+The inversion is the server's because MapLibre can't invert a raster (no `raster-color`), and a shader would otherwise be written twice.
 
-**Veils** (`fog.LightVeil`, `fog.DarkVeil`) are each opposite in lightness to their basemap, at 0.82 opacity: at 0.6 the cream veil left satellite imagery too clear to tell fogged ground from revealed. The fog is designed over the vector basemap, with imagery optional (§4.26). The clients draw the veil, the Country/Region fills and Heatmap as the served style's overlays (`ARCHITECTURE.md` §2.1), beneath the first symbol layer, so labels stay on top.
+**Veils** (`coverageStyle.ts`) are each opposite in lightness to their basemap, at 0.82 opacity: at 0.6 the cream veil left satellite imagery too clear to tell fogged ground from revealed. The fog is designed over the vector basemap, with imagery optional (§4.26). The clients draw the veil, the Country/Region fills and Heatmap as the served style's overlays (`ARCHITECTURE.md` §2.1), beneath the first symbol layer, so labels stay on top.
 
 #### 4.2.2 Heatmap mode
 
@@ -277,7 +277,7 @@ Heatmap shares Fog's masks, `fog_tiles` row, dirty flag and render; the server s
 
 **Each point is weighted for its neighbours** (`weighNeighbours`). MapLibre adds overlapping circles and its kernel peaks at about 0.4 of a weight, so a lone place read faint and a route hot. Dividing by what the neighbours add under MapLibre's kernel, `exp(-½ (3d/r)²)` at the clients' radius of 1.6 cells, with the clients' intensity of 2.5, makes each circle peak at its own weight. **The radius and intensity are the served style's (`coverageStyle.ts`), and a test in `internal/fog` holds the radius to `heatRadiusCells`.**
 
-**One query a tile**: up to z8 a grouped read of the account's own mask rows; from z9 the row and one object read, counted against the R2 budget. The MVT is encoded in Go, saving a round trip on the database the load tests found to be the bottleneck. The old `/heatmap/` raster route answers a transparent tile for old Android builds, since a stored raster would keep showing deleted or newly private activity.
+**One query a tile**: up to z8 a grouped read of the account's own mask rows; from z9 the row and one object read, counted against the R2 budget. The MVT is encoded in Go, saving a round trip on the database the load tests found to be the bottleneck.
 
 **`heatmap_cap`** is the account's most-touched z14 tile in distinct in-window activities (`fog.RecomputeHeatmapCap`). A changed cap re-renders nothing, it only bumps the tile version. The cap sweep and the window aging run daily and at worker start, independently; each corrects from the state it finds.
 
@@ -295,7 +295,7 @@ Below exact coverage, Fog reveals whole countries, then regions (FR-4.2). The ti
 
 **Boundaries**: `scripts/boundaries-extract.sh` cuts countries, dependencies and regions from a pinned Overture release with DuckDB, off the server, dropping the code-less duplicate drawing of a disputed region. `seed-admin-boundaries` replaces them in one transaction, re-matches every activity and bumps every account's tile version. It refuses a file with too few countries or regions, which would erase the rest of the world. Simplification stays under a pixel at each tier, and a country it would erase (Vatican City) keeps its full outline. Matching runs once per activity at ingest (`geo.MatchActivity`) against the full-detail pieces, the trajectory wrapped into −180…180.
 
-**Served as live MVT, not a precomputed pyramid**: the cost scales with a fixed boundary set, not with history, so there's no dirty machinery to keep. Fog's query returns the locked set (no non-Pending membership row), filled in the veil's colour so nothing shifts crossing the zoom boundary. A tile's clipped outlines are stored on its first request (§3.26), the built mark inserted first with `ON CONFLICT DO NOTHING` so a concurrent build waits; only tiles up to each tier's maxzoom are kept, and the seed empties them last in its transaction. The Heatmap country and region routes remain only for old Android builds.
+**Served as live MVT, not a precomputed pyramid**: the cost scales with a fixed boundary set, not with history, so there's no dirty machinery to keep. Fog's query returns the locked set (no non-Pending membership row), filled in the veil's colour so nothing shifts crossing the zoom boundary. A tile's clipped outlines are stored on its first request (§3.26), the built mark inserted first with `ON CONFLICT DO NOTHING` so a concurrent build waits; only tiles up to each tier's maxzoom are kept, and the seed empties them last in its transaction.
 
 #### 4.2.5 Pending activities drop out of every map read (FR-5.15)
 

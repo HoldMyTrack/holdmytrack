@@ -260,7 +260,7 @@ func TestTileRoutesRefuseOutOfRangeCoordinates(t *testing.T) {
 	me := d.newAccount(false)
 	for _, path := range []string{
 		"/tiles/v1/tracks/-1/0/0.mvt", "/tiles/v1/tracks/2/4/0.mvt", "/tiles/v1/tracks/2/0/-1.mvt",
-		"/tiles/v1/tracks/40/0/0.mvt", "/tiles/v1/fog/3/8/0.png", "/tiles/v1/heatmap/1/0/2.png",
+		"/tiles/v1/tracks/40/0/0.mvt", "/tiles/v1/fog-vector/3/8/0.mvt", "/tiles/v1/heat-points/1/0/2.mvt",
 	} {
 		if rec := d.do(me, http.MethodGet, path, nil); rec.Code != http.StatusBadRequest {
 			t.Errorf("%s: %d, want 400", path, rec.Code)

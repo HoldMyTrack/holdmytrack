@@ -68,12 +68,12 @@ func TestBudgetStages(t *testing.T) {
 	if rec := d.do(me, "POST", "/v1/account/export", nil); rec.Code != http.StatusServiceUnavailable {
 		t.Errorf("data download request: %d, want 503", rec.Code)
 	}
-	if rec := d.do(me, "GET", "/tiles/v1/fog/14/8800/5370", nil); rec.Code == http.StatusServiceUnavailable {
+	if rec := d.do(me, "GET", "/tiles/v1/fog-vector/14/8800/5370.mvt", nil); rec.Code == http.StatusServiceUnavailable {
 		t.Error("Fog tile refused before the last stage")
 	}
 
 	d.srv.SetBudget(budget.NewGate(d.pool, 4, log)) // 112%: the map's reads stop too
-	if rec := d.do(me, "GET", "/tiles/v1/fog/14/8800/5370", nil); rec.Code != http.StatusServiceUnavailable {
+	if rec := d.do(me, "GET", "/tiles/v1/fog-vector/14/8800/5370.mvt", nil); rec.Code != http.StatusServiceUnavailable {
 		t.Errorf("Fog tile: %d, want 503", rec.Code)
 	}
 	if rec := d.do(me, "GET", "/tiles/v1/tracks/14/8800/5370", nil); rec.Code == http.StatusServiceUnavailable {

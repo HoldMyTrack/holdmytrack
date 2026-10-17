@@ -196,22 +196,16 @@ func New(pool *pgxpool.Pool, store *storage.Store, log *slog.Logger, mailer mail
 	s.mux.HandleFunc(route("POST", "/sync/activities"), s.requireNotDemo(s.budgeted(budget.AddingPaused, s.handleSyncActivities)))
 	s.mux.HandleFunc(route("POST", "/sync/known"), s.requireNotDemo(s.handleSyncKnown))
 	s.tile("/tracks/{z}/{x}/{y}", s.handleTracksTile)
-	s.tile("/fog/{z}/{x}/{y}", s.budgeted(budget.ReadsPaused, s.handleFogTile))
 	s.tile("/fog-vector/{z}/{x}/{y}", s.budgeted(budget.ReadsPaused, s.handleFogVectorTile))
-	s.tile("/heatmap/{z}/{x}/{y}", s.handleHeatmapTile)
 	s.tile("/spots/{z}/{x}/{y}", s.handleSpotsTile)
 	s.tile("/bike-paths/{z}/{x}/{y}", s.handleBikePathsTile)
 	s.mux.HandleFunc(route("GET", "/spots"), s.requireVerified(s.handleSpotsInArea))
 	s.mux.HandleFunc(route("GET", "/spots/captures"), s.requireVerified(s.handleListSpotCaptures))
 	s.mux.HandleFunc(route("GET", "/spots/{id}"), s.requireVerified(s.handleSpotDetail))
 	s.mux.HandleFunc(route("POST", "/spots/{id}/captures"), s.requireNotDemo(s.handleCaptureSpot))
-	// §4.2.4's Country/Region zoom tiers — live MVT, not precomputed, see
-	// admin_country_tiles.go's own doc comment for why that's safe here despite the
-	// live-heatmap-compositing cost fog/heatmap's own tiles were moved away from.
+	// §4.2.4's Country/Region zoom tiers: live MVT, not precomputed (admin_country_tiles.go).
 	s.tile("/country-fog/{z}/{x}/{y}", s.handleCountryFogTile)
-	s.tile("/country-heatmap/{z}/{x}/{y}", s.handleCountryHeatmapTile)
 	s.tile("/region-fog/{z}/{x}/{y}", s.handleRegionFogTile)
-	s.tile("/region-heatmap/{z}/{x}/{y}", s.handleRegionHeatmapTile)
 	// §4.2.2's Heatmap: weighted points made from the stored count tiles.
 	s.tile("/heat-points/{z}/{x}/{y}", s.handleHeatPointsTile) // budgeted inside: only close in reads the store
 	// Deliberately not behind requireAuth, unlike every /v1 route above it. The style

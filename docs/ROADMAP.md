@@ -54,6 +54,4 @@ Public pages, followers and the rest (`VISION.md` §5.7, §5.8). No steps: the f
 - [x] One error shape for the JSON API (ADR-0045), described in the contract.
 - [x] Generate the web client's types from the contract (`apps/web/src/apiSchema.ts`).
 - [x] Typed Android wire classes (`net/Wire.kt`) checked against the contract (`WireContractTest`).
-- [ ] Once the Play Console shows no Android build from before Heatmap's circles, or `MIN_ANDROID_BUILD` passes them (`IMPLEMENTATION.md` §4.33), remove the routes only those builds call: the `/heatmap/` raster route, which answers a transparent tile, and the `country-heatmap` and `region-heatmap` tiles with their queries (`IMPLEMENTATION.md` §4.2.2, §4.2.4; ADR-0046).
-- [ ] Once the Play Console shows no Android build from before the vector veil, or `MIN_ANDROID_BUILD` passes them, remove the Fog PNG route (`/tiles/v1/fog/`) and its palette rewrite (`internal/fog/tint.go`) (`IMPLEMENTATION.md` §4.2, §4.33).
 - [ ] Turn on Sign in with Facebook (`SPEC.md` FR-1.10): Meta publishes the app only after Business Verification, which needs a business document such as an EIN letter or a DBA filing (`docs/DEPLOY.md` §4). Not a launch gate.

@@ -7,29 +7,6 @@ import (
 	"testing"
 )
 
-// BenchmarkFogTile is serving one stored z14 mask — a couple of strokes across an otherwise
-// empty tile — as its Fog tile.
-func BenchmarkFogTile(b *testing.B) {
-	m := image.NewGray(image.Rect(0, 0, TileSize, TileSize))
-	for i := 0; i < TileSize; i++ {
-		for w := -1; w <= 1; w++ { // a stroke ~3 px wide, as strokeRadiusPx draws one
-			if y := i/2 + TileSize/5 + w; y >= 0 && y < TileSize {
-				m.Pix[y*m.Stride+i] = 255
-			}
-		}
-	}
-	var buf bytes.Buffer
-	if err := png.Encode(&buf, m); err != nil {
-		b.Fatal(err)
-	}
-	mask := buf.Bytes()
-	for b.Loop() {
-		if _, err := FogTile(mask, LightVeil); err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
 func benchStroke() *image.Gray {
 	m := image.NewGray(image.Rect(0, 0, TileSize, TileSize))
 	for i := 0; i < TileSize; i++ {

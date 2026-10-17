@@ -20,7 +20,7 @@ test('a same-origin API base sends the cookie to the app only', () => {
 
 test('a separate API origin (dev) sends the cookie there only', () => {
   const transform = withApiCredentials('http://localhost:8080', 'http://localhost:5173/');
-  assert.equal(transform('http://localhost:8080/tiles/v1/fog/8/69/95.png').credentials, 'include');
+  assert.equal(transform('http://localhost:8080/tiles/v1/fog-vector/8/69/95.mvt').credentials, 'include');
   assert.equal(transform('http://localhost:5173/basemap/sprites/v4/light.png').credentials, undefined);
 });
 

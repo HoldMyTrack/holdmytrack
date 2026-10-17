@@ -39,20 +39,14 @@ func (l adminLayer) liveGeoms() string {
 		WHERE o.geom && ST_Transform(ST_TileEnvelope($1, $2, $3), 4326)`, l.outlines)
 }
 
-// tileQuery is one account's tile ($1, $2, $3) of this layer, for account $4: Fog's shows the
-// outlines the account has no activity in (the locked side), Heatmap's those it has one in
-// that is still `in_heatmap_window`, so a country visited only long ago cools off here exactly
-// as it does at the per-pixel tier instead of the two disagreeing at the zoom boundary.
+// tileQuery is one account's tile ($1, $2, $3) of this layer, for account $4: the outlines
+// the account has no activity in (the locked side), which Fog veils.
 //
 // visited starts from the account's own activities, so its cost is the account's history,
 // not every account's matches in the outlines the tile covers. It answers two columns: whether
 // the tile is in admin_tile_geoms yet (always true for a live one) and the tile itself, its
 // features in outline order whichever way it was drawn.
-func (l adminLayer) tileQuery(heatmap, cached bool) string {
-	window, test := "", "NOT EXISTS"
-	if heatmap {
-		window, test = "AND a.in_heatmap_window", "EXISTS"
-	}
+func (l adminLayer) tileQuery(cached bool) string {
 	built, geoms := "true", l.liveGeoms()
 	if cached {
 		built = fmt.Sprintf(`EXISTS (
@@ -66,37 +60,31 @@ func (l adminLayer) tileQuery(heatmap, cached bool) string {
 		WITH visited AS MATERIALIZED (
 			SELECT DISTINCT m.%[1]s AS id
 			FROM activities a JOIN %[2]s m ON m.activity_id = a.id
-			WHERE a.user_id = $4 AND NOT a.edit_pending %[3]s
+			WHERE a.user_id = $4 AND NOT a.edit_pending
 		)
-		SELECT %[4]s,
-		       (SELECT ST_AsMVT(t, '%[5]s', 4096, 'geom')
+		SELECT %[3]s,
+		       (SELECT ST_AsMVT(t, '%[4]s', 4096, 'geom')
 		        FROM (
 		            SELECT g.admin_id AS id, g.geom
-		            FROM (%[6]s) g
-		            WHERE %[7]s (SELECT 1 FROM visited v WHERE v.id = g.admin_id)
+		            FROM (%[5]s) g
+		            WHERE NOT EXISTS (SELECT 1 FROM visited v WHERE v.id = g.admin_id)
 		            ORDER BY g.admin_id
-		        ) t)`, l.matchID, l.matches, window, built, l.name, geoms, test)
+		        ) t)`, l.matchID, l.matches, built, l.name, geoms)
 }
 
-// adminTileQueries are the four handlers' queries, cached and live, built once.
+// adminTileQueries are the two handlers' queries, cached and live, built once.
 type adminTileQueries struct{ cached, live string }
 
 var (
-	countryFogQueries     = adminTileQueries{countryLayer.tileQuery(false, true), countryLayer.tileQuery(false, false)}
-	countryHeatmapQueries = adminTileQueries{countryLayer.tileQuery(true, true), countryLayer.tileQuery(true, false)}
-	regionFogQueries      = adminTileQueries{regionLayer.tileQuery(false, true), regionLayer.tileQuery(false, false)}
-	regionHeatmapQueries  = adminTileQueries{regionLayer.tileQuery(true, true), regionLayer.tileQuery(true, false)}
+	countryFogQueries = adminTileQueries{countryLayer.tileQuery(true), countryLayer.tileQuery(false)}
+	regionFogQueries  = adminTileQueries{regionLayer.tileQuery(true), regionLayer.tileQuery(false)}
 )
 
 func (s *Server) handleCountryFogTile(w http.ResponseWriter, r *http.Request) {
 	s.serveAdminTile(w, r, countryLayer, countryFogQueries)
 }
 
-func (s *Server) handleCountryHeatmapTile(w http.ResponseWriter, r *http.Request) {
-	s.serveAdminTile(w, r, countryLayer, countryHeatmapQueries)
-}
-
-// serveAdminTile is shared by all four admin-boundary tile handlers (this file's pair and
+// serveAdminTile is shared by the Country and Region tile handlers (this file's and
 // admin_region_tiles.go's) — they differ only in the layer and its queries, not in how tile
 // coordinates are parsed or the result written. A tile up to the layer's cacheMaxZoom is read
 // from admin_tile_geoms, built there by its first request (buildAdminTile).

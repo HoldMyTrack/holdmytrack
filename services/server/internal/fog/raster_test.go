@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"image"
-	"image/color"
 	"math/rand/v2"
 	"testing"
 )
@@ -20,35 +19,6 @@ func TestDecodeGrayRefusesAnotherSize(t *testing.T) {
 		_, err = decodeGray(bytes.NewReader(b))
 		if want := size != TileSize; errors.Is(err, errTileSize) != want {
 			t.Errorf("%d px: err = %v, want refused %v", size, err, want)
-		}
-	}
-}
-
-func TestFogTileVeils(t *testing.T) {
-	mask := image.NewGray(image.Rect(0, 0, 2, 1))
-	mask.SetGray(1, 0, color.Gray{Y: 255}) // (0,0) unexplored, (1,0) fully covered
-
-	for _, tc := range []struct {
-		theme string
-		veil  Veil
-	}{
-		{"", LightVeil},
-		{"light", LightVeil},
-		{"dark", DarkVeil},
-	} {
-		veil := VeilForTheme(tc.theme)
-		if veil != tc.veil {
-			t.Fatalf("VeilForTheme(%q) = %+v, want %+v", tc.theme, veil, tc.veil)
-		}
-		out := decodeTile(t, mustTile(FogTile(encodeMask(t, mask), veil)))
-
-		fogged := color.NRGBAModel.Convert(out.At(0, 0)).(color.NRGBA)
-		want := color.NRGBA{R: veil.R, G: veil.G, B: veil.B, A: uint8(veil.Opacity * 255)}
-		if fogged != want {
-			t.Errorf("theme %q: unexplored pixel = %+v, want %+v", tc.theme, fogged, want)
-		}
-		if _, _, _, a := out.At(1, 0).RGBA(); a != 0 {
-			t.Errorf("theme %q: covered pixel alpha = %d, want fully transparent", tc.theme, a)
 		}
 	}
 }

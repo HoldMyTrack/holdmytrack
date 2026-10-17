@@ -54,9 +54,7 @@ func TestAdminTilesAreBuiltOnceAndMatchTheLiveQuery(t *testing.T) {
 	}
 	cases := []tileCase{
 		{"country-fog", countryLayer, countryFogQueries},
-		{"country-heatmap", countryLayer, countryHeatmapQueries},
 		{"region-fog", regionLayer, regionFogQueries},
-		{"region-heatmap", regionLayer, regionHeatmapQueries},
 	}
 	coords := func(l adminLayer) (int, int, int) {
 		x, y := tilemath.LonLatToTile(at[0], at[1], l.cacheMaxZoom)
@@ -87,7 +85,6 @@ func TestAdminTilesAreBuiltOnceAndMatchTheLiveQuery(t *testing.T) {
 		sql  string
 		args []any
 	}{
-		{`UPDATE activities SET in_heatmap_window = true WHERE id = $1`, []any{activity}},
 		{`INSERT INTO activity_country VALUES ($1, $2)`, []any{activity, visited}},
 		{`INSERT INTO activity_region VALUES ($1, $2)`, []any{activity, region}},
 	} {
