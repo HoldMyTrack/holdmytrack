@@ -342,6 +342,8 @@ One ride synced from a watch and uploaded as its `.fit` has two `external_id`s, 
 
 **One filter parser** (`parseActivityFilter`) serves the list, its totals, the day histogram and the tracks tiles, so the panel and the map can't disagree. **No pagination**: Type and Distance filter client-side over the whole range, and the map draws every match anyway; a future cursor must be `(started_at, id)`, since two sources' copies of a ride share a start time. **`bbox` is computed, the short way round**: PostGIS keeps the box in the geometry header, and one wider than 180° is recomputed from `ST_ShiftLongitude` with the narrower kept. **Every day is the activity's local day** (§4.30); the account's zone decides only what "today" is. The histogram pages by activity-day, since the slider packs only days with activity. `activity_type` is the source's free text, never normalized. A name is only ever typed by a person, and sorting never reads it.
 
+**The map's state rules are one set on every client**: the web's `map/session.ts` and Android's `MapSession` (range or Story, selection, the camera's next flight) and their pure rules run the same cases in `testdata/map-session`, so a rule can't change on one platform alone.
+
 #### 4.7.5 Delete an activity — a full purge (FR-5.11)
 
 The cascade takes masks with their bytes, region rows, Story memberships and photo rows. Object storage has no foreign keys, so `handleDeleteActivity`:
@@ -379,7 +381,7 @@ flowchart TD
 
 **Split rides on the track edit**: one request and job, with the new piece Pending from its insert. Its `external_id` is the original's plus `#split:<ms>`, so a re-import still matches the original row and pieces never collide. If the job fails the new piece has no geometry, which Merge can fold back in.
 
-**Merge** (`ingest.MergePieces`, one transaction) keeps the earliest piece (the original row when included, which keeps its `external_id`), moves the others' photos and Story memberships to it, marks every piece's tiles dirty while their masks still exist, deletes the others and queues an `edit_track`. `MergeEdits` folds the specs into one that shows what the pieces showed: each is narrowed to its piece's range, a piece's Keep becomes Remove over what it cut away, and an open end is 2⁵³−1, since the browser replays the spec; `split_test.go` checks the fold. Neither client offers Merge.
+**Merge** (`ingest.MergePieces`, one transaction) keeps the earliest piece (the original row when included, which keeps its `external_id`), moves the others' photos and Story memberships to it, marks every piece's tiles dirty while their masks still exist, deletes the others and queues an `edit_track`. `MergeEdits` folds the specs into one that shows what the pieces showed: each is narrowed to its piece's range, a piece's Keep becomes Remove over what it cut away, and an open end is 2⁵³−1, since the browser replays the spec; Neither client offers Merge.
 
 ### 4.8 Activity graph — a private, per-user contribution grid
 
@@ -491,7 +493,7 @@ sequenceDiagram
 
 **Sending never reveals an account**: the inbox row comes from an `INSERT … SELECT` matching only a verified, non-demo, non-deleted account other than the sender's. **The copy is the recipient's own data, made like an upload** (ADR-0036, `internal/storycopy`), so the recipient's Private locations, masks and region matching apply. Photo rows share the original's files (§3.22), read `FOR KEY SHARE` so a racing photo delete sees the copy's row. Each original arrives once ever, every step is idempotent, and an activity whose owner has an edit pending is retried later.
 
-**The web** keeps the open Story in `MapView` state and `?story=`; with one open, the activity query is the Story alone, with no dates, and the selected range is left as it was. The Stories tab has no automated suite.
+**The web** keeps the open Story in its map session and `?story=`; with one open, the activity query is the Story alone and the selected range is left as it was.
 
 ### 4.24 Trails and bike paths (FR-4.13)
 

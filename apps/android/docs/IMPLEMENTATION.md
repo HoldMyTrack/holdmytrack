@@ -112,11 +112,11 @@ Tiles are cached by URL, so refreshing means a new URL (root `docs/IMPLEMENTATIO
 
 ### 3.3 Logic ported from the web
 
-Where the web has a rule, the app ports it as a pure Kotlin class with the web's test cases, and a change to one side needs the other: `PanelState` and `ActivityFacets`, `ActivityDays`, `DateRangeSlider`, `RangeShift`, `ZoomTier`, `TrackBands`, `EditTrackOps`, `BoxUnion`, `CoverageWatch`, `Viewfinder`, the `photos/` rules, `SpotText`, and `sync/Similar`, whose test runs the server's overlap cases both ways round. `MapPaths`' legend colors and dashes must match the web's `style.ts`.
+Where the web has a rule, the app ports it as a pure Kotlin class with the web's test cases, and a change to one side needs the other: `PanelState` and `ActivityFacets`, `ActivityDays`, `DateRangeSlider`, `RangeShift`, `ZoomTier`, `TrackBands`, `EditTrackOps`, `BoxUnion`, `CoverageWatch`, `Viewfinder`, the `photos/` rules, `SpotText`, and `sync/Similar`, whose test runs the server's overlap cases both ways round. `MapSession`, `DefaultRange`, `PendingDiff`, `PanelRules` and `PhotoMarkerScope` run the web's own JSON cases (`testdata/map-session`). `MapPaths`' legend colors and dashes must match the web's `style.ts`.
 
 ### 3.4 The panel, editors and touches
 
-The split follows the web's: `PanelState` is what `MapView.tsx` keeps, `ActivitiesPanel` binds views and redraws from it in one `render()`, and `MapFragment` owns the map, the fetches, the open Story and the photos.
+The split follows the web's: `MapSession` holds the range or Story shown and the camera's next flight, `PanelState` the selection, and `ActivitiesPanel` binds views and redraws from it in one `render()`. `MapFragment` owns the map and the fetches and composes one controller per feature (recording, spots, photos, layers, export, insets). Trap: a controller that registers a permission request or the photo picker is created as a fragment field, since registering after the fragment starts throws; Back callbacks are asked last-added first, export's before the editors' before the sheet's.
 
 - **Touch order**: a tap asks `MapSpots.spotAt` first unless an editor holds the map, so a spot's tap never selects a track under it. The track editor's point drags and the Private location handle are taken in a touch listener on the `MapView`, which runs before MapLibre's gestures (the web's `dragPan.disable()`). Photo markers are views, so their taps never reach the map.
 - **Edits run one request at a time**: parallel deletes raced each other's coverage re-render. A group edit resends each activity's own name and description, since the endpoint replaces them, and skips saves already sent on a retry.
