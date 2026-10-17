@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -60,8 +58,7 @@ func (s *Server) handleHeatPointsTile(w http.ResponseWriter, r *http.Request) {
 		// zoomed-out tiles are the database's alone and keep working.
 		if s.budget.Stage(r.Context()) >= budget.ReadsPaused {
 			w.Header().Del("Content-Type")
-			w.Header().Set("Retry-After", strconv.Itoa(int(budget.UntilReset(time.Now()).Seconds())+1))
-			httpErrorT(w, r, http.StatusServiceUnavailable, "error.daily_capacity")
+			writeBudgetPaused(w, r)
 			return
 		}
 		points, err = s.heatCountPoints(r.Context(), z, x, y)

@@ -23,12 +23,17 @@ func (s *Server) SetBudget(g *budget.Gate) {
 func (s *Server) budgeted(at budget.Stage, h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if s.budget.Stage(r.Context()) >= at {
-			w.Header().Set("Retry-After", strconv.Itoa(int(budget.UntilReset(time.Now()).Seconds())+1))
-			httpErrorT(w, r, http.StatusServiceUnavailable, "error.daily_capacity")
+			writeBudgetPaused(w, r)
 			return
 		}
 		h(w, r)
 	}
+}
+
+// writeBudgetPaused is budgeted's refusal: a 503 with a Retry-After to the day's end.
+func writeBudgetPaused(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Retry-After", strconv.Itoa(int(budget.UntilReset(time.Now()).Seconds())+1))
+	httpErrorT(w, r, http.StatusServiceUnavailable, "error.daily_capacity")
 }
 
 // overBudget is budgeted's check for an account core shared with a page form (an avatar, a data
