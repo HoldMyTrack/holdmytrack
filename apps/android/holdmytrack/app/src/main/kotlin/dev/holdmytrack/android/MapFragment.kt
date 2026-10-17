@@ -14,6 +14,7 @@ import dev.holdmytrack.android.map.BoxUnion
 import dev.holdmytrack.android.map.CameraFramer
 import dev.holdmytrack.android.map.ChromeInsets
 import dev.holdmytrack.android.map.CoverageController
+import dev.holdmytrack.android.map.CoverageLayers
 import dev.holdmytrack.android.map.DataRefresh
 import dev.holdmytrack.android.map.DateRange
 import dev.holdmytrack.android.map.LayersController
@@ -438,7 +439,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             instance.addOnCameraIdleListener { photos.onCameraIdle() }
             spots.onMapReady(view, instance, layers.shownSpots())
             instance.addOnCameraIdleListener { spots.onCameraIdle() }
-            instance.addOnCameraIdleListener { modes.onCameraIdle(instance.cameraPosition.zoom) }
+            instance.addOnCameraIdleListener {
+                style?.let { modes.onCameraIdle(CoverageLayers.tier(it, instance.cameraPosition.zoom)) }
+            }
             loadStyle()
         }
     }
@@ -501,7 +504,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
         val loaded = style ?: return
         if (!overlaysAttached) {
-            MapOverlays.attach(loaded, mode, selectedRange, layers.darkBase(loaded), layers.isNight(), storyId)
+            MapOverlays.attach(loaded, mode, selectedRange, layers.satelliteDrawn(loaded), layers.isNight(), storyId)
             // The bike-path layers attach just added start hidden.
             layers.applyPaths(loaded)
             MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.highlighted)
@@ -659,7 +662,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun prepareExportStyle(loaded: Style) {
         layers.applyPaths(loaded)
         MapSatellite.apply(loaded, layers.satelliteOn, mode)
-        MapOverlays.attach(loaded, mode, selectedRange, layers.darkBase(loaded), layers.isNight(), storyId)
+        MapOverlays.attach(loaded, mode, selectedRange, layers.satelliteDrawn(loaded), layers.isNight(), storyId)
         layers.applyPaths(loaded)
         MapOverlays.setTrackFilter(loaded, panelState.mapHidden, panelState.highlighted)
     }

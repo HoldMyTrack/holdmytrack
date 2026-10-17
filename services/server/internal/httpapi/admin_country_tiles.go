@@ -16,7 +16,7 @@ type adminLayer struct {
 	matches  string
 	matchID  string
 	// cacheMaxZoom is the highest zoom whose tiles are kept in admin_tile_geoms: the source's
-	// maxzoom on both clients (apps/web/src/map/zoomTiers.ts). A tile past it, which no client
+	// maxzoom in the served style (apps/web/src/map/coverageStyle.ts). A tile past it, which no client
 	// asks for, is drawn live rather than letting anyone fill the table with tiles nothing
 	// draws.
 	cacheMaxZoom int

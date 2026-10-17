@@ -25,7 +25,7 @@ class CoverageController(
             rendering = it
             onRenderingChanged()
         },
-        onRefetch = { style()?.let(MapOverlays::refreshCoverage) },
+        onRefetch = { style()?.let(CoverageLayers::refresh) },
     )
 
     /** Watches the account's re-render until it's done, then refetches Fog and Heatmap and runs [onDone]. */
@@ -46,7 +46,7 @@ class CoverageController(
             if (status.tileVersion.isEmpty() || status.tileVersion == Session.tileVersion) return@coverageStatus
             Session.tileVersion = status.tileVersion
             style()?.let {
-                MapOverlays.refreshCoverage(it)
+                CoverageLayers.refresh(it)
                 MapOverlays.refreshTracks(it, range())
                 // Loading places or bike paths bumps the version too.
                 MapSpots.refresh(it)

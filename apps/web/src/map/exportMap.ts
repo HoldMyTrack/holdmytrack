@@ -5,9 +5,8 @@ import logoOnDarkUrl from '../assets/logo-on-dark.png';
 import logoOnLightUrl from '../assets/logo-on-light.png';
 import { basemapOrigin, satelliteSource } from './config';
 import { withApiCredentials } from './requestCredentials';
-import { ensureFogLayer } from './fog';
+import { ensureCoverageLayers } from './coverageLayers';
 import { ensureBikePathLayers, setBikePathsVisible } from './bikePaths';
-import { ensureHeatmapLayer } from './heatmap';
 import { raisePathLayers } from './paths';
 import { labelInsertionPoint } from './layers';
 import { setMapMode, type MapMode } from './mapMode';
@@ -357,13 +356,12 @@ async function renderOffscreen(
     });
 
     const beforeId = labelInsertionPoint(instance);
-    ensureFogLayer(instance, beforeId, isDarkBase(state.flavor, state.satellite));
-    ensureHeatmapLayer(instance, beforeId, isDarkBase(state.flavor, state.satellite));
+    ensureCoverageLayers(instance, beforeId);
     raisePathLayers(instance, beforeId);
     ensureBikePathLayers(instance, beforeId, state.flavor);
     setBikePathsVisible(instance, state.paths);
     ensureTrackLayer(instance, beforeId, state.activityQuery);
-    setMapMode(instance, state.mode);
+    setMapMode(instance, state.mode, state.satellite);
     setSatelliteVisible(instance, state.satellite, state.mode);
     setHiddenTracks(instance, state.hiddenIds);
 

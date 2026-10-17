@@ -53,6 +53,9 @@ const (
 	satelliteLayer  = "satellite"
 )
 
+// satelliteMetadataPrefix starts every metadata key style.ts gives the imagery.
+const satelliteMetadataPrefix = "holdmytrack:satellite-"
+
 // Satellite is a deployment's imagery, mirroring style.ts's SatelliteSource. A zero Tiles means
 // none: Document then leaves the satellite source out, and clients show no switch for it.
 type Satellite struct {
@@ -148,7 +151,7 @@ func Document(flavor, lang, origin string, sat Satellite) ([]byte, error) {
 }
 
 // withSatellite replaces the generated placeholder source with sat, or drops the source, its
-// layer and the metadata listing what it hides. It edits the document structurally rather than
+// layer and the satellite metadata keys, keeping the rest (the Fog and Heatmap overlays). It edits the document structurally rather than
 // by string replacement: the tile URL and credit are arbitrary text that needs JSON escaping,
 // and removing a layer is not a substitution at all. Layers other than the satellite one pass
 // through as raw JSON, untouched.
@@ -177,9 +180,10 @@ func withSatellite(doc []byte, sat Satellite) ([]byte, error) {
 			return nil, err
 		}
 	} else {
-		// metadata holds only the hidden-layer list (style.ts), meaningless without the layer.
 		delete(sources, satelliteSource)
-		delete(style, "metadata")
+		if style["metadata"], err = withoutSatelliteMetadata(style["metadata"]); err != nil {
+			return nil, err
+		}
 		var layers []json.RawMessage
 		if err := json.Unmarshal(style["layers"], &layers); err != nil {
 			return nil, fmt.Errorf("mapstyle: layers: %w", err)
@@ -205,6 +209,24 @@ func withSatellite(doc []byte, sat Satellite) ([]byte, error) {
 		return nil, err
 	}
 	return json.Marshal(style)
+}
+
+// withoutSatelliteMetadata is metadata without the keys style.ts names for the imagery
+// (holdmytrack:satellite-*), meaningless without its layer.
+func withoutSatelliteMetadata(raw json.RawMessage) (json.RawMessage, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	var metadata map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &metadata); err != nil {
+		return nil, fmt.Errorf("mapstyle: metadata: %w", err)
+	}
+	for key := range metadata {
+		if strings.HasPrefix(key, satelliteMetadataPrefix) {
+			delete(metadata, key)
+		}
+	}
+	return json.Marshal(metadata)
 }
 
 // ETag is a strong validator over the document's actual bytes. The style changes only when

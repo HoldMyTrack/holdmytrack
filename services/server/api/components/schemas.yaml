@@ -347,3 +347,58 @@ SpotCapture:
   properties:
     spot_id: { type: integer }
     captured_at: { type: string, format: date-time }
+CoverageOverlays:
+  type: object
+  description: Fog of War and Heatmap (IMPLEMENTATION.md §4.2), for the client to apply as they come. Every view sets the same properties, so switching views never undoes one.
+  required: [sources, layers, views, tiers]
+  additionalProperties: false
+  properties:
+    sources:
+      type: object
+      description: By source id, each a vector source of this account's tiles.
+      additionalProperties:
+        type: object
+        required: [tiles, minzoom, maxzoom]
+        additionalProperties: false
+        properties:
+          tiles: { type: string, description: "A path on the API's origin with {z}/{x}/{y}; the client adds its base URL and the tile version as cv." }
+          minzoom: { type: integer }
+          maxzoom: { type: integer }
+          attribution: { type: string }
+    layers:
+      type: array
+      description: MapLibre layers in paint order, inserted beneath the first symbol layer. Every array in a filter, layout or paint value is an expression.
+      items: { type: object, required: [id, type] }
+    views:
+      type: object
+      description: The layout and paint every overlay and label layer takes in each mode, over satellite imagery or not.
+      required: [plain, satellite]
+      additionalProperties: false
+      properties:
+        plain: { $ref: "#/CoverageViews" }
+        satellite: { $ref: "#/CoverageViews" }
+    tiers:
+      type: array
+      description: The zoom tiers Fog draws at, in order; a tier is in view below its `below`, the last at every zoom past.
+      items:
+        type: object
+        required: [tier]
+        additionalProperties: false
+        properties:
+          tier: { type: string, enum: [country, region, city] }
+          below: { type: number }
+CoverageViews:
+  type: object
+  required: [normal, fog, heatmap]
+  additionalProperties: false
+  properties:
+    normal: { $ref: "#/CoverageView" }
+    fog: { $ref: "#/CoverageView" }
+    heatmap: { $ref: "#/CoverageView" }
+CoverageView:
+  type: object
+  required: [layout, paint]
+  additionalProperties: false
+  properties:
+    layout: { type: object, description: "By layer id, the layout properties to set." }
+    paint: { type: object, description: "By layer id, the paint properties to set." }

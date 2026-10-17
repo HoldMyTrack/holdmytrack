@@ -1,5 +1,5 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { FOG_LAYER_ID } from './fog';
+import { firstCoverageLayerId } from './coverageLayers';
 import { PATH_LAYER_IDS } from './style';
 
 /**
@@ -8,14 +8,15 @@ import { PATH_LAYER_IDS } from './style';
  * rather than under them (IMPLEMENTATION.md §4.24). Call it after Fog and Heatmap are added and
  * before the bike-path layers and the activity tracks, which then stack over the trails.
  *
- * Only a layer still below the fog raster moves: reattachOverlays calls this on every
+ * Only a layer still below the lowest overlay moves: reattachOverlays calls this on every
  * `styledata`, and moving a layer that's already in place would fire another (docs/DEVELOPMENT.md).
  * A style swap puts the layers back among the roads, and the next call lifts them again. The cost
  * is that a path paints over a road bridge crossing it.
  */
 export function raisePathLayers(map: MapLibreMap, beforeId: string | undefined): void {
+  const first = firstCoverageLayerId(map);
   const order = map.getStyle().layers.map((layer) => layer.id);
-  const fog = order.indexOf(FOG_LAYER_ID);
+  const fog = first === undefined ? -1 : order.indexOf(first);
   if (fog < 0) return;
   for (const id of PATH_LAYER_IDS) {
     const at = order.indexOf(id);

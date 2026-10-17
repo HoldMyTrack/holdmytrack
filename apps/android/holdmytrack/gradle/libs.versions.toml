@@ -3,7 +3,7 @@ agp = "9.4.0"
 # MapLibre Native for Android. 11.8.0 is where built-in `pmtiles://` support landed and
 # 13.3.0 added its ambient cache, so anything in the 13.x line already speaks the same URL
 # scheme the style document carries (docs/ARCHITECTURE.md §3).
-maplibre = "13.6.1"
+maplibre = "13.7.1"
 appcompat = "1.7.1"
 # Material Components for Android — the Material 3 theme and widgets the Views UI is styled
 # with (docs/ARCHITECTURE.md §3). 1.13.0 is the
@@ -19,7 +19,7 @@ coroutines = "1.10.2"
 # Declared explicitly rather than inherited transitively: the app builds its own OkHttpClient
 # (net/HoldMyTrackApi.kt) and hands that same instance to MapLibre Native, so the version is a
 # direct compile dependency here, not an implementation detail of the map SDK. 4.12.0 is the
-# version MapLibre 13.6.1's own POM already resolves to, so this pins rather than upgrades.
+# version MapLibre 13.7.1's own POM already resolves to, so this pins rather than upgrades.
 okhttp = "4.12.0"
 # Sign in with Google (docs/IMPLEMENTATION.md §4.9): Credential Manager's account picker,
 # its Play services backend, and the Google ID-token credential type it returns.

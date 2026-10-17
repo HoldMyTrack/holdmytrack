@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import type { MapMode } from '../map/mapMode';
-import { levelNoticeKey, zoomTier } from '../map/zoomTiers';
+import { coverageOverlays } from '../map/coverageLayers';
+import { zoomTier } from '../map/coverageStyle';
+import { levelNoticeKey } from '../map/zoomTiers';
 import { t } from '../i18n';
 
 /** How long the notice stays before it fades. */
@@ -14,7 +16,7 @@ export interface ZoomLevelNoticeProps {
 
 /**
  * Fog draws at three levels by zoom (`SPEC.md` FR-4.2): whole countries, then whole states or
- * provinces, then exactly where you've been (zoomTiers.ts). Nothing else on the map says which
+ * provinces, then exactly where you've been, at the tiers the style sets (coverageStyle.ts). Nothing else on the map says which
  * is in view, and a veil lifted from a whole country reads as a bug when you don't know that's
  * the level you're at. So this names it — a pill under the mode toggle (MapView renders it in
  * `.map-toggles`, on a line of its own below however many rows those wrap to), on entering the
@@ -24,12 +26,12 @@ export interface ZoomLevelNoticeProps {
  * Never in Normal mode, which draws tracks at every zoom.
  */
 export function ZoomLevelNotice({ map, mode }: ZoomLevelNoticeProps) {
-  const [tier, setTier] = useState(() => zoomTier(map.getZoom()));
+  const [tier, setTier] = useState(() => tierAt(map));
   const [shown, setShown] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const onZoomEnd = () => setTier(zoomTier(map.getZoom()));
+    const onZoomEnd = () => setTier(tierAt(map));
     map.on('zoomend', onZoomEnd);
     return () => {
       map.off('zoomend', onZoomEnd);
@@ -54,4 +56,8 @@ export function ZoomLevelNotice({ map, mode }: ZoomLevelNoticeProps) {
       <span className="zoom-level-notice__pill">{shown}</span>
     </div>
   );
+}
+
+function tierAt(map: MapLibreMap) {
+  return zoomTier(coverageOverlays(map)?.tiers ?? [], map.getZoom());
 }

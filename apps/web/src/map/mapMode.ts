@@ -1,69 +1,34 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { COUNTRY_FOG_LAYER_ID, FOG_EDGE_LAYER_ID, FOG_LAYER_ID, REGION_FOG_LAYER_ID } from './fog';
-import { HEAT_POINTS_LAYER_ID, HEATMAP_DIM_LAYER_ID } from './heatmap';
-import { SPOTS_LAYER_ID } from './spots';
+import { setCoverageView } from './coverageLayers';
 import { BAND_LAYER_ID } from './trackBands';
 import { TRACKS_CASING_LAYER_ID, TRACKS_LAYER_ID } from './tracks';
 
 /**
  * The three mutually exclusive views (docs/SPEC.md FR-4.4) — not
- * independent checkboxes, a single toggle. Lives here rather than in fog.ts or heatmap.ts
- * because it has to coordinate all three overlay layers (fog, heatmap, tracks) at once:
- * both Fog and Heatmap hide the track layer (the coverage already shows where, and
- * the drawn lines on top of either one read as visual noise rather than adding information,
- * reported live as ruining the effect), which neither fog.ts nor heatmap.ts alone could
- * express without reaching into a layer they don't own.
+ * independent checkboxes, a single toggle. What Fog and Heatmap show, and how they quiet the
+ * basemap, is the served style's (coverageStyle.ts); this adds the app's own layers, which
+ * both modes hide: the coverage already shows where, and the drawn lines on top of either one
+ * read as visual noise rather than adding information, reported live as ruining the effect.
  */
 export type MapMode = 'normal' | 'fog' | 'heatmap';
 
 /**
- * Applies visibility for all three overlay layers per mode. A no-op for whichever layer
- * isn't on the map yet (relevant right after a styledata swap, before reattachOverlays has
- * re-added everything) rather than throwing.
+ * Applies `mode` to the overlays and the tracks. A no-op for whichever layer isn't on the map yet
+ * (relevant right after a styledata swap, before reattachOverlays has re-added everything)
+ * rather than throwing. `satellite` picks the overlays' view over imagery.
  *
  * `editingTrack` is the Edit track session (§4.7.7): every other activity disappears while
  * one is being edited, and the edited one is drawn by its own overlay (trackEdit.ts), so the
  * shared tracks layer and its bands are hidden outright rather than filtered.
  */
-export function setMapMode(map: MapLibreMap, mode: MapMode, editingTrack = false): void {
-  setVisible(map, FOG_LAYER_ID, mode === 'fog');
-  setVisible(map, FOG_EDGE_LAYER_ID, mode === 'fog');
-  setVisible(map, COUNTRY_FOG_LAYER_ID, mode === 'fog');
-  setVisible(map, REGION_FOG_LAYER_ID, mode === 'fog');
-  setVisible(map, HEAT_POINTS_LAYER_ID, mode === 'heatmap');
-  // Heatmap washes the basemap beneath the heat (heatmap.ts), so the heat stands off it.
-  setVisible(map, HEATMAP_DIM_LAYER_ID, mode === 'heatmap');
-  // Tracks stay visible only in Normal — both Fog and Heatmap hide them (§4.2.2).
-  setVisible(map, TRACKS_LAYER_ID, mode === 'normal' && !editingTrack);
-  setVisible(map, TRACKS_CASING_LAYER_ID, mode === 'normal' && !editingTrack);
+export function setMapMode(map: MapLibreMap, mode: MapMode, satellite: boolean, editingTrack = false): void {
+  setCoverageView(map, mode, satellite);
+  const tracks = mode === 'normal' && !editingTrack;
+  setVisible(map, TRACKS_LAYER_ID, tracks);
+  setVisible(map, TRACKS_CASING_LAYER_ID, tracks);
   // FR-4.8: a focused activity's pace-colored segments are a second layer over the shared
-  // tracks layer (trackBands.ts) — not covered by the tracks toggle above — so switching to
-  // Fog/Heatmap has to hide it too, or it keeps rendering over the raster.
-  setVisible(map, BAND_LAYER_ID, mode === 'normal' && !editingTrack);
-  // Basemap labels (place names, street names, POIs) stay above the veil (layers.ts) so
-  // they're legible, but at full strength they read as brighter than the fog itself and
-  // pull the eye away from what's actually been cleared — so Fog mode mutes them. Every
-  // symbol layer on the map is the basemap's own but Spots' (spots.ts), which stays at full
-  // strength: it's there to be found. @protomaps/basemaps never sets text-/icon-opacity itself,
-  // so resetting to undefined restores exactly the style's default rather than a remembered value.
-  const labelOpacity = mode === 'fog' ? FOG_LABEL_OPACITY : undefined;
-  for (const layer of map.getStyle().layers) {
-    if (layer.type !== 'symbol' || layer.id === SPOTS_LAYER_ID) continue;
-    setPaint(map, layer.id, 'text-opacity', labelOpacity);
-    setPaint(map, layer.id, 'icon-opacity', labelOpacity);
-  }
-}
-
-/** How far Fog mode mutes basemap labels — dim enough to recede behind the veil, still
- *  readable enough to orient by. */
-const FOG_LABEL_OPACITY = 0.4;
-
-/** Same diff-before-set guard as setVisible below: map.setPaintProperty also calls
- *  _update(true) unconditionally, so skipping a no-op call is what keeps the styledata
- *  loop from self-sustaining. */
-function setPaint(map: MapLibreMap, layerId: string, property: 'text-opacity' | 'icon-opacity', value: number | undefined): void {
-  if (map.getPaintProperty(layerId, property) === value) return;
-  map.setPaintProperty(layerId, property, value);
+  // tracks layer (trackBands.ts), so leaving Normal has to hide it too.
+  setVisible(map, BAND_LAYER_ID, tracks);
 }
 
 function setVisible(map: MapLibreMap, layerId: string, visible: boolean): void {
