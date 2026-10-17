@@ -765,6 +765,10 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         layers.dismiss()
         spots.stopCapture()
         mapView.onDestroy()
+        // A fetch that lands after this must find no map: the destroyed style throws on every call.
+        map = null
+        style = null
+        overlaysAttached = false
         range.release()
         coverage.stop()
         super.onDestroyView()
