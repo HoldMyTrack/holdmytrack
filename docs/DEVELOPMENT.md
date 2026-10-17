@@ -12,7 +12,7 @@ Everything runs in Docker, the Vite dev server included: `docker compose up`, th
 
 ### Server-rendered pages in dev
 
-Every page, the map's shell included, is rendered by Go (`IMPLEMENTATION.md` §4.19), but you open everything at `localhost:5173`. Vite proxies the page paths (`pageRoutes` in `vite.config.ts`) to `API_PROXY_TARGET` (`http://api:8080` in compose, `localhost:8080` by default on the host) and marks each request `X-HoldMyTrack-Vite: dev`; a dev Go server then answers with a shell that loads the app from Vite, with Fast Refresh. `vite preview` proxies without the marker, so the shell loads the build. Both `verify:map` and `verify:build` need a running Go server.
+Every page, the map's shell included, is rendered by Go (`IMPLEMENTATION.md` §4.19), but you open everything at `localhost:5173`. Vite proxies the page paths (`pageRoutes` in `vite.config.ts`) to `API_PROXY_TARGET` (`http://api:8080` in compose, `localhost:8080` by default on the host) and marks each request `X-HoldMyTrack-Vite: dev`; a dev Go server then answers with a shell that loads the app from Vite, with Fast Refresh. `vite preview` proxies without the marker, so the shell loads the build. `verify:map` and `verify:build` need a running Go server; `verify:map`'s flows, which upload activities, the worker too.
 
 `compose.yaml` mounts `services/server/internal/web` into `api` with `WEB_DEV_DIR` set, so templates and stylesheets are re-read on every request; a Go handler change needs `docker compose up -d --build api`. A new page path goes in both `registerPages` (`server.go`) and `pageRoutes`, whose patterns must allow a query string; a path missing from either 404s in dev only, since production's Caddy sends every non-static path to Go.
 
@@ -24,7 +24,7 @@ The Android suite's sample files (`/testing`) are generated. After changing `dem
 docker run --rm -v "$PWD":/src -w /src golang:1.25-bookworm go run ./cmd/make-testing-files
 ```
 
-Use the Go version `go.mod` names: another release compresses the zips and encodes the JPEGs differently, and the Go tests fail while the committed files differ from the output.
+Use the Go version `go.mod` names: another release compresses the zips and JPEGs differently, failing the Go tests.
 
 ### Text and translations
 
@@ -107,13 +107,13 @@ Every request `internal/httpapi`'s tests send through `dbTest.do`, `dbTest.send`
 
 ### Android verification
 
-The app has JUnit tests over its pure logic (`./gradlew :app:testDebugUnitTest` in `apps/android/holdmytrack`) and no instrumentation tests or Health Connect test double; the rest is checked by hand. After a change to the sync code, re-check on a physical device with real Health Connect data: a run cut off midway, a route not handed over, a reinstall (synced sessions must not come back) and an activity deleted on the web (its session must). Only one device and one provider (Fitbit) have been tested; Samsung's missing routes rest on Samsung's documentation.
+The app has JUnit tests over its pure logic (`./gradlew :app:testDebugUnitTest` in `apps/android/holdmytrack`) and UI Automator flows over the map (`connectedDebugAndroidTest -Pholdmytrack.apiBaseUrl=http://10.0.2.2:8081`, on an emulator); there is no Health Connect test double. An emulator recording needs a moving location (Extended controls › Location › Routes, or `adb emu geo fix` in a loop), or Stop drops it. After a change to the sync code, re-check on a physical device with real Health Connect data: a run cut off midway, a route not handed over, a reinstall (synced sessions must not come back) and an activity deleted on the web (its session must). Only one device and one provider (Fitbit) have been tested; Samsung's missing routes rest on Samsung's documentation.
 
 ### CI
 
-`.github/workflows/ci.yml` runs on every push to `main` and every pull request, in five parallel jobs: `scripts/check-doc-refs.sh`, which fails on a `§`, FR or ADR citation whose heading no longer exists; `go test -p 1 ./...` with a PostGIS service; the web `typecheck`, `test:coverage`, `verify:style` and `verify:api-types`; the Android JUnit tests; and `make verify verify-build` against the compose stack. That last job caches the basemap extract keyed on `apps/web/scripts/build-basemap.sh` and cuts it on a miss, which 404s once the pinned Protomaps build ages out (about a week): bump `BUILD` in the script.
+`.github/workflows/ci.yml` runs on every push to `main` and every pull request, in six jobs: `scripts/check-doc-refs.sh`, which fails on dead citations; `scripts/check-file-size.sh`, a warning only; `go test -p 1 ./...` with a PostGIS service; the web `typecheck`, `test:coverage`, `verify:style` and `verify:api-types`; the Android JUnit tests; and `make verify verify-build` against the compose stack. That last job caches the basemap extract keyed on `apps/web/scripts/build-basemap.sh` and cuts it on a miss, which 404s once the pinned Protomaps build ages out (about a week): bump `BUILD` in the script.
 
-The Go, web and Android jobs upload unit-test coverage to Codecov (flags `go`, `typescript`, `kotlin`), so the numbers are low by design; c8's `all` (`apps/web/.c8rc.json`) counts untested files. `codecov.yml` keeps the status checks informational. CI never deploys (`docs/DEPLOY.md` §6).
+The Go, web and Android jobs upload unit-test coverage to Codecov, informational only (`codecov.yml`) and low by design: c8's `all` counts untested files. CI never deploys (`docs/DEPLOY.md` §6).
 
 ## Writing a migration
 
@@ -132,10 +132,10 @@ Removing or renaming takes two releases: stop using it, then drop it. A migratio
 - **`vite.config.ts` declares its own `process`.** `tsconfig.json`'s `types` is only `["vite/client"]`, so a bare `process` elsewhere fails `tsc`.
 - **Playwright is pinned exactly.** Its browser build is keyed to its version; a caret range let the package drift from the image's browser.
 - **`ST_SimplifyPreserveTopology` drops the M ordinate in PostGIS 3.4**, returning a plain `LINESTRING` without the epoch seconds. `internal/ingest/simplify.go` simplifies X/Y, then reattaches each surviving vertex's timestamp by matching coordinates in order; read its doc comment before collapsing it to one call.
-- **A `styledata`-only listener can miss first load, and adding a source makes `isStyleLoaded()` dip to `false`.** The listener is attached after `'load'`, so `MapView` also calls its overlay attach directly. A new source drops `isStyleLoaded()` while its tiles load, so `tests/smoke.mjs`'s `styleLoaded()` waits for `true` on two checks 150ms apart. Once overlays exist, `isStyleLoaded()` is no one-shot signal.
+- **A `styledata`-only listener can miss first load, and adding a source makes `isStyleLoaded()` dip to `false`.** The listener is attached after `'load'`, so `useMapLayers` also calls its overlay attach directly. A new source drops `isStyleLoaded()` while its tiles load, so `tests/smoke.mjs`'s `styleLoaded()` waits for `true` on two checks 150ms apart. Once overlays exist, `isStyleLoaded()` is no one-shot signal.
 - **Inside the `test` service, `localhost` is that container.** `network_mode: "service:api"` puts it on `api`'s network stack so `localhost:8080` works and browser, Vite and `api` stay same-site for the `SameSite=Lax` session cookie; a base of `api:8080` loses the cookie.
 - **Idempotency lives at persist time.** The upload handler's existing-row check is a fast path racing uploads can both pass; the guarantee is `internal/ingest.Process`'s `ON CONFLICT (user_id, source, external_id) DO NOTHING`. Any new job kind writing `activities` needs the same.
-- **`map.setFilter`/`map.setLayoutProperty` call `_update(true)` even when nothing changes** (maplibre-gl 6.9.0). `reattachOverlays` (`MapView.tsx`) re-applies mode and hidden tracks on every `'styledata'`, since `addLayer` resets them, so an unconditional setter there loops forever (setter → `'styledata'` → setter) and `isStyleLoaded()` never settles. `mapMode.ts`'s `setVisible` and `tracks.ts`'s `setHiddenTracks` diff first; any `map.set*` call on that path needs the same guard.
+- **`map.setFilter`/`map.setLayoutProperty` call `_update(true)` even when nothing changes** (maplibre-gl 6.9.0). `useMapLayers` re-applies mode and hidden tracks on every `'styledata'`, since `addLayer` resets them, so an unconditional setter there loops forever (setter → `'styledata'` → setter) and `isStyleLoaded()` never settles. `mapMode.ts`'s `setVisible` and `tracks.ts`'s `setHiddenTracks` diff first; any `map.set*` call on that path needs the same guard.
 - **`go:embed` can't reach from `internal/db/` into `migrations/`.** `migrations/embed.go` embeds the SQL beside it and `internal/db` imports that package.
 
 ## Commands
@@ -144,6 +144,7 @@ Removing or renaming takes two releases: stop using it, then drop it. A migratio
 
 ```bash
 scripts/check-doc-refs.sh                                         # citation check
+scripts/check-file-size.sh                                        # soft size warnings
 cd apps/web && npm run gen:api-types                              # after a contract change
 cd apps/web && npm run build:style                                # after src/map/style.ts changes
 cd apps/android/holdmytrack && ./gradlew :app:testDebugUnitTest   # Android JUnit tests
@@ -155,8 +156,8 @@ On the host, `npm run build` must precede `verify:build`, and `npm run basemap` 
 
 - **The IDE needs a host `node_modules`**, about 300 MB, refreshed by hand when the lockfile changes.
 - **Adding a dependency takes three steps**: install in the container, rebuild the image, install on the host.
-- **`vite build` copies the 326 MB archive through VirtioFS**, seconds instead of an instant APFS clone.
-- **Playwright renders on SwiftShader**, a rasteriser no user has.
-- **HMR can go deaf over VirtioFS**, which the host never does.
+- **`vite build` copies the 326 MB archive through VirtioFS**, taking seconds.
+- **Playwright renders on SwiftShader**, which no user has.
+- **HMR can go deaf over VirtioFS.**
 
 Open follow-up: `scripts/build-basemap.sh` pins a Protomaps build that their seven-day retention ages out. Resolving the newest key from `https://build-metadata.protomaps.dev/builds.json` when `BUILD` is unset would make CI's cache miss self-healing ("CI" above).

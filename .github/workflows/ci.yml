@@ -20,6 +20,17 @@ jobs:
       - uses: actions/checkout@v4
       - run: scripts/check-doc-refs.sh
 
+  file-size:
+    name: File size (soft)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Annotations only (scripts/check-file-size.sh always exits 0). A pull request is compared
+      # with its base branch, a push with the commit before it.
+      - run: scripts/check-file-size.sh "${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}"
+
   go:
     name: Go tests
     runs-on: ubuntu-latest

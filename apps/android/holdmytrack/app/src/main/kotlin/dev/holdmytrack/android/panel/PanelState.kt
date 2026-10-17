@@ -5,8 +5,8 @@ import dev.holdmytrack.android.net.Activity
 /**
  * What the Activities panel and the map agree on: the date range's activities, the two
  * filters, the checked group, the one selected (focused) activity, and the tracks hidden for
- * the session — the state the web keeps in `apps/web/src/map/MapView.tsx`, with the same rules.
- * Plain data and rules, no views, so it's what the unit tests exercise.
+ * the session. The web keeps the same state in `apps/web/src/map/MapView.tsx`, its rules in
+ * `selection.ts`. Plain data and rules, no views, so it's what the unit tests exercise.
  *
  * Selection and the checked group take turns (`apps/android/docs/SPEC.md` FR-2.7):
  * outside selecting, tapping a row or a track *selects* it — at most one, bold on the map, flown
@@ -77,15 +77,9 @@ class PanelState {
             it.pending || it.id in hidden || !ActivityFacets.passesFilters(it, excludedTypes, distanceFilter)
         }.mapTo(HashSet()) { it.id }
 
-    /** What the toolbar acts on: the checked group whenever anything is checked, else the
-     *  selected row alone, else nothing. Checked wins rather than the two being joined, so a
-     *  toolbar action never reaches further than what was ticked. */
+    /** What the toolbar acts on ([PanelRules.targetIds]). */
     val targetIds: Set<String>
-        get() = when {
-            checked.isNotEmpty() -> checked
-            focused != null -> setOf(focused!!)
-            else -> emptySet()
-        }
+        get() = PanelRules.targetIds(checked, focused)
 
     /** [targetIds]' rows among the ones listed — none when every one is filtered out, which
      *  disables the toolbar the same as having no target at all. */
@@ -134,11 +128,9 @@ class PanelState {
         checked = listed.filter { it.id !in checked }.mapTo(HashSet()) { it.id }
     }
 
-    /** The toolbar's Show/Hide over its target: any of it hidden shows all of it, otherwise
-     *  hides all of it — one tap always leaves the group in one state. */
+    /** The toolbar's Show/Hide over its target ([PanelRules.toggledVisibility]). */
     fun toggleTargetVisibility() {
-        val target = targetIds
-        hidden = if (target.any { it in hidden }) hidden - target else hidden + target
+        hidden = PanelRules.toggledVisibility(hidden, targetIds)
     }
 
     /** A toggle, so a type is always one tap from coming back without "Reset filters". */

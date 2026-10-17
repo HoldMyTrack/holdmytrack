@@ -14,9 +14,9 @@
     "gen:api-types": "openapi-typescript ../../services/server/api/openapi.yaml --array-length -o src/apiSchema.ts",
     "verify:api-types": "openapi-typescript ../../services/server/api/openapi.yaml --array-length -o src/apiSchema.ts --check",
     "verify:style": "node scripts/build-style.mjs --check",
-    "verify:map": "node --test tests/smoke.mjs",
+    "verify:map": "node --test --test-concurrency=1 tests/smoke.mjs tests/flows.mjs",
     "verify:build": "node --test tests/build.mjs",
-    "test:unit": "node --test tests/activityFacets.test.mjs tests/apiError.test.mjs tests/bbox.test.mjs tests/coveragePoll.test.mjs tests/editTrackOps.test.mjs tests/i18n.test.mjs tests/photoClusters.test.mjs tests/photoPrep.test.mjs tests/photoTrack.test.mjs tests/photoZoom.test.mjs tests/rangeShift.test.mjs tests/requestCredentials.test.mjs tests/spotCaptures.test.mjs tests/timeZone.test.mjs tests/zoomTiers.test.mjs tests/heatPoints.test.mjs tests/globe.test.mjs tests/exportViewfinder.test.mjs tests/satelliteRoads.test.mjs",
+    "test:unit": "node --test tests/activityFacets.test.mjs tests/apiError.test.mjs tests/bbox.test.mjs tests/coveragePoll.test.mjs tests/editTrackOps.test.mjs tests/i18n.test.mjs tests/photoClusters.test.mjs tests/photoPrep.test.mjs tests/photoTrack.test.mjs tests/photoZoom.test.mjs tests/rangeShift.test.mjs tests/requestCredentials.test.mjs tests/spotCaptures.test.mjs tests/timeZone.test.mjs tests/zoomTiers.test.mjs tests/heatPoints.test.mjs tests/globe.test.mjs tests/exportViewfinder.test.mjs tests/satelliteRoads.test.mjs tests/mapRules.test.mjs tests/selection.test.mjs tests/exportFlow.test.mjs tests/storyUrl.test.mjs tests/cameraRules.test.mjs tests/editAvailability.test.mjs tests/session.test.mjs",
     "test:coverage": "c8 npm run test:unit"
   },
   "dependencies": {

@@ -1,0 +1,12 @@
+{
+  "rule": "photoScope",
+  "description": "Whose photos the map shows, in Normal mode only: the Edit window's single activity (none for a group), else the focused activity, else the open Story.",
+  "cases": [
+    { "name": "Fog shows none", "input": { "mode": "fog", "focused": "a", "storyId": "s" }, "expected": null },
+    { "name": "the Edit window's one activity", "input": { "mode": "normal", "editWindowIds": ["e"], "focused": "a", "storyId": "s" }, "expected": { "activity": "e" } },
+    { "name": "an Edit window over a group shows none", "input": { "mode": "normal", "editWindowIds": ["e", "f"], "focused": "a" }, "expected": null },
+    { "name": "the focused activity over the Story", "input": { "mode": "normal", "focused": "a", "storyId": "s" }, "expected": { "activity": "a" } },
+    { "name": "the open Story", "input": { "mode": "normal", "storyId": "s" }, "expected": { "story": "s" } },
+    { "name": "nothing in view", "input": { "mode": "normal" }, "expected": null }
+  ]
+}

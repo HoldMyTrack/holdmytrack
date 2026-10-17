@@ -1,0 +1,31 @@
+{
+  "rule": "pendingChange",
+  "description": "What a newly fetched list says about reprocesses. An edit applied here (awaiting) counts as finished once a list shows it not pending, even if no list ever showed it pending.",
+  "cases": [
+    {
+      "name": "a row entering Pending starts",
+      "input": { "previous": [], "now": ["a"], "awaiting": [] },
+      "expected": { "started": true, "finished": false, "left": [], "landed": [], "awaiting": [] }
+    },
+    {
+      "name": "a row leaving Pending finishes",
+      "input": { "previous": ["a", "b"], "now": ["b"], "awaiting": [] },
+      "expected": { "started": false, "finished": true, "left": ["a"], "landed": [], "awaiting": [] }
+    },
+    {
+      "name": "an awaited edit never seen Pending still finishes",
+      "input": { "previous": [], "now": [], "awaiting": ["a"] },
+      "expected": { "started": false, "finished": true, "left": [], "landed": ["a"], "awaiting": [] }
+    },
+    {
+      "name": "an awaited edit still pending keeps waiting",
+      "input": { "previous": [], "now": ["a"], "awaiting": ["a"] },
+      "expected": { "started": true, "finished": false, "left": [], "landed": [], "awaiting": ["a"] }
+    },
+    {
+      "name": "the same pending set changes nothing",
+      "input": { "previous": ["a"], "now": ["a"], "awaiting": [] },
+      "expected": { "started": false, "finished": false, "left": [], "landed": [], "awaiting": [] }
+    }
+  ]
+}

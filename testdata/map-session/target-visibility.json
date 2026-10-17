@@ -1,0 +1,10 @@
+{
+  "rule": "targetVisibility",
+  "description": "The toolbar's Show/Hide: if any of the target is hidden, show all of it; otherwise hide all of it.",
+  "cases": [
+    { "name": "none hidden hides all", "input": { "hidden": ["x"], "target": ["a", "b"] }, "expected": ["a", "b", "x"] },
+    { "name": "some hidden shows all", "input": { "hidden": ["a", "x"], "target": ["a", "b"] }, "expected": ["x"] },
+    { "name": "all hidden shows all", "input": { "hidden": ["a", "b"], "target": ["a", "b"] }, "expected": [] },
+    { "name": "empty target changes nothing", "input": { "hidden": ["x"], "target": [] }, "expected": ["x"] }
+  ]
+}

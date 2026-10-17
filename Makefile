@@ -47,11 +47,12 @@ test-go: ## Go tests (services/server), one package at a time, against compose's
 	$(GO) go test -p 1 ./...
 
 # verify:style compares against services/server/internal/mapstyle/styles, and verify:api-types
-# against the API contract in services/server/api, which the web container does not otherwise
-# see; each mounted where the scripts' own relative paths land.
+# against the API contract in services/server/api, and the map rule cases read testdata/; the web
+# container sees none of these otherwise, so each is mounted where the relative paths land.
 test-unit: ## Web unit tests and drift checks (fix: npm run build:style / gen:api-types)
 	$(COMPOSE) run --rm -v $(CURDIR)/services/server/internal/mapstyle/styles:/services/server/internal/mapstyle/styles:ro \
 	  -v $(CURDIR)/services/server/api:/services/server/api:ro \
+	  -v $(CURDIR)/testdata:/testdata:ro \
 	  web sh -c "npm run test:unit && npm run verify:style && npm run verify:api-types"
 
 verify: ## Headless Playwright map checks against a dev server (test profile)

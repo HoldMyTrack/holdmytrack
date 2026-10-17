@@ -1,0 +1,26 @@
+{
+  "rule": "defaultRange",
+  "description": "The default date range: the five most recent activity-days in the slider's window, through today; with none, from the earliest activity, else today (docs/SPEC.md FR-6.1).",
+  "cases": [
+    {
+      "name": "five most recent of more",
+      "input": { "visibleDays": ["2026-09-01", "2026-09-03", "2026-09-06", "2026-09-07", "2026-09-08", "2026-09-09"], "earliest": "2026-08-01", "today": "2026-09-12" },
+      "expected": { "from": "2026-09-03", "to": "2026-09-12" }
+    },
+    {
+      "name": "fewer than five days takes them all",
+      "input": { "visibleDays": ["2026-09-06", "2026-09-08"], "earliest": "2026-09-06", "today": "2026-09-12" },
+      "expected": { "from": "2026-09-06", "to": "2026-09-12" }
+    },
+    {
+      "name": "no days in the window starts at the earliest activity",
+      "input": { "visibleDays": [], "earliest": "2026-07-14", "today": "2026-09-12" },
+      "expected": { "from": "2026-07-14", "to": "2026-09-12" }
+    },
+    {
+      "name": "no history at all is today alone",
+      "input": { "visibleDays": [], "today": "2026-09-12" },
+      "expected": { "from": "2026-09-12", "to": "2026-09-12" }
+    }
+  ]
+}

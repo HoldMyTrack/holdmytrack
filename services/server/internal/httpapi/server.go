@@ -45,15 +45,14 @@ const multipartMemoryBytes = 32 << 20
 // of its own: archives aren't imported (ADR-0039).
 var uploadExts = map[string]bool{".gpx": true, ".fit": true, ".tcx": true}
 
-// corsAllowedOrigins lists the origins a credentialed cross-origin request may come from —
-// needed now that sessions are cookies (see serve's own doc comment for why "*" no
-// longer works once a request carries credentials). apps/web's dev server (5173), plus the
-// dev servers apps/web/tests/smoke.mjs and build.mjs spawn for themselves (5180, 4183) so
-// those suites can sign in the same way a real browser does; a production origin gets added
-// here the day one exists.
+// corsAllowedOrigins lists the origins a credentialed cross-origin request may come from: a
+// cookie session rules out "*" (serve's doc comment). apps/web's dev server (5173), and the dev
+// servers apps/web/tests/smoke.mjs, flows.mjs and build.mjs spawn for themselves (5180, 5181,
+// 4183), so those suites sign in as a real browser does.
 var corsAllowedOrigins = map[string]bool{
 	"http://localhost:5173": true,
 	"http://localhost:5180": true,
+	"http://localhost:5181": true,
 	"http://localhost:4183": true,
 }
 

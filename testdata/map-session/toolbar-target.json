@@ -1,0 +1,9 @@
+{
+  "rule": "toolbarTarget",
+  "description": "What the toolbar acts on: the checked group if anything is checked, else the focused row, else nothing.",
+  "cases": [
+    { "name": "checked wins over focus", "input": { "checked": ["a", "b"], "focused": "c" }, "expected": ["a", "b"] },
+    { "name": "focus alone", "input": { "checked": [], "focused": "c" }, "expected": ["c"] },
+    { "name": "nothing", "input": { "checked": [] }, "expected": [] }
+  ]
+}
