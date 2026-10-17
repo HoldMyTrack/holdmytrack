@@ -36,6 +36,7 @@ The tuning values have defaults to leave alone. A change to one needs `… up -d
 | `UPLOADS_PER_HOUR` | 100 | a load test's `seed` or `import` runs (`docs/PERFORMANCE.md`, `SPEC.md` FR-3.1); recreating also resets every count | `api` |
 | `TILES_PER_MINUTE` | 1200 | a load test's `browse` runs (`SPEC.md` FR-4.15) | `api` |
 | `SIGNUPS_PER_HOUR` | 5 | a load test's `signup` runs (`SPEC.md` FR-1.1) | `api` |
+| `RATE_LIMITS` | on | never here: `off` lifts every request limit for local development, and `api` refuses it unless `APP_BASE_URL` is local | `api` |
 | `R2_DAILY_BUDGET_USD` | 2 | the R2 alerts (§13) show real use nearing it, or a load test runs (`SPEC.md` FR-17, ADR-0044); a raise lifts the stages at once if the day's spend is under it | `api`, `worker` |
 | `MIN_ANDROID_BUILD` | empty | older Android builds must go (§10, `SPEC.md` §1.5) | `api` |
 

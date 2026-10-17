@@ -2,8 +2,17 @@ package httpapi
 
 import (
 	"net/http"
+	"sync/atomic"
 	"time"
 )
+
+// rateLimitsOff lets every fixedWindowLimiter through, the per-account and per-address limits
+// alike, for local development only: config's RATE_LIMITS=off, refused for an APP_BASE_URL
+// that isn't local. The R2 budget (internal/budget) is a cost cap, not one of these.
+var rateLimitsOff atomic.Bool
+
+// SetRateLimitsOff turns every per-account and per-address request limit off, or back on.
+func SetRateLimitsOff(off bool) { rateLimitsOff.Store(off) }
 
 // defaultTilesPerMinute is how many tile requests one account may make in a minute, across
 // every /tiles/v1 layer. A pan fetches dozens at once and a high-resolution map export

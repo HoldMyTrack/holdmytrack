@@ -129,6 +129,10 @@ func main() {
 		srv.SetUploadsPerHour(cfg.UploadsPerHour)
 		srv.SetTilesPerMinute(cfg.TilesPerMinute)
 		srv.SetSignupsPerHour(cfg.SignupsPerHour)
+		httpapi.SetRateLimitsOff(cfg.RateLimitsOff)
+		if cfg.RateLimitsOff {
+			log.Warn("serve: RATE_LIMITS=off, no request limits apply")
+		}
 		srv.SetMinAndroidBuild(cfg.MinAndroidBuild)
 		// No ReadTimeout or WriteTimeout: a 16 MiB upload, a data export's download or a photo
 		// over a slow uplink is a legitimate request that takes minutes. ReadHeaderTimeout and IdleTimeout still free a connection

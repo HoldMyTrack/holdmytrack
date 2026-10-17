@@ -207,3 +207,22 @@ func TestSignupsPastTheHourlyLimitAreRefused(t *testing.T) {
 		t.Fatalf("accounts created: %d, %v; want 2", n, err)
 	}
 }
+
+// With the limits off every limiter lets everything through, counted or not, and on again
+// they count as before.
+func TestRateLimitsOff(t *testing.T) {
+	l := newFixedWindowLimiter(1, time.Hour)
+	SetRateLimitsOff(true)
+	t.Cleanup(func() { SetRateLimitsOff(false) })
+	for range 3 {
+		if !l.allow("k") || !l.allowN("k", 5) || l.exceeded("k") {
+			t.Fatal("a limit applied while off")
+		}
+		l.hit("k")
+	}
+	SetRateLimitsOff(false)
+	l = newFixedWindowLimiter(1, time.Hour)
+	if !l.allow("k") || l.allow("k") {
+		t.Fatal("back on: want the first request through and the second refused")
+	}
+}
