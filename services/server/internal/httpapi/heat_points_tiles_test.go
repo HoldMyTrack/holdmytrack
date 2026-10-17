@@ -99,17 +99,4 @@ func TestHeatPointsTile(t *testing.T) {
 			t.Errorf("z5 %d/%d: %d bytes, want empty %v", c.x, c.y, rec.Body.Len(), c.empty)
 		}
 	}
-
-	// The raster route Android builds from before the points ask for answers with nothing.
-	rec := d.do(me, "GET", "/tiles/v1/heatmap/14/4471/6119.png", nil)
-	if rec.Code != 200 {
-		t.Fatalf("old raster route: status %d", rec.Code)
-	}
-	img, err := png.Decode(rec.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, _, _, a := img.At(0, 0).RGBA(); a != 0 {
-		t.Errorf("old raster route's tile has alpha %d, want transparent", a)
-	}
 }

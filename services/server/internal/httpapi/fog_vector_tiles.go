@@ -10,8 +10,7 @@ import (
 )
 
 // handleFogVectorTile serves Fog as vector shapes (IMPLEMENTATION.md §4.2): the veil and its
-// edges, traced from the same stored coverage tile handleFogTile colours — read, decoded and
-// traced per request, so the render and what it stores don't change. The clients draw the veil
+// edges, traced from the stored coverage tile — read, decoded and traced per request, so the render and what it stores don't change. The clients draw the veil
 // as a fill and its edges as a blurred line, crisp at every zoom.
 func (s *Server) handleFogVectorTile(w http.ResponseWriter, r *http.Request) {
 	z, x, y, ok := tileCoords(w, r, ".mvt")

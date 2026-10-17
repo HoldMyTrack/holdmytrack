@@ -58,11 +58,11 @@ func TestWriteAPIError(t *testing.T) {
 // Errors under the API's prefixes take its shape; a page's stay HTML.
 func TestIsAPIPath(t *testing.T) {
 	for path, want := range map[string]bool{
-		"/v1/activities":      true,
-		"/tiles/v1/fog/1/2/3": true,
-		"/v1":                 false,
-		"/settings":           false,
-		"/":                   false,
+		"/v1/activities":             true,
+		"/tiles/v1/fog-vector/1/2/3": true,
+		"/v1":                        false,
+		"/settings":                  false,
+		"/":                          false,
 	} {
 		if got := isAPIPath(path); got != want {
 			t.Errorf("isAPIPath(%q) = %v, want %v", path, got, want)

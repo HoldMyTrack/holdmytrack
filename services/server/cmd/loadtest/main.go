@@ -367,7 +367,7 @@ func tileXY(lat, lon float64, z int) (int, int) {
 }
 
 // The served style's tiers (apps/web/src/map/coverageStyle.ts and the layers' own zoom ranges): Fog
-// draws whole countries below z3 and whole regions below z7, its raster from z7; Heatmap draws
+// draws whole countries below z3 and whole regions below z7, its veil from z7; Heatmap draws
 // heat points at every zoom; Normal draws tracks from z4. Every tile source stops at z14 and is
 // stretched past it, except heat points, at z15.
 const (
@@ -399,8 +399,6 @@ func layers(mode string, spots bool, z int) ([]string, int) {
 			out = append(out, "country-fog:mvt")
 		case z < regionMaxZoom:
 			out = append(out, "region-fog:mvt")
-		case *fogPNG:
-			out = append(out, "fog:png")
 		default:
 			out = append(out, "fog-vector:mvt")
 		}
@@ -423,10 +421,6 @@ type visitor struct {
 	z     int
 	cache map[string]bool
 }
-
-// fogPNG has Fog ask for the PNG raster Android builds from before the vector veil draw, in
-// place of the vector tiles the clients now draw, to compare the two.
-var fogPNG = flag.Bool("fog-png", false, "browse: request Fog's PNG raster tiles instead of its vector tiles")
 
 // onlyMode pins every visitor to one mode for the whole run, for a session measuring one.
 var onlyMode = flag.String("mode", "", "browse: keep every visitor in this mode (normal, fog or heatmap) instead of the usual mix")

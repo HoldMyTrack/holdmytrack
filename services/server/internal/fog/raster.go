@@ -180,30 +180,3 @@ const (
 	// and recorded here the same way defaultHeatmapCap above is, equally open to retuning.
 	HeatmapWindowDays = 365
 )
-
-// Veil is one theme's fog treatment: the colour unexplored territory is painted in, and how
-// opaque it is where coverage is zero.
-type Veil struct {
-	R, G, B uint8
-	Opacity float64
-}
-
-// LightVeil and DarkVeil are the two fog treatments, one per basemap brightness. Each one is
-// the opposite of the map it sits on, so unexplored territory reads as covered whatever shade
-// the basemap happens to be: on the light basemap, the app's dark ink (`--fm-ink`, #202b25);
-// on the dark one, a cream mist in the app's light background (`--fm-bg`, #f7f4ec). The
-// country/region fill layers on both clients use the same two colour/opacity pairs, so
-// nothing shifts hue when a pan/zoom crosses the Region/City boundary.
-var (
-	LightVeil = Veil{R: 32, G: 43, B: 37, Opacity: 0.82}
-	DarkVeil  = Veil{R: 247, G: 244, B: 236, Opacity: 0.82}
-)
-
-// VeilForTheme maps a tile request's `theme` query value to its veil: `dark` gets DarkVeil,
-// anything else (including no value) LightVeil.
-func VeilForTheme(theme string) Veil {
-	if theme == "dark" {
-		return DarkVeil
-	}
-	return LightVeil
-}

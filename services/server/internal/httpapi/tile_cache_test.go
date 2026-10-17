@@ -21,7 +21,7 @@ func TestSetTileCacheControl(t *testing.T) {
 		{"only an older client's counter", "?v=4", "private, no-cache"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			r := httptest.NewRequest("GET", "/tiles/v1/fog/14/1/2.png"+tc.query, nil)
+			r := httptest.NewRequest("GET", "/tiles/v1/fog-vector/14/1/2.mvt"+tc.query, nil)
 			r = r.WithContext(context.WithValue(r.Context(), authContextKey, authInfo{userID: user}))
 			w := httptest.NewRecorder()
 			setTileCacheControl(w, r)
@@ -33,7 +33,7 @@ func TestSetTileCacheControl(t *testing.T) {
 }
 
 func TestClientGone(t *testing.T) {
-	r := httptest.NewRequest("GET", "/tiles/v1/heatmap/12/1114/1529.png", nil)
+	r := httptest.NewRequest("GET", "/tiles/v1/heat-points/12/1114/1529.mvt", nil)
 	w := httptest.NewRecorder()
 	if clientGone(w, r) {
 		t.Fatal("clientGone = true for a live request")

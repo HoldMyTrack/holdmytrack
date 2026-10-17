@@ -8,7 +8,7 @@
 
 | Subcommand | What it is |
 | :-- | :-- |
-| `serve` | The HTTP API: ingest and sync endpoints, tile and raster routes, auth, the served style document. |
+| `serve` | The HTTP API: ingest and sync endpoints, tile routes, auth, the served style document. |
 | `work` | The job worker: parsing, fog raster generation, tile precomputation. Map export renders in the browser (`docs/IMPLEMENTATION.md` §5.5). Dequeues from Postgres with `FOR UPDATE SKIP LOCKED` (`docs/IMPLEMENTATION.md` §3.8, §4.1), with no broker. |
 | `migrate` | Applies the SQL in `migrations/`, embedded with `go:embed`, through a small runner (`internal/db`) instead of a library's CLI, so the deployed binary can always migrate the database it is about to talk to. |
 
