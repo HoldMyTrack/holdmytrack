@@ -1098,20 +1098,25 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		var info authInfo
-		var lastSeen *time.Time
+		var was seen
 		err := s.pool.QueryRow(r.Context(), `
-			SELECT u.id, u.email_verified, u.timezone, COALESCE(u.locale, ''), u.last_seen_at
+			SELECT u.id, u.email_verified, u.timezone, COALESCE(u.locale, ''), u.last_seen_at,
+			       u.web_seen_at, u.android_seen_at, u.android_build
 			FROM sessions se JOIN users u ON u.id = se.user_id
 			WHERE se.id = $1 AND se.expires_at > NOW()
-		`, sessionID).Scan(&info.userID, &info.emailVerified, &info.timezone, &info.locale, &lastSeen)
+		`, sessionID).Scan(&info.userID, &info.emailVerified, &info.timezone, &info.locale, &was.last,
+			&was.web, &was.android, &was.androidBuild)
 		if err != nil {
 			writeAPIError(w, "authentication required", http.StatusUnauthorized)
 			return
 		}
 		info.isDemo = info.userID == DemoCustomerUserID
-		if !info.isDemo && lastSeenDue(lastSeen, time.Now()) {
-			if _, err := s.pool.Exec(r.Context(), `UPDATE users SET last_seen_at = NOW() WHERE id = $1`, info.userID); err != nil {
-				s.log.Error("last_seen_at update failed", "err", err)
+		if !info.isDemo {
+			c, build := requestClient(r.UserAgent(), inApp(r))
+			if query, args := seenDue(was, c, build, time.Now()).update(); query != "" {
+				if _, err := s.pool.Exec(r.Context(), query, append([]any{info.userID}, args...)...); err != nil {
+					s.log.Error("last seen update failed", "err", err)
+				}
 			}
 		}
 		next(w, r.WithContext(context.WithValue(r.Context(), authContextKey, info)))

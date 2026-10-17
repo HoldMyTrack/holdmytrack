@@ -1173,6 +1173,90 @@
         }
       },
       "description": "Per 15 minutes, api and worker together. Class A (writes, listings) costs $4.50 a million, Class B (reads) $0.36; deletes are free."
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "Clients (30 days)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${PROM}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 63,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${PROM}"
+          },
+          "expr": "holdmytrack_stat{deployment=\"${DEPLOYMENT}\", key=~\"clients_30d\\\\..+\"}",
+          "legendFormat": "{{key}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "Accounts that used only the website, only the Android app, or both, in the last 30 days, as of the snapshot's day."
+    },
+    {
+      "id": 25,
+      "type": "timeseries",
+      "title": "Android builds (30 days)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${PROM}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 63,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${PROM}"
+          },
+          "expr": "holdmytrack_stat{deployment=\"${DEPLOYMENT}\", key=~\"android_builds_30d\\\\..+\"}",
+          "legendFormat": "{{key}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "Accounts by the Android build they last used, among those that used the app in the last 30 days. MIN_ANDROID_BUILD is safe to raise past a build once its line is at 0."
     }
   ]
 }
