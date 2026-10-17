@@ -152,6 +152,8 @@ services:
       # Accounts one address may create an hour (docs/DEPLOY.md §4). Higher than production's 5:
       # the web and Android flows sign up a fresh account on every run.
       SIGNUPS_PER_HOUR: ${SIGNUPS_PER_HOUR:-100}
+      # off lifts every request limit while developing (docs/DEPLOY.md §4); on unless .env says so.
+      RATE_LIMITS: ${RATE_LIMITS:-on}
       # Daily R2 budget in US dollars, read by api and worker (docs/DEPLOY.md §4).
       R2_DAILY_BUDGET_USD: ${R2_DAILY_BUDGET_USD:-2}
       # The oldest Android versionCode /v1/ answers (docs/DEPLOY.md §4); set it above this

@@ -5,6 +5,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 )
@@ -98,6 +99,10 @@ type Config struct {
 	// in an hour (internal/httpapi's defaultSignupsPerHour). Raised only while a load test
 	// creates its accounts. Only read by `serve`.
 	SignupsPerHour int
+	// RateLimitsOff turns every per-account and per-address request limit off
+	// (internal/httpapi's SetRateLimitsOff), from RATE_LIMITS=off. Local development only:
+	// Load refuses it unless AppBaseURL is local. Only read by `serve`.
+	RateLimitsOff bool
 	// R2DailyBudgetUSD is the daily R2 budget in US dollars (internal/budget, docs/DEPLOY.md
 	// §4): what every account together may spend on object store requests in a UTC day before
 	// the service starts giving things up. Read by `serve` and `work`.
@@ -156,6 +161,9 @@ func Load() (Config, error) {
 	if c.SignupsPerHour, err = positiveInt("SIGNUPS_PER_HOUR", 5); err != nil {
 		return c, err
 	}
+	if c.RateLimitsOff, err = rateLimitsOff(c.AppBaseURL); err != nil {
+		return c, err
+	}
 	if c.R2DailyBudgetUSD, err = positiveFloat("R2_DAILY_BUDGET_USD", 2); err != nil {
 		return c, err
 	}
@@ -196,6 +204,36 @@ func Load() (Config, error) {
 		return c, fmt.Errorf("config: S3_ENDPOINT is required")
 	}
 	return c, nil
+}
+
+// rateLimitsOff reads RATE_LIMITS, "on" (the default) or "off". Off is refused for an
+// appBaseURL that isn't local, so a development .env copied to a server can't take the
+// limits away there.
+func rateLimitsOff(appBaseURL string) (bool, error) {
+	switch v := env("RATE_LIMITS", "on"); v {
+	case "on":
+		return false, nil
+	case "off":
+		if !isLocal(appBaseURL) {
+			return false, fmt.Errorf("config: RATE_LIMITS=off is for local development only, and APP_BASE_URL is %q", appBaseURL)
+		}
+		return true, nil
+	default:
+		return false, fmt.Errorf("config: RATE_LIMITS must be on or off, got %q", v)
+	}
+}
+
+// isLocal reports whether rawURL's host is this machine.
+func isLocal(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	switch u.Hostname() {
+	case "localhost", "127.0.0.1", "::1":
+		return true
+	}
+	return false
 }
 
 func positiveInt(key string, def int) (int, error) {

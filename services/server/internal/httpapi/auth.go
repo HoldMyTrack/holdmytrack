@@ -861,6 +861,9 @@ func newFixedWindowLimiter(limit int, window time.Duration) *fixedWindowLimiter 
 // allow counts one request against key and reports whether it is within the limit — the
 // limit on every request, for the endpoints that mail or create something.
 func (l *fixedWindowLimiter) allow(key string) bool {
+	if rateLimitsOff.Load() {
+		return true
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	c := l.current(key)
@@ -874,6 +877,9 @@ func (l *fixedWindowLimiter) allow(key string) bool {
 // allowN is allow for n at once: it counts all n and reports true when they fit in what's left
 // of key's window, and counts nothing and reports false when they don't.
 func (l *fixedWindowLimiter) allowN(key string, n int) bool {
+	if rateLimitsOff.Load() {
+		return true
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	c := l.current(key)
@@ -887,6 +893,9 @@ func (l *fixedWindowLimiter) allowN(key string, n int) bool {
 // exceeded and hit split allow for a limit on failures only (sign-in): exceeded checks
 // without counting, hit counts one.
 func (l *fixedWindowLimiter) exceeded(key string) bool {
+	if rateLimitsOff.Load() {
+		return false
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.current(key).count >= l.limit
