@@ -13,6 +13,8 @@ export interface PhotoLayerInputs {
   storyId: string | null;
   /** Changes when the photos may have moved under the scope: a reprocess, a Story's members. */
   version: string;
+  /** The Edit window is open: it opens with nothing being moved on the map. */
+  editOpen: boolean;
   /** The Edit window's Track tab has the map, which hides the photos. */
   trackTabShown: boolean;
   mapHiddenIds: ReadonlySet<string>;
@@ -31,7 +33,7 @@ export interface PhotoLayer {
 /** Photos on the map (FR-16): the scope's photos as markers on their routes, and the popup a
  *  marker's click opens. The popup closes when the scope changes. */
 export function usePhotoLayer(map: MapLibreMap | null, inputs: PhotoLayerInputs): PhotoLayer {
-  const { mode, editWindowIds, focusedId, storyId, version, trackTabShown, mapHiddenIds } = inputs;
+  const { mode, editWindowIds, focusedId, storyId, version, editOpen, trackTabShown, mapHiddenIds } = inputs;
   const scope = useMemo(() => photoScopeFor(mode, editWindowIds, focusedId, storyId), [mode, editWindowIds, focusedId, storyId]);
   const photos = usePhotos(scope, version);
   const [openGroup, setOpenGroup] = useState<{ ids: string[]; index: number } | null>(null);
@@ -40,6 +42,7 @@ export function usePhotoLayer(map: MapLibreMap | null, inputs: PhotoLayerInputs)
     [openGroup, photos.photos],
   );
   const [overlay, setOverlay] = useState<PhotoMarkerOverlay | null>(null);
+  useEffect(() => setOverlay(null), [editOpen]);
   const scopeKey = scope === null ? null : JSON.stringify(scope);
   useEffect(() => setOpenGroup(null), [scopeKey]);
 

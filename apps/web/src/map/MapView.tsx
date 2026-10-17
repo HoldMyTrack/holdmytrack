@@ -6,29 +6,30 @@ import { satelliteSource } from './config';
 import { defaultRange } from './defaultRange';
 import type { MapMode } from './mapMode';
 import { loadOverlays, saveOverlays, type Overlays } from './overlays';
-import { pendingChange } from './pending';
 import { initialSession, mapSessionReducer } from './session';
 import { invertedChecks, mapHiddenIds as hiddenOnMap, toolbarTarget } from './selection';
-import { storiesTabParam, storyParam, urlWithStory, type StoryNav } from './storyUrl';
+import { storiesTabParam, storyParam } from './storyUrl';
 import type { SpotCategory } from './spots';
-import { refreshTrackLayer } from './tracks';
 import { useCoverageRefresh } from './useCoverageRefresh';
+import { useDataRefresh } from './useDataRefresh';
+import { useEditWindow } from './useEditWindow';
 import { useExportFlow } from './useExportFlow';
 import { useFileDrop } from './useFileDrop';
 import { useHashSync, useInitialView } from './useInitialView';
 import { useListFlight } from './useListFlight';
 import { useMapInstance } from './useMapInstance';
 import { useMapLayers } from './useMapLayers';
+import { usePendingPoll } from './usePendingPoll';
 import { usePhotoLayer } from './usePhotoLayer';
 import { useSelectionLayers } from './useSelectionLayers';
 import { useSpots } from './useSpots';
+import { useStoryNav } from './useStoryNav';
 import { useTrackMetrics } from './useTrackMetrics';
-import { type Activity, type Story } from '../api';
+import type { Activity } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { distanceBounds, passesFilters, typeFacets, type DistanceRange } from '../ui/activityFacets';
-import { ActivitiesPanel, type PanelTab, type StoriesPanel } from '../ui/ActivitiesPanel';
-import { editPhotosBlocker, editTrackBlocker } from '../ui/editAvailability';
-import { EditActivityWindow, type EditTab, type EditWindowResult } from '../ui/EditActivityWindow';
+import { ActivitiesPanel, type PanelTab } from '../ui/ActivitiesPanel';
+import { EditActivityWindow, type EditWindowResult } from '../ui/EditActivityWindow';
 import { ExportControl } from '../ui/ExportControl';
 import { ExportViewfinder } from '../ui/ExportViewfinder';
 import { OverlaysMenu } from '../ui/OverlaysMenu';
@@ -42,17 +43,8 @@ import { useUnitSystem } from '../ui/units';
 import { useActivityDays } from '../ui/useActivityDays';
 import { useActivityList } from '../ui/useActivityList';
 import { useStories } from '../ui/useStories';
-import { useStoryInbox } from '../ui/useStoryInbox';
 import { useStory } from '../ui/useStory';
 import { t } from '../i18n';
-
-/** How often the list is re-read while a reprocess is pending: one activity's ingest takes seconds. */
-const EDIT_PENDING_POLL_MS = 2000;
-
-function moveStoryUrl(id: string | null, nav: StoryNav) {
-  if (nav === 'push') window.history.pushState(null, '', urlWithStory(window.location, id));
-  else if (nav === 'replace') window.history.replaceState(null, '', urlWithStory(window.location, id));
-}
 
 export interface MapViewProps {
   /** Mount with the Activities panel on its Privacy tab: `/?private-locations` (App.tsx). */
@@ -61,6 +53,11 @@ export interface MapViewProps {
   initialActivity?: { id: string; day: string } | null;
 }
 
+/**
+ * The map page: the map and its layers, the Activities panel beside it, and the Edit window, the
+ * export and the popups over it. It composes the map's state (session.ts) with each feature's
+ * hook; the hooks are called in the order their effects must run.
+ */
 export function MapView({ initialPrivateLocationsOpen = false, initialActivity = null }: MapViewProps) {
   // A demo account is read-only (docs/SPEC.md FR-2.1); `'email' in user` tells a DemoUser from an AuthUser.
   const { user } = useAuth();
@@ -99,18 +96,7 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
 
   // Bumped when a reprocess finishes, so the bands refetch against the new points.
   const [trackMetricsVersion, setTrackMetricsVersion] = useState(0);
-
-  // The Edit window's activities, by id. While it's open the panel is inert and the map's own controls step aside.
-  const [editWindowIds, setEditWindowIds] = useState<string[] | null>(null);
-  const editOpen = editWindowIds !== null;
-  // The Track tab's session (§4.7.7): one activity, until the window closes. Every other track is
-  // hidden and TrackEditor owns the map.
-  const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
-  const editingTrack = editingActivityId !== null;
-  const spotsShown = useMemo<readonly SpotCategory[]>(
-    () => (editingTrack || !overlays.enabled ? [] : overlays.spots),
-    [editingTrack, overlays.enabled, overlays.spots],
-  );
+  const bumpMetrics = useCallback(() => setTrackMetricsVersion((v) => v + 1), []);
 
   // The panel's tab lives here so `/?private-locations` (FR-8.1) and `/?story=` (FR-14.6) can open
   // on it, and so it survives the panel unmounting in Fog and Heatmap.
@@ -125,9 +111,6 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   );
 
   const storyState = useStory(storyId);
-
-  // The Edit window's tab: its Track tab hides the photos.
-  const [editTab, setEditTab] = useState<EditTab>('activity');
   const storiesList = useStories(panelTab === 'stories');
 
   const toggleActivityChecked = useCallback((id: string) => dispatch({ type: 'checkToggled', id }), []);
@@ -165,10 +148,18 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
     generation: historyGeneration,
   } = useActivityDays();
 
+  const edit = useEditWindow(activities, activitiesLoading);
+  const editOpen = edit.open;
+  const editingTrack = edit.editingId !== null;
+  const spotsShown = useMemo<readonly SpotCategory[]>(
+    () => (editingTrack || !overlays.enabled ? [] : overlays.spots),
+    [editingTrack, overlays.enabled, overlays.spots],
+  );
+
   // The default range (defaultRange.ts) is re-derived on every real refetch of days
-  // (`historyGeneration`) until the user picks a range (session.ts ignores it after). Trap: keying on `visibleDays` would also
-  // re-pick on Earlier/Later paging, and settling once would freeze a zero-history account (every
-  // demo) on `{today, today}` past its first upload.
+  // (`historyGeneration`) until the user picks a range (session.ts ignores it after). Trap: keying
+  // on `visibleDays` would also re-pick on Earlier/Later paging, and settling once would freeze a
+  // zero-history account (every demo) on `{today, today}` past its first upload.
   //
   // Held while the Edit window is open: an import landing newer days would slide the default past
   // the edited activity and close the window. It catches up when the window closes.
@@ -218,14 +209,14 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   const storyMembers = storyState.story?.activityIds.join(',') ?? '';
   const photoLayer = usePhotoLayer(map, {
     mode: mapMode,
-    editWindowIds,
+    editWindowIds: edit.ids,
     focusedId: focusedActivityId,
     storyId,
     version: `${trackMetricsVersion}|${storyMembers}`,
-    trackTabShown: editOpen && editTab === 'track',
+    editOpen,
+    trackTabShown: editOpen && edit.tab === 'track',
     mapHiddenIds,
   });
-  const photoState = photoLayer.photos;
 
   // Flies to the combined bounds of the given activities; one activity is its own bbox.
   const fitToSelection = useCallback(
@@ -289,20 +280,16 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
 
   // A click on empty list space, the counterpart of clicking away from every track. The checked group stays.
   const clearFocus = useCallback(() => dispatch({ type: 'focused', id: null }), []);
-
   // The master checkbox while fully checked: empties the group; the focus stays.
   const clearSelection = useCallback(() => dispatch({ type: 'checkedSet', ids: [] }), []);
-
   // The master checkbox while unchecked or partial: checks every row listed, so never a row the
   // filters hide. No fly; Focus on map does that.
   const selectAll = useCallback(() => dispatch({ type: 'checkedSet', ids: filteredActivities.map((a) => a.id) }), [filteredActivities]);
-
   // Inverts the check over the listed rows; a checked row the filters hide is dropped. No fly.
   const invertSelection = useCallback(
     () => dispatch({ type: 'checkedSet', ids: invertedChecks(filteredActivities, checkedActivityIds) }),
     [filteredActivities, checkedActivityIds],
   );
-
   // Focus on map: flies to the toolbar's target, hidden tracks excluded. The one way to look at a checked group.
   const showSelected = useCallback(() => {
     const visible = activities.filter((a) => toolbarTargetIds.has(a.id) && !mapHiddenIds.has(a.id));
@@ -340,29 +327,14 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // account's jobs to drain and then refetches both (useCoverageRefresh.ts). `coverageRendering`
   // drives the notice that they may be incomplete.
   const { watch: watchCoverage, rendering: coverageRendering } = useCoverageRefresh(map);
-
-  // A finished import or a delete: tracks, list, days, the open Story and coverage all refresh.
-  const handleUploaded = useCallback(() => {
-    if (map) refreshTrackLayer(map, activityQuery);
-    reloadActivities();
-    reloadDays();
-    storyState.reload();
-    watchCoverage();
-  }, [map, activityQuery, reloadActivities, reloadDays, storyState.reload, watchCoverage]);
-
-  // A Story copy that arrived (FR-14.7) is new activities, refreshed as an import is.
-  const storiesReload = storiesList.reload;
-  const handleCopyArrived = useCallback(() => {
-    storiesReload();
-    handleUploaded();
-  }, [storiesReload, handleUploaded]);
-  const storyInbox = useStoryInbox(panelTab === 'stories', handleCopyArrived);
-
-  // The header's Upload menu (static/upload.js) says when an upload or import has landed.
-  useEffect(() => {
-    window.addEventListener('hmt:imports-changed', handleUploaded);
-    return () => window.removeEventListener('hmt:imports-changed', handleUploaded);
-  }, [handleUploaded]);
+  const refresh = useDataRefresh(map, {
+    activityQuery,
+    reloadActivities,
+    reloadDays,
+    reloadStory: storyState.reload,
+    watchCoverage,
+    bumpMetrics,
+  });
 
   const fileDrop = useFileDrop(!isDemo);
 
@@ -371,232 +343,78 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // would keep fetching its metrics.
   const handleActivitiesDeleted = useCallback(
     (ids: string[]) => {
-      handleUploaded();
+      refresh.afterImport();
       dispatch({ type: 'activitiesRemoved', ids });
     },
-    [handleUploaded],
+    [refresh.afterImport],
   );
 
-  const openEditWindow = useCallback((group: Activity[]) => {
-    setHoveredActivityId(null);
-    setEditWindowIds(group.map((a) => a.id));
-  }, []);
+  const stories = useStoryNav({
+    storyId,
+    dispatch,
+    panelTab,
+    setPanelTab,
+    stories: storiesList,
+    story: storyState,
+    reloadActivities,
+    watchCoverage,
+    refreshTracks: refresh.refreshTracks,
+    afterImport: refresh.afterImport,
+    onActivityRemoved: (id) => setHoveredActivityId((hovered) => (hovered === id ? null : hovered)),
+  });
 
-  // Opening or closing a Story resets the list state as a new range does (session.ts).
-  const enterStory = useCallback((id: string, nav: StoryNav = 'push') => {
-    dispatch({ type: 'storyEntered', id });
-    setPanelTab('stories');
-    moveStoryUrl(id, nav);
-  }, []);
-  const exitStory = useCallback((nav: StoryNav = 'push') => {
-    dispatch({ type: 'storyExited' });
-    moveStoryUrl(null, nav);
-  }, []);
-  // Leaving the Stories tab closes its Story; opening it opens the newest (the effect below).
-  const changePanelTab = useCallback(
-    (next: PanelTab) => {
-      if (next !== 'stories' && storyId !== null) exitStory();
-      setPanelTab(next);
-    },
-    [storyId, exitStory],
-  );
-  // One Story is always open on the Stories tab: the newest, until another is picked.
-  useEffect(() => {
-    if (panelTab !== 'stories' || storyId !== null || !storiesList.ready) return;
-    const newest = storiesList.stories[0];
-    if (newest) enterStory(newest.id);
-  }, [panelTab, storyId, storiesList.ready, storiesList.stories, enterStory]);
-  // Back and Forward between Stories, and to and from the tab.
-  const storyNavRef = useRef({ storyId, enterStory, exitStory });
-  storyNavRef.current = { storyId, enterStory, exitStory };
-  useEffect(() => {
-    const onPopState = () => {
-      const { storyId: current, enterStory: enter, exitStory: exit } = storyNavRef.current;
-      const next = storyParam(window.location.search);
-      if (next === current) return;
-      if (next !== null) {
-        enter(next, 'none');
-        return;
-      }
-      exit('none');
-      setPanelTab('activities');
-    };
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, []);
-
-  // A Story just made with Add to story's "New story…" opens on the Stories tab.
-  const openCreatedStory = useCallback((story: Story) => enterStory(story.id), [enterStory]);
-  // Activities added to an existing Story: the list reloads for the rows' badges. The server moved
-  // the tile version, which only `watchCoverage` brings to this page; without it the Story could
-  // later draw from stale cached tiles.
-  const handleStoryAdded = useCallback(
-    (story: Story) => {
-      storiesList.replace(story);
-      reloadActivities();
+  // A row that leaves Pending has new points: the track, the days, the open Story and the bands
+  // refresh. The camera stays (FR-5.15). Fog and Heatmap go through the coverage watch, because the
+  // server clears Pending just before its last render; a row that enters Pending starts the same watch.
+  const awaitEdit = usePendingPoll(pendingIds, {
+    reload: reloadActivities,
+    onStarted: () => {
+      refresh.refreshTracks();
       watchCoverage();
     },
-    [storiesList.replace, reloadActivities, watchCoverage],
-  );
-
-  const handleStoryEdited = useCallback(
-    (story: Story) => {
-      storiesList.replace(story);
-      storyState.set(story); // only if it's still the open one (useStory)
+    onFinished: () => {
+      refresh.refreshTracks();
+      // Includes the Country/Region tiers: an edit can un-visit a region.
+      watchCoverage();
+      reloadDays();
+      storyState.reload();
+      bumpMetrics();
     },
-    [storiesList.replace, storyState.set],
-  );
-  // A deleted Story's activities stay. Deleting the open one opens the next newest in its place in
-  // history; deleting the last leaves none open.
-  const handleStoryDeleted = useCallback(
-    (id: string) => {
-      storiesList.remove(id);
-      if (id !== storyId) return;
-      const next = storiesList.stories.find((s) => s.id !== id);
-      if (next) enterStory(next.id, 'replace');
-      else exitStory('replace');
-    },
-    [storiesList.remove, storiesList.stories, storyId, enterStory, exitStory],
-  );
+  });
 
-  // An activity taken out of the open Story (FR-14.6): new totals, the row gone, and the tracks
-  // redrawn at the tile version the removal moved to.
-  const handleStoryActivityRemoved = useCallback(
-    (story: Story, activityId: string) => {
-      handleStoryEdited(story);
-      dispatch({ type: 'activitiesRemoved', ids: [activityId], unfocusOnly: true });
-      setHoveredActivityId((id) => (id === activityId ? null : id));
-      reloadActivities();
-      watchCoverage(() => {
-        if (map) refreshTrackLayer(map, activityQuery);
-      });
+  const openEditWindow = useCallback(
+    (group: Activity[]) => {
+      setHoveredActivityId(null);
+      edit.openFor(group);
     },
-    [handleStoryEdited, reloadActivities, watchCoverage, map, activityQuery],
-  );
-
-  const storiesPanel: StoriesPanel = useMemo(
-    () => ({
-      stories: storiesList.stories,
-      ready: storiesList.ready,
-      error: storiesList.error,
-      inbox: storyInbox,
-      openId: storyId,
-      openStory: storyState.story,
-      openError: storyState.error,
-      onOpen: (id: string) => enterStory(id),
-      onEdited: handleStoryEdited,
-      onDeleted: handleStoryDeleted,
-      onActivityRemoved: handleStoryActivityRemoved,
-    }),
-    [
-      storiesList.stories,
-      storiesList.ready,
-      storiesList.error,
-      storyInbox,
-      storyId,
-      storyState.story,
-      storyState.error,
-      enterStory,
-      handleStoryEdited,
-      handleStoryDeleted,
-      handleStoryActivityRemoved,
-    ],
+    [edit.openFor],
   );
   // The Track tab's session (§4.7.7): flies to the activity, then TrackEditor owns the map until the window closes.
   const startEditTrack = useCallback(
     (activity: Activity) => {
       setHoveredActivityId(null);
-      setEditingActivityId(activity.id);
+      edit.startTrack(activity.id);
       fitToSelection([activity]);
     },
-    [fitToSelection],
+    [edit.startTrack, fitToSelection],
   );
-  // Activities whose track edit was applied here and whose finished reprocess isn't picked up yet
-  // (the completion effect below).
-  const awaitingEditIdsRef = useRef<Set<string>>(new Set());
   const closeEditWindow = useCallback(
     ({ saved, trackApplied, photosSaved }: EditWindowResult) => {
-      if (trackApplied && editingActivityId !== null) awaitingEditIdsRef.current.add(editingActivityId);
-      setEditWindowIds(null);
-      setEditingActivityId(null);
-      // A track edit leaves the row Pending; the effects below poll until the reprocess lands.
+      const editedTrack = edit.close();
+      if (trackApplied && editedTrack !== null) awaitEdit(editedTrack);
+      // A track edit leaves the row Pending; the poll runs until the reprocess lands.
       if (saved) reloadActivities();
-      if (photosSaved) photoState.reload();
+      if (photosSaved) photoLayer.photos.reload();
     },
-    [editingActivityId, reloadActivities, photoState.reload],
+    [edit.close, awaitEdit, reloadActivities, photoLayer.photos.reload],
   );
-  // A saved or deleted Private location reprocesses every activity it could clip. The reload shows
-  // them Pending and the Pending poll refreshes the map, but a batch that finishes before the reload
-  // returns is never seen Pending, so the coverage watch refreshes everything once the server drains.
-  const handlePrivateLocationsChanged = useCallback(() => {
-    reloadActivities();
-    watchCoverage(() => {
-      if (map) refreshTrackLayer(map, activityQuery);
-      reloadActivities();
-      reloadDays();
-      storyState.reload();
-      setTrackMetricsVersion((v) => v + 1);
-    });
-  }, [map, activityQuery, reloadActivities, reloadDays, storyState.reload, watchCoverage]);
-  const editWindowActivities = useMemo(() => {
-    if (editWindowIds === null) return null;
-    const group = activities.filter((a) => editWindowIds.includes(a.id));
-    return group.length === editWindowIds.length ? group : null;
-  }, [activities, editWindowIds]);
-  // The window closes when its activities leave the list (deleted elsewhere, say); otherwise the
-  // map would stay locked with no editor to close it.
-  useEffect(() => {
-    if (editOpen && editWindowActivities === null && !activitiesLoading) {
-      setEditWindowIds(null);
-      setEditingActivityId(null);
-    }
-  }, [editOpen, editWindowActivities, activitiesLoading]);
-  const editTrackKey = editTrackBlocker(editWindowActivities);
-  const editTrackUnavailable = editTrackKey === null ? null : t(editTrackKey);
-  const editPhotosKey = editPhotosBlocker(editWindowActivities);
-  const editPhotosUnavailable = editPhotosKey === null ? null : t(editPhotosKey);
-  // The Edit window opens on its Activity tab, with nothing being moved on the map.
-  useEffect(() => {
-    setEditTab('activity');
-    photoLayer.setOverlay(null);
-  }, [editOpen]);
-
-  // While any row is pending, re-read the list. Keyed on each fetched list, so polling stops by
-  // itself once nothing is pending.
-  useEffect(() => {
-    if (pendingIds.length === 0) return;
-    const timer = window.setTimeout(reloadActivities, EDIT_PENDING_POLL_MS);
-    return () => window.clearTimeout(timer);
-  }, [pendingIds, reloadActivities]);
-
-  // A row that leaves Pending has new points: the track, the days, the open Story and the bands
-  // refresh. The camera stays (FR-5.15). Fog and Heatmap go through the coverage watch, because the
-  // server clears Pending just before its last render; a row that enters Pending starts the same watch.
-  // An edit applied here counts as finished once a later list shows it not pending (pending.ts).
-  // Each fetched list is a new `pendingIds` array, and Apply's fetch aborts earlier ones, so every
-  // list seen after Apply was fetched after it.
-  const previousPendingRef = useRef<ReadonlySet<string>>(new Set());
-  const lastPendingIdsRef = useRef<string[] | null>(null);
-  useEffect(() => {
-    // Only a newly fetched list says anything new; the map or range changing re-runs this on an older list.
-    if (pendingIds === lastPendingIdsRef.current) return;
-    lastPendingIdsRef.current = pendingIds;
-    const change = pendingChange(previousPendingRef.current, pendingIds, awaitingEditIdsRef.current);
-    previousPendingRef.current = change.now;
-    awaitingEditIdsRef.current = change.awaiting;
-    if (change.started) {
-      // Drawn from tiles fetched before it went Pending; the server now leaves it out.
-      if (map) refreshTrackLayer(map, activityQuery);
-      watchCoverage();
-    }
-    if (!change.finished) return;
-    if (map) refreshTrackLayer(map, activityQuery);
-    // Includes the Country/Region tiers: an edit can un-visit a region.
-    watchCoverage();
-    reloadDays();
-    storyState.reload();
-    setTrackMetricsVersion((v) => v + 1);
-  }, [pendingIds, map, activityQuery, reloadDays, storyState.reload, watchCoverage]);
+  const editWindowActivities = edit.activities;
+  const editTrackUnavailable = edit.trackBlocker === null ? null : t(edit.trackBlocker);
+  const editPhotosUnavailable = edit.photosBlocker === null ? null : t(edit.photosBlocker);
+  const setEditTab = edit.setTab;
+  const photoState = photoLayer.photos;
+  const { storiesPanel, changePanelTab, openCreatedStory, handleStoryAdded } = stories;
+  const handlePrivateLocationsChanged = refresh.afterPrivateLocations;
 
   useMapLayers(map, {
     initialFlavor: initial.flavor,
