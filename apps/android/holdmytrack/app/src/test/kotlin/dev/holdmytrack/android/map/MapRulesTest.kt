@@ -1,6 +1,8 @@
 package dev.holdmytrack.android.map
 
+import dev.holdmytrack.android.net.Activity
 import dev.holdmytrack.android.panel.PanelRules
+import dev.holdmytrack.android.panel.PanelState
 import dev.holdmytrack.android.photos.PhotoMarkerScope
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -78,6 +80,46 @@ class MapRulesTest {
                 buildJsonObject { put("fit", buildJsonArray { box.forEach { add(JsonPrimitive(it)) } }) }
             } ?: JsonPrimitive("open")
         },
+        "session" to { input ->
+            val state = input["state"]!!.jsonObject
+            val panel = PanelState()
+            val session = MapSession(panel)
+            (state["range"] as? JsonObject)?.let { session.restore(range(it), state["userPicked"]?.jsonPrimitive?.booleanOrNull ?: false) }
+            // The Story first: opening one resets the selection set up below.
+            state.string("storyId")?.let { session.enterStory(it); session.consumeFly() }
+            val ids = (state.strings("checked") + state.strings("hidden")).distinct()
+            panel.setActivities(ids.map(::activity))
+            // Hidden first: hiding goes through the toolbar's target, the checked group.
+            state.strings("hidden").forEach { panel.toggleChecked(it) }
+            panel.toggleTargetVisibility()
+            panel.clearChecked()
+            state.strings("checked").forEach { panel.toggleChecked(it) }
+            state.strings("excludedTypes").forEach(panel::toggleType)
+            val event = input["event"]!!.jsonObject
+            when (val type = event.string("type")) {
+                "rangePicked" -> session.pickRange(range(event["range"]!!.jsonObject))
+                "defaultRange" -> session.offerDefault(range(event["range"]!!.jsonObject))
+                "storyEntered" -> session.enterStory(event.string("id")!!)
+                "storyExited" -> session.exitStory()
+                else -> error("no Android event $type")
+            }
+            buildJsonObject {
+                session.range?.let { put("range", buildJsonObject { put("from", it.from); put("to", it.to) }) }
+                put("userPicked", session.userPicked)
+                session.storyId?.let { put("storyId", it) }
+                put("checked", ids(panel.checked))
+                put("hidden", ids(panel.hidden))
+                put("excludedTypes", ids(panel.excludedTypes))
+                put("flyRequest", session.flyRequest)
+            }
+        },
+    )
+
+    private fun range(json: JsonObject) = DateRange(json.string("from")!!, json.string("to")!!)
+
+    private fun activity(id: String) = Activity(
+        id = id, startedAt = "2026-10-01T08:00:00Z", activityType = "walking", name = null, distanceMeters = 1000.0,
+        durationSeconds = 600, description = null, bbox = listOf(0.0, 0.0, 1.0, 1.0), pending = false, edited = false,
     )
 
     /** Numbers compared as numbers, so 24.75 and 24.750 agree. */

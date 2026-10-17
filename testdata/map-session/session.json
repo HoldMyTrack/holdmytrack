@@ -1,0 +1,46 @@
+{
+  "rule": "session",
+  "description": "What the map's scope events do to the range, the open Story, the selection and the camera's next flight. State and expected: range, userPicked, storyId, checked, hidden, excludedTypes, flyRequest.",
+  "cases": [
+    {
+      "name": "a picked range resets the selection and flies",
+      "input": {
+        "state": { "range": { "from": "2026-10-01", "to": "2026-10-16" }, "userPicked": false, "checked": ["a", "b"], "hidden": ["c"], "excludedTypes": ["walking"] },
+        "event": { "type": "rangePicked", "range": { "from": "2026-10-05", "to": "2026-10-16" } }
+      },
+      "expected": { "range": { "from": "2026-10-05", "to": "2026-10-16" }, "userPicked": true, "checked": [], "hidden": [], "excludedTypes": [], "flyRequest": true }
+    },
+    {
+      "name": "the default replaces a range nobody picked, keeping the selection, without a flight",
+      "input": {
+        "state": { "range": { "from": "2026-10-01", "to": "2026-10-16" }, "userPicked": false, "checked": ["a"] },
+        "event": { "type": "defaultRange", "range": { "from": "2026-10-03", "to": "2026-10-16" } }
+      },
+      "expected": { "range": { "from": "2026-10-03", "to": "2026-10-16" }, "userPicked": false, "checked": ["a"], "hidden": [], "excludedTypes": [], "flyRequest": false }
+    },
+    {
+      "name": "the default never replaces a picked range",
+      "input": {
+        "state": { "range": { "from": "2026-10-05", "to": "2026-10-16" }, "userPicked": true },
+        "event": { "type": "defaultRange", "range": { "from": "2026-10-03", "to": "2026-10-16" } }
+      },
+      "expected": { "range": { "from": "2026-10-05", "to": "2026-10-16" }, "userPicked": true, "checked": [], "hidden": [], "excludedTypes": [], "flyRequest": false }
+    },
+    {
+      "name": "opening a Story keeps the range, resets the selection and flies",
+      "input": {
+        "state": { "range": { "from": "2026-10-01", "to": "2026-10-16" }, "userPicked": true, "checked": ["a"], "hidden": ["b"] },
+        "event": { "type": "storyEntered", "id": "s1" }
+      },
+      "expected": { "range": { "from": "2026-10-01", "to": "2026-10-16" }, "userPicked": true, "storyId": "s1", "checked": [], "hidden": [], "excludedTypes": [], "flyRequest": true }
+    },
+    {
+      "name": "closing a Story returns to the range, resets the selection, and the camera stays",
+      "input": {
+        "state": { "range": { "from": "2026-10-01", "to": "2026-10-16" }, "storyId": "s1", "checked": ["a"], "excludedTypes": ["running"] },
+        "event": { "type": "storyExited" }
+      },
+      "expected": { "range": { "from": "2026-10-01", "to": "2026-10-16" }, "userPicked": false, "checked": [], "hidden": [], "excludedTypes": [], "flyRequest": false }
+    }
+  ]
+}

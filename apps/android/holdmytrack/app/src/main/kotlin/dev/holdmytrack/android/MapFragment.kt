@@ -1,28 +1,19 @@
 package dev.holdmytrack.android
 
-import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.RectF
 import android.os.Bundle
 import android.util.Log
 import android.view.View
-import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import androidx.core.view.AccessibilityDelegateCompat
-import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
-import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.fragment.app.Fragment
-import com.google.android.material.button.MaterialButton
 import dev.holdmytrack.android.export.ExportController
 import dev.holdmytrack.android.map.ActivityDays
 import dev.holdmytrack.android.map.BoxUnion
 import dev.holdmytrack.android.map.ChromeInsets
-import dev.holdmytrack.android.map.CoverageWatch
-import dev.holdmytrack.android.map.EditPreview
-import dev.holdmytrack.android.map.SyncCandidatesOverlay
 import dev.holdmytrack.android.map.TrackEditOverlay
 import dev.holdmytrack.android.map.DateRange
 import dev.holdmytrack.android.map.DateRangeSlider
@@ -31,25 +22,24 @@ import dev.holdmytrack.android.map.FrameRules
 import dev.holdmytrack.android.map.MapChromeRules
 import dev.holdmytrack.android.map.MapMode
 import dev.holdmytrack.android.map.MapNotice
-import dev.holdmytrack.android.map.MapModeButton
 import dev.holdmytrack.android.map.MapOverlays
+import dev.holdmytrack.android.map.MapSession
+import dev.holdmytrack.android.panel.EditController
+import dev.holdmytrack.android.map.CoverageController
+import dev.holdmytrack.android.map.PendingTracker
+import dev.holdmytrack.android.map.PaceBands
+import dev.holdmytrack.android.map.ModeBarState
+import dev.holdmytrack.android.map.ModeBar
 import dev.holdmytrack.android.map.LayersController
 import dev.holdmytrack.android.map.LocateController
-import dev.holdmytrack.android.map.MapBikePaths
 import dev.holdmytrack.android.map.MapSatellite
-import dev.holdmytrack.android.map.MapSpots
 import dev.holdmytrack.android.map.NoticePanel
-import dev.holdmytrack.android.map.PendingDiff
 import dev.holdmytrack.android.map.SpotsController
-import dev.holdmytrack.android.map.ZoomLevelNotice
 import dev.holdmytrack.android.net.Activity
-import dev.holdmytrack.android.net.TrackMetrics
-import dev.holdmytrack.android.net.TrackPoint
 import dev.holdmytrack.android.net.HoldMyTrackApi
 import dev.holdmytrack.android.net.Session
 import dev.holdmytrack.android.net.SessionGate
 import dev.holdmytrack.android.panel.ActivitiesPanel
-import dev.holdmytrack.android.panel.ActivityFacets
 import dev.holdmytrack.android.panel.EditActivityWindow
 import dev.holdmytrack.android.panel.PanelTab
 import dev.holdmytrack.android.panel.PrivateLocationEditor
@@ -60,7 +50,6 @@ import dev.holdmytrack.android.sync.SyncCandidatesController
 import dev.holdmytrack.android.sync.SyncProgress
 import dev.holdmytrack.android.recording.RecordingController
 import dev.holdmytrack.android.recording.RecordingService
-import dev.holdmytrack.android.ui.LargeText
 import dev.holdmytrack.android.recording.RecordedPoint
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -97,12 +86,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
     /** Whether the session lets the map show the user's layers. */
     private lateinit var gate: SessionGate
-    private lateinit var modeBar: View
-    private lateinit var modeButtons: Map<MapMode, MaterialButton>
+    /** The Normal / Fog / Heatmap toggle and what it says about the mode. */
+    private lateinit var modes: ModeBar
     private lateinit var mapRail: View
-    private lateinit var layersPanel: View
-    private lateinit var modeChip: TextView
-
 
     /** The Activities sheet, the date range at its head. */
     private lateinit var sheet: View
@@ -111,8 +97,9 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private lateinit var selectionBar: View
     private lateinit var panel: ActivitiesPanel
     private val panelState = PanelState()
-    private lateinit var editWindow: EditActivityWindow
-    private lateinit var privateEditor: PrivateLocationEditor
+    /** The Edit window and the Private location editor along the bottom of the map. */
+    private lateinit var edit: EditController
+    private val editWindow: EditActivityWindow get() = edit.window
 
     /** Back closes an open sheet before it leaves the map. */
     private val collapseSheetOnBack = object : OnBackPressedCallback(false) {
@@ -124,37 +111,25 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         override fun handleOnBackPressed() = panel.endSelecting()
     }
 
-    /** Back closes the Edit window before it leaves the map. */
-    private val closeEditOnBack = object : OnBackPressedCallback(false) {
-        override fun handleOnBackPressed() = editWindow.back()
-    }
-
     /** The map image export's viewfinder, from the rail's camera. */
     private lateinit var export: ExportController
 
-    /** Back closes the Private location editor, unsaved, before it leaves the map. */
-    private val closePrivateOnBack = object : OnBackPressedCallback(false) {
-        override fun handleOnBackPressed() = privateEditor.stop()
-    }
-
-    /** Fog and Heatmap fetched again once the server has re-rendered them after a delete or a
-     *  reprocess (`map/CoverageWatch`), and the notice that they're still being updated. */
-    private val coverageWatch = CoverageWatch(
-        onRendering = { rendering ->
-            coverageRendering = rendering
-            renderCoverageNotice()
-        },
-        onRefetch = { style?.takeIf { overlaysAttached }?.let(MapOverlays::refreshCoverage) },
+    /** Fog, Heatmap and every tile kept current with the account's renders and tile version. */
+    private val coverage = CoverageController(
+        style = { style?.takeIf { overlaysAttached } },
+        range = { selectedRange },
+        onRenderingChanged = { if (::modes.isInitialized) modes.renderCoverage() },
     )
 
-    /** What the coverage watch last read: the account's Fog/Heatmap are still being worked on. */
-    private var coverageRendering = false
-    private lateinit var coverageNotice: View
-
-    /** The selected activity's pace bands (`renderTrackMetrics`); null with nothing selected,
-     *  and while a new selection's are loading. */
-    private var trackMetrics: TrackMetrics? = null
-    private var trackMetricsFor: String? = null
+    /** The selected activity's pace bands. */
+    private val bands = PaceBands(
+        panelState,
+        style = { style?.takeIf { overlaysAttached } },
+        onSyncTab = { ::panel.isInitialized && panel.tab == PanelTab.SYNC },
+        onShown = { panel.setBandsShown(it) },
+        // A reprocess can move a photo along its track, or take its stretch away.
+        onRefetch = { photos.refresh(force = true) },
+    )
 
     /** A Sync history row's activity, to select once its range's list has it
      *  (`viewActivityOnMap`). */
@@ -164,42 +139,20 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  the session to be confirmed. */
     private var viewOnMapRequest: Pair<String, String>? = null
 
-    /** The activity whose track the Edit window's Track tab is editing, while it is. */
-    private var editingTrackId: String? = null
-
-    /**
-     * Activities whose track edit was saved here and whose reprocess hasn't been seen finishing,
-     * as the web's `awaitingEditIdsRef`. Trap: the job often finishes before the reload after
-     * the save answers, so the row is never seen Pending at all.
-     */
-    private val awaitingEditIds = HashSet<String>()
-
-    /** The ids the last list showed Pending, to notice a reprocess finishing. */
-    private var pendingIds: Set<String> = emptySet()
-
-    /** Re-reads the list while any of it is Pending. */
-    private val pendingPoll = Runnable { reloadList() }
+    /** Reprocesses running, and the list read again while any is. */
+    private val pending = PendingTracker(host = { if (::mapView.isInitialized) mapView else null }, reload = { reloadList() })
 
     /** Something the Sync tab sent has landed, whichever tab shows: the list, its days and the
      *  tiles catch up. Until then its job is only queued, with no row to show Pending. */
     private val syncProgressListener = SyncProgress.Listener(onChange = {}, onLanded = { onSyncedFromPhone() })
     private lateinit var dateFooter: View
-    private lateinit var zoomLevelNotice: ZoomLevelNotice
     private lateinit var dateSlider: DateRangeSlider
     private lateinit var activityDays: ActivityDays
 
-    /** The date range the tracks are drawn for; null until the first page of activity days
-     *  has set the default, when the tracks are the whole history. */
-    private var selectedRange: DateRange? = null
-
-    /** The Story open on the Stories tab (`docs/SPEC.md` FR-14.6). While one is, the tracks and
-     *  the list are all its activities; [selectedRange] is kept for when it closes. */
-    private var storyId: String? = null
-
-    /** Whether the user picked [selectedRange]. Until then it is the default, re-derived
-     *  whenever the activity days reload, so a first sync on an empty account moves it onto
-     *  what arrived. */
-    private var userChangedRange = false
+    /** The range or Story the list and tracks show, and whether the next list moves the camera. */
+    private val session = MapSession(panelState)
+    private val selectedRange: DateRange? get() = session.range
+    private val storyId: String? get() = session.storyId
 
     /** Set on every resume, since Sync or a recording may have added days; `syncSession`
      *  reloads them once the session allows. */
@@ -287,10 +240,10 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      * editor on the map, in Normal mode. Not while recording, which has the map.
      */
     fun editPrivateLocation(id: String) {
-        if (!::privateEditor.isInitialized || isRecording()) return
+        if (!::edit.isInitialized || isRecording()) return
         if (mode != MapMode.NORMAL) setMode(MapMode.NORMAL)
-        privateEditor.start(id)
-        privateEditor.onStyleReady()
+        edit.privacy.start(id)
+        edit.privacy.onStyleReady()
     }
 
     /** The bottom bar's Map: the panel's Activities tab, collapsed. */
@@ -314,28 +267,18 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             onSync = { ::panel.isInitialized && panel.tab == PanelTab.SYNC },
         )
         gate = SessionGate(this, notices, onChecked = ::syncSession)
-        modeBar = findViewById(R.id.mode_bar)
-        modeButtons = mapOf(
-            MapMode.NORMAL to findViewById(R.id.mode_normal),
-            MapMode.FOG to findViewById(R.id.mode_fog),
-            MapMode.HEATMAP to findViewById(R.id.mode_heatmap),
-        )
-        // One choice of three: each reads as a radio button, "1 of 3" (map/MapModeButton).
-        modeButtons.values.forEachIndexed { index, button -> (button as? MapModeButton)?.position = index }
-        ViewCompat.setAccessibilityDelegate(modeBar, object : AccessibilityDelegateCompat() {
-            override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfoCompat) {
-                super.onInitializeAccessibilityNodeInfo(host, info)
-                info.setCollectionInfo(AccessibilityNodeInfoCompat.CollectionInfoCompat.obtain(1, modeButtons.size, false, AccessibilityNodeInfoCompat.CollectionInfoCompat.SELECTION_MODE_SINGLE))
-            }
-        })
-        modeButtons.forEach { (value, button) ->
-            button.setOnClickListener { setMode(value) }
-            button.minWidth = ChromeInsets.minTouchTargetPx(button)
-            button.minimumWidth = ChromeInsets.minTouchTargetPx(button)
+        modes = ModeBar(view, onPick = ::setMode) {
+            ModeBarState(
+                mode = mode,
+                sessionReady = modeBarReady,
+                recording = isRecording(),
+                editOpen = ::edit.isInitialized && editWindow.isOpen,
+                selectionShown = selectionShown(),
+                exportOpen = ::export.isInitialized && export.isOpen,
+                coverageRendering = coverage.rendering,
+            )
         }
         mapRail = findViewById(R.id.map_rail)
-        layersPanel = findViewById(R.id.layers_panel)
-        modeChip = findViewById(R.id.mode_chip)
         layers.bind(view)
         spots.bind(view) { topChrome.bottom }
         photos.bind(view) { topChrome.bottom }
@@ -343,8 +286,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
         locate.bind(view)
         dateFooter = findViewById(R.id.date_footer)
-        zoomLevelNotice = ZoomLevelNotice(findViewById(R.id.zoom_level_notice))
-        coverageNotice = findViewById(R.id.coverage_notice)
         sheet = findViewById(R.id.activities_sheet)
         export = ExportController(
             view,
@@ -355,7 +296,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             prepare = ::prepareExportStyle,
             chrome = listOf(topChrome, sheet, findViewById(R.id.photo_markers)),
             onShown = { shown ->
-                renderModeChip()
+                modes.renderChip()
                 if (shown) {
                     spots.closePopup()
                     photos.closePopup()
@@ -414,50 +355,35 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             pendingSync = false
             view.post { showSync() }
         }
-        privateEditor = PrivateLocationEditor(
-            findViewById(R.id.private_editor),
+        edit = EditController(
+            view,
+            panelState,
+            panel = { panel },
+            photos = photos,
+            spots = spots,
             map = { map },
-            style = { style?.takeIf { overlaysAttached } },
-            onEditorOpen = {
-                closePrivateOnBack.isEnabled = true
-                chrome.placeEditors()
-                renderRail()
-                renderDateFooter()
-                host?.setBottomBarShown(false)
-            },
-            // Closing the editor gives the map back.
-            onEditorClose = {
-                closePrivateOnBack.isEnabled = false
-                if (privateEditor.isShowing) privateEditor.stop()
-                renderRail()
-                renderDateFooter()
-                host?.setBottomBarShown(true)
-            },
-            onChanged = ::onPrivateLocationsChanged,
+            style = { style },
+            attached = { style?.takeIf { overlaysAttached } },
+            mode = { mode },
+            frame = ::flyToActivities,
             openAreaCenterY = {
                 val editor = findViewById<View>(R.id.private_editor)
                 val top = findViewById<View>(R.id.top_bar).bottom
                 val bottom = if (editor.isVisible) editor.top else mapView.height - if (sheet.isVisible) panel.peekHeight else 0
                 (top + bottom) / 2f
             },
-        )
-        editWindow = EditActivityWindow(
-            findViewById(R.id.edit_window),
-            findViewById(R.id.edit_bar),
-            onStartTrack = ::startEditTrack,
-            onDrawTrack = ::drawTrackEdit,
-            onPickPhotos = photos::pick,
-            onPhotoOverlay = photos::setOverlay,
-            onTabChanged = photos::render,
-            onClose = ::onEditClosed,
+            onPrivateLocationsChanged = ::onPrivateLocationsChanged,
+            onWindowChanged = ::onEditWindowChanged,
+            onPrivacyChanged = ::onPrivacyEditorChanged,
+            onWindowClosed = ::onEditClosed,
         )
         chrome = ChromeInsets(findViewById(R.id.map_root), findViewById(R.id.top_bar), topChrome, notices.view, sheet, panel) { map }
         chrome.restore(savedInstanceState)
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, collapseSheetOnBack)
         // Added after the sheet's, so it's asked first: Back ends selecting before it closes the sheet.
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, endSelectingOnBack)
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, closeEditOnBack)
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, closePrivateOnBack)
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, edit.closeWindowOnBack)
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, edit.closePrivacyOnBack)
         // Last, so it's asked first.
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, export.backCallback)
         activityDays = ActivityDays(DateRangeSlider.WINDOW_DAYS, ::onActivityDaysChanged)
@@ -467,14 +393,13 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             onShift = activityDays::shift,
             canShift = activityDays::canShift,
         ) { range ->
-            userChangedRange = true
-            applyRange(range, fly = true)
+            session.pickRange(range)
+            showRange(reset = true)
         }
         savedInstanceState?.getString(STATE_RANGE_FROM)?.let { from ->
             val to = savedInstanceState.getString(STATE_RANGE_TO) ?: return@let
-            selectedRange = DateRange(from, to)
+            session.restore(DateRange(from, to), savedInstanceState.getBoolean(STATE_RANGE_CHOSEN))
             dateSlider.value = selectedRange
-            userChangedRange = savedInstanceState.getBoolean(STATE_RANGE_CHOSEN)
         }
         // Carried through a recreation (a theme or language change), since the mode buttons
         // restore their own checked state and would otherwise show a mode the map isn't in.
@@ -494,7 +419,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         // The camera comes back with the view; framing it again would undo where the user was.
         if (restoringCamera) framed = true
         mapView.onCreate(savedInstanceState)
-        takeHandleDrags()
+        edit.takeHandleDrags(mapView)
 
         // Failures are reported here rather than only in logcat: a style or tile fetch that
         // 404s leaves a plausible-looking blank map behind, with nothing on screen to say so.
@@ -523,22 +448,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             instance.addOnCameraIdleListener { photos.onCameraIdle() }
             spots.onMapReady(view, instance, layers.shownSpots())
             instance.addOnCameraIdleListener { spots.onCameraIdle() }
-            instance.addOnCameraIdleListener { zoomLevelNotice.onCameraIdle(instance.cameraPosition.zoom) }
+            instance.addOnCameraIdleListener { modes.onCameraIdle(instance.cameraPosition.zoom) }
             loadStyle()
-        }
-    }
-
-    /** A press on a Private location's handle (`PrivateLocationEditor.onMapTouch`) or on a track
-     *  point in Move point mode (`TrackEditor.onMapTouch`) takes the touch before the map pans.
-     *  Every other touch, taps included, reaches the map. */
-    @SuppressLint("ClickableViewAccessibility")
-    private fun takeHandleDrags() {
-        mapView.setOnTouchListener { _, event ->
-            when {
-                privateEditor.isShowing -> privateEditor.onMapTouch(event)
-                editWindow.isOpen -> map?.let { editWindow.trackEditor.onMapTouch(event, it, resources.displayMetrics.density) } ?: false
-                else -> false
-            }
         }
     }
 
@@ -607,37 +518,15 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             spots.attach(loaded, layers.shownSpots())
             overlaysAttached = true
             spots.onStyleAttached()
-            renderTrackMetrics()
+            bands.render()
             // A new style has none of the circles; draw them again if the editor has the map.
-            privateEditor.onStyleReady()
+            edit.privacy.onStyleReady()
             // Nor the Sync tab's lines, which the account's tracks still step aside for.
             syncCandidates.draw()
             MapOverlays.setSyncing(loaded, ::panel.isInitialized && panel.tab == PanelTab.SYNC, mode)
             if (isRecording()) MapOverlays.setRecording(loaded, true, mode)
             frameActivities()
-            checkTileVersion()
-        }
-    }
-
-    /**
-     * The overlays attach at the stored tile version ([Session.tileVersion]), so cached tiles draw
-     * at once. This reads the current version and refetches every tile only if it moved while the
-     * app was away.
-     */
-    private fun checkTileVersion() {
-        HoldMyTrackApi.coverageStatus { result ->
-            val status = result.getOrNull() ?: return@coverageStatus
-            // Still rendering: watched until done, with the notice meanwhile and a refetch at the end.
-            if (status.rendering) coverageWatch.watch()
-            if (status.tileVersion.isEmpty() || status.tileVersion == Session.tileVersion) return@coverageStatus
-            Session.tileVersion = status.tileVersion
-            style?.takeIf { overlaysAttached }?.let {
-                MapOverlays.refreshCoverage(it)
-                MapOverlays.refreshTracks(it, selectedRange)
-                // Loading places or bike paths bumps the version too.
-                MapSpots.refresh(it)
-                MapBikePaths.refresh(it)
-            }
+            coverage.checkTileVersion()
         }
     }
 
@@ -647,35 +536,27 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      */
     private fun onActivityDaysChanged(reloaded: Boolean) {
         dateSlider.setDays(activityDays.visibleDays, activityDays.canPanEarlier, activityDays.canPanLater)
-        if (reloaded && !userChangedRange) {
+        if (reloaded) {
             val range = DefaultRange.of(activityDays.visibleDays.map { it.date }, activityDays.earliest, LocalDate.now().toString())
-            if (range != selectedRange) applyRange(range, fly = false)
+            if (session.offerDefault(range)) showRange(reset = false)
         }
         renderDateFooter()
     }
 
-    /**
-     * Draws the tracks for [range] and lists its activities. Only a picked range ([fly]) moves
-     * the camera and clears the selection, group, hidden set and filters (`docs/SPEC.md` FR-6.6);
-     * a re-derived default does neither.
-     */
-    private fun applyRange(range: DateRange, fly: Boolean) {
-        selectedRange = range
+    /** Draws the tracks for the session's range and lists its activities; with [reset], the
+     *  panel's emptied selection reaches the map too (`MapSession.pickRange`). */
+    private fun showRange(reset: Boolean) {
+        val range = selectedRange ?: return
         dateSlider.value = range
-        if (fly) {
-            panelState.resetForNewRange()
-            applyTrackFilter()
-        }
+        if (reset) applyTrackFilter()
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setTrackRange(it, range) }
-        loadActivities(range, fly)
+        reloadList()
     }
 
-    /** Reads the list again for the open Story, else the range. */
-    private fun reloadList() = loadActivities(selectedRange, fly = false)
-
-    /** Lists [range]'s activities, or the open Story's, in the panel; with [fly], frames every
-     *  drawn one. */
-    private fun loadActivities(range: DateRange?, fly: Boolean) {
+    /** Lists the open Story's activities, else the range's, in the panel; frames every drawn one
+     *  when the session asked for a flight. */
+    private fun reloadList() {
+        val range = selectedRange
         val story = storyId
         if (story == null && range == null) return
         panel.setLoading()
@@ -690,39 +571,34 @@ class MapFragment : Fragment(R.layout.fragment_map) {
                     panel.focusFromMap(id)
                 }
                 // A recording started since owns the camera.
-                if (fly && !isRecording()) flyToActivities(activities.filter { !it.pending })
+                if (session.consumeFly() && !isRecording()) flyToActivities(activities.filter { !it.pending })
             }.onFailure { failure ->
                 Log.w(TAG, "could not load the activity list", failure)
+                session.consumeFly()
                 panel.setError(getString(R.string.map_unreachable))
                 // A failed read doesn't end the polling: a Pending row still has to be seen finishing.
-                mapView.removeCallbacks(pendingPoll)
-                if (pendingIds.isNotEmpty()) mapView.postDelayed(pendingPoll, PENDING_POLL_MS)
+                pending.readFailed()
             }
         }
     }
 
     /**
-     * Pending rows (a reprocess running, from here or another client): while any is, the list is
-     * read again every [PENDING_POLL_MS]. A row starting or stopping Pending refetches the track
-     * tiles and watches Fog and Heatmap until re-rendered; a finished one also reloads the days.
+     * Pending rows ([PendingTracker]): a row starting or stopping Pending refetches the track tiles
+     * and watches Fog and Heatmap until re-rendered; a finished one also reloads the days.
      */
     private fun trackPending(activities: List<Activity>) {
-        val change = PendingDiff.of(pendingIds, activities.filter { it.pending }.mapTo(HashSet()) { it.id }, awaitingEditIds)
-        awaitingEditIds.retainAll(change.awaiting)
+        val change = pending.track(activities)
         // The selected activity's reprocess landed: its metrics describe the old points.
-        if (panelState.focused in change.landed) updateTrackMetrics(refetch = true)
-        if (panelState.focused in change.left) updateTrackMetrics(refetch = true)
-        pendingIds = change.now
+        if (panelState.focused in change.landed) bands.update(refetch = true)
+        if (panelState.focused in change.left) bands.update(refetch = true)
         if (change.started || change.finished) {
             style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
-            coverageWatch.watch()
+            coverage.watch()
         }
         if (change.finished) {
             activityDays.reload()
             panel.storiesTab.reloadOpen()
         }
-        mapView.removeCallbacks(pendingPoll)
-        if (change.now.isNotEmpty()) mapView.postDelayed(pendingPoll, PENDING_POLL_MS)
     }
 
     /**
@@ -741,11 +617,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             return
         }
         pendingFocusId = activityId
-        userChangedRange = true
-        panelState.resetForNewRange()
-        applyTrackFilter()
-        // The selection flies to the activity itself; the range's own fly would override it.
-        applyRange(DateRange(day, day), fly = false)
+        session.viewDay(day)
+        showRange(reset = true)
     }
 
     /**
@@ -753,20 +626,18 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      * become the Story's activities, and the camera fits them.
      */
     private fun enterStory(id: String) {
-        storyId = id
-        panelState.resetForNewRange()
+        session.enterStory(id)
         applyTrackFilter()
         panel.showStories()
         panel.storiesTab.setOpen(id)
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setTrackStory(it, id, null) }
-        loadActivities(null, fly = true)
+        reloadList()
     }
 
     /** Closes the open Story: back to the range, the panel's state reset. The camera stays. */
     private fun exitStory() {
-        storyId = null
+        session.exitStory()
         panel.storiesTab.setOpen(null)
-        panelState.resetForNewRange()
         applyTrackFilter()
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setTrackStory(it, null, selectedRange) }
         if (selectedRange != null) reloadList() else panel.setActivities(emptyList())
@@ -777,74 +648,46 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun onRemovedFromStory(activityId: String) {
         if (panelState.focused == activityId) panel.clearFocus()
         photos.refresh(force = true)
-        checkTileVersion()
+        coverage.checkTileVersion()
         style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
         reloadList()
     }
 
-    /** The toolbar's Edit: the window over its target, the panel held and inert under it, and
-     *  the mode toggle away. */
-    private fun openEditWindow(group: List<Activity>) {
-        panel.dismissPopups()
-        panel.hold(true)
-        editWindow.open(group, ActivityFacets.typeFacets(panelState.activities, null))
-        // The photos follow the window: its one activity's, which its Photos tab manages.
-        photos.refresh(force = false)
-        closeEditOnBack.isEnabled = true
-        chrome.placeEditors()
+    /** The toolbar's Edit ([EditController.open]). */
+    private fun openEditWindow(group: List<Activity>) = edit.open(group)
+
+    /** The Edit window opened or closed: the chrome steps aside for it or comes back. */
+    private fun onEditWindowChanged(open: Boolean) {
+        if (open) chrome.placeEditors()
         renderDateFooter()
-        host?.setBottomBarShown(false)
+        host?.setBottomBarShown(!open && !privacyEditing())
         renderSelectionBar()
         renderModeBar()
         renderRail()
-        renderTrackMetrics()
+        bands.render()
     }
 
-    /** The Track tab opened: the other tracks and the bands away, and the camera on this one. */
-    private fun startEditTrack(activity: Activity) {
-        editingTrackId = activity.id
-        style?.takeIf { overlaysAttached }?.let {
-            MapOverlays.setEditingTrack(it, true, mode)
-        }
-        spots.setEditing(true)
-        // Once the Track tab has laid out, so the fit leaves room under the window as it now is.
-        findViewById<View>(R.id.edit_window).post { flyToActivities(listOf(activity)) }
-    }
-
-    /** The track editor's overlay: the points as edited, its knobs and what would go. */
-    private fun drawTrackEdit(visible: List<TrackPoint>?, lo: Int, hi: Int, preview: EditPreview, split: Int?) {
-        val loaded = style ?: return
-        if (visible == null) TrackEditOverlay.clear(loaded) else TrackEditOverlay.set(loaded, visible, lo, hi, preview, split)
-    }
-
-    private fun onEditClosed(saved: Boolean, trackApplied: Boolean, photosSaved: Boolean) {
-        photos.editClosed(photosSaved)
-        editingTrackId?.let { id ->
-            if (trackApplied) awaitingEditIds += id
-            style?.let(TrackEditOverlay::clear)
-            style?.takeIf { overlaysAttached }?.let { MapOverlays.setEditingTrack(it, false, mode) }
-            spots.setEditing(false)
-        }
-        editingTrackId = null
-        closeEditOnBack.isEnabled = false
-        panel.hold(false)
-        renderDateFooter()
-        host?.setBottomBarShown(!privacyEditing())
-        renderSelectionBar()
-        renderModeBar()
+    /** The Private location editor opened or closed. */
+    private fun onPrivacyEditorChanged(open: Boolean) {
+        if (open) chrome.placeEditors()
         renderRail()
-        renderTrackMetrics()
+        renderDateFooter()
+        host?.setBottomBarShown(!open)
+    }
+
+    private fun onEditClosed(saved: Boolean, editedTrack: String?) {
+        editedTrack?.let(pending::awaitEdit)
         if (saved) reloadList()
     }
 
     /** Whether the Private location editor is open over the map. */
-    private fun privacyEditing() = ::privateEditor.isInitialized && privateEditor.isEditing
+    private fun privacyEditing() = ::edit.isInitialized && edit.privacyEditing
 
     /** The Private location editor has the map in Normal mode only: another mode or a recording
      *  closes it, unsaved draft and all. */
     private fun renderPrivacy() {
-        if (!::privateEditor.isInitialized || !privateEditor.isShowing) return
-        if (modeBarReady && !normalMode()) privateEditor.stop()
+        if (!::edit.isInitialized || !edit.privacy.isShowing) return
+        if (modeBarReady && !normalMode()) edit.privacy.stop()
     }
 
     /**
@@ -854,11 +697,11 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      */
     private fun onPrivateLocationsChanged() {
         reloadList()
-        coverageWatch.watch {
+        coverage.watch {
             style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
             reloadList()
             activityDays.reload()
-            updateTrackMetrics(refetch = true)
+            bands.update(refetch = true)
             photos.refresh(force = true)
             panel.storiesTab.reloadOpen()
         }
@@ -871,7 +714,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
         reloadList()
         activityDays.reload()
-        coverageWatch.watch()
+        coverage.watch()
     }
 
     /** The Sync tab sent activities: the list, its days and the tiles catch up. */
@@ -880,7 +723,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         reloadList()
         // Tracks refetch at once; the tile version moves only after the coverage render.
         style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
-        checkTileVersion()
+        coverage.checkTileVersion()
         if (notices.shown == MapNotice.EMPTY) {
             framed = false
             frameActivities()
@@ -894,45 +737,12 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         style?.takeIf { overlaysAttached }?.let { MapOverlays.refreshTracks(it, selectedRange) }
         reloadList()
         activityDays.reload()
-        coverageWatch.watch()
+        coverage.watch()
         panel.storiesTab.reloadOpen()
         photos.refresh(force = true)
     }
 
-    /** The mode toggle shows once the session allows, hidden while recording or editing. Layers
-     *  stays while recording: the base map and paths are about where the recording goes. */
-    private fun renderModeBar() {
-        if (!modeBarReady) return
-        modeBar.isVisible = MapChromeRules.modeBarShown(isRecording(), editWindow.isOpen, selectionShown())
-        layersPanel.visibility = View.VISIBLE
-        renderZoomLevelNotice()
-        renderCoverageNotice()
-        renderModeChip()
-    }
-
-    /** Names what Fog or Heatmap shows, since neither takes the date range. Not while recording,
-     *  which draws neither. */
-    private fun renderModeChip() {
-        val text = when (mode) {
-            MapMode.NORMAL -> null
-            MapMode.FOG -> R.string.mode_chip_fog
-            MapMode.HEATMAP -> R.string.mode_chip_heatmap
-        }
-        modeChip.isVisible = MapChromeRules.modeChipShown(mode, modeBarReady, isRecording(), ::export.isInitialized && export.isOpen)
-        if (text != null) modeChip.setText(text)
-    }
-
-    /** Names Fog's and Heatmap's level in view; not while recording. */
-    private fun renderZoomLevelNotice() {
-        zoomLevelNotice.render(mode, active = modeBarReady && !isRecording())
-    }
-
-    /** "Your map is still being updated…" (`docs/SPEC.md` FR-4.2), in Fog and Heatmap while the
-     *  coverage watch finds coverage rendering. */
-    private fun renderCoverageNotice() {
-        if (!::coverageNotice.isInitialized) return
-        coverageNotice.isVisible = MapChromeRules.coverageNoticeShown(coverageRendering, mode, modeBarReady, isRecording())
-    }
+    private fun renderModeBar() = modes.render()
 
     /** The rail (Layers, Find my location), hidden while an editor is open over the map. */
     private fun renderRail() {
@@ -945,7 +755,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
      *  the bands, the sheet's head and the selection bar. */
     private fun applyTrackFilter() {
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setTrackFilter(it, panelState.mapHidden, panelState.highlighted) }
-        updateTrackMetrics(refetch = false)
+        bands.update(refetch = false)
         photos.refresh(force = false)
         if (::panel.isInitialized) renderDateFooter()
     }
@@ -966,53 +776,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         renderRail()
     }
 
-    /**
-     * The selected activity's metrics: fetched when the selection moves, again with [refetch]
-     * after its reprocess lands, and dropped when it clears.
-     */
-    private fun updateTrackMetrics(refetch: Boolean) {
-        val focused = panelState.focused
-        if (focused == null) {
-            trackMetrics = null
-            trackMetricsFor = null
-            renderTrackMetrics()
-            return
-        }
-        if (focused == trackMetricsFor && !refetch) {
-            renderTrackMetrics()
-            return
-        }
-        // A reprocess can move a photo along its track, or take its stretch away.
-        if (refetch) photos.refresh(force = true)
-        trackMetricsFor = focused
-        if (!refetch) trackMetrics = null
-        renderTrackMetrics()
-        HoldMyTrackApi.trackMetrics(focused) { result ->
-            if (panelState.focused != focused) return@trackMetrics
-            trackMetrics = result.getOrNull()
-            renderTrackMetrics()
-        }
-    }
-
-    /**
-     * The selected activity's pace bands, while its track is drawn: not hidden, filtered out or
-     * Pending (its metrics would show the old points). Not on the Sync tab, whose picked candidate
-     * has its own (`map/SyncCandidatesOverlay`).
-     */
-    private fun renderTrackMetrics() {
-        val metrics = trackMetrics
-        val loaded = style?.takeIf { overlaysAttached } ?: return
-        val focused = panelState.focused
-        val onSync = ::panel.isInitialized && panel.tab == PanelTab.SYNC
-        if (metrics != null && focused == metrics.activityId && focused !in panelState.mapHidden && !onSync) {
-            MapOverlays.setTrackBands(loaded, metrics.points)
-            panel.setBandsShown(true)
-        } else {
-            MapOverlays.clearTrackBands(loaded)
-            panel.setBandsShown(false)
-        }
-    }
-
     /** Frames every one of [activities] that has a track. */
     private fun flyToActivities(activities: List<Activity>) {
         flyTo(BoxUnion.of(activities.mapNotNull { it.bbox }) ?: return)
@@ -1025,7 +788,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     private fun onMapTap(instance: MapLibreMap, point: LatLng): Boolean {
         // A spot's badge first, in every mode, unless an editor has the map; a tap elsewhere
         // closes its popup.
-        if (!privateEditor.isShowing && !editWindow.isOpen && spots.tap(instance, point)) return true
+        if (!edit.privacy.isShowing && !editWindow.isOpen && spots.tap(instance, point)) return true
         // The Sync tab's lines: one tapped is picked out on its list.
         if (::panel.isInitialized && panel.tab == PanelTab.SYNC && sheet.isVisible) {
             syncCandidates.keyAt(instance, point, resources.displayMetrics.density)?.let(panel.syncTab::focus)
@@ -1033,8 +796,8 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
         if (!normalMode()) return false
         // The Private location editor has the map to itself while it's open.
-        if (privateEditor.isShowing) {
-            privateEditor.onMapTap(point)
+        if (edit.privacy.isShowing) {
+            edit.privacy.onMapTap(point)
             return true
         }
         // The Edit window's group mustn't change under it; a tap only serves Delete point.
@@ -1073,7 +836,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         if (!normal) panel.dismissPopups()
         onSheetChanged()
         renderSelectionBar()
-        renderTrackMetrics()
+        bands.render()
         renderPrivacy()
     }
 
@@ -1088,7 +851,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         renderModeBar()
         locate.setShown(!active)
         export.setAvailable(!active)
-        renderModeChip()
+        modes.renderChip()
         renderDateFooter()
         notices.render()
         // Like every history layer, the photos give the map to the live track.
@@ -1099,30 +862,12 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         MapOverlays.updateLiveTrack(loaded, points)
     }
 
-    /**
-     * At a large font size only the active mode keeps its label; the others show icons
-     * (`ui/LargeText`), still named for TalkBack. The layout's label is kept in the button's tag.
-     */
-    private fun renderModeLabel(button: MaterialButton, active: Boolean) {
-        val label = (button.tag as? CharSequence) ?: button.text.also { button.tag = it }
-        button.contentDescription = label
-        if (!LargeText.isOn(resources)) return
-        button.text = if (active) label else ""
-        button.iconPadding = if (active) resources.getDimensionPixelSize(R.dimen.hmt_space_6) else 0
-    }
-
     private fun setMode(next: MapMode) {
         mode = next
-        modeButtons.forEach { (value, button) ->
-            val active = value == next
-            button.isChecked = active
-            renderModeLabel(button, active)
-        }
+        modes.check(next)
         style?.takeIf { overlaysAttached }?.let { MapOverlays.setMode(it, next) }
         style?.let { MapSatellite.apply(it, layers.satelliteOn, next) }
-        renderZoomLevelNotice()
-        renderCoverageNotice()
-        renderModeChip()
+        modes.renderNotices()
         renderDateFooter()
         photos.refresh(force = false)
     }
@@ -1230,7 +975,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
             spots.loadCaptures(onlyNew = true)
             // Back from elsewhere (the web, Sync): new tiles if the version moved, and the notice
             // if the account's coverage is still being worked on.
-            checkTileVersion()
+            coverage.checkTileVersion()
         }
         spots.resume()
         // An empty map is checked again on every return, so the notice goes and the camera frames
@@ -1260,7 +1005,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
     override fun onStop() {
         // Health Connect's routes can't be read in the background (`docs/IMPLEMENTATION.md` §4.0).
         if (::panel.isInitialized) panel.syncTab.pause()
-        if (::mapView.isInitialized) mapView.removeCallbacks(pendingPoll)
+        pending.stop()
         SyncProgress.removeListener(syncProgressListener)
         recording.stop()
         mapView.onStop()
@@ -1279,7 +1024,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         selectedRange?.let {
             outState.putString(STATE_RANGE_FROM, it.from)
             outState.putString(STATE_RANGE_TO, it.to)
-            outState.putBoolean(STATE_RANGE_CHOSEN, userChangedRange)
+            outState.putBoolean(STATE_RANGE_CHOSEN, session.userPicked)
         }
         if (::chrome.isInitialized) chrome.save(outState)
     }
@@ -1296,7 +1041,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         spots.stopCapture()
         mapView.onDestroy()
         dateSlider.release()
-        coverageWatch.stop()
+        coverage.stop()
         super.onDestroyView()
     }
 
@@ -1309,9 +1054,6 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
         /** How far from a tap a track still counts as tapped, as on the web. */
         private const val TAP_TOLERANCE_DP = 14
-
-        /** How often a list with Pending rows is read again. */
-        private const val PENDING_POLL_MS = 2_000L
         private const val FRAME_DURATION_MS = 900
 
         private const val STATE_MODE = "mode"
