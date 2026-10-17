@@ -36,9 +36,10 @@ class MapSession(private val panel: PanelState) {
         panel.resetForNewRange()
     }
 
-    /** The default range re-derived: taken, and true, unless the user picked one or it's the same. */
-    fun offerDefault(next: DateRange): Boolean {
-        if (userPicked || next == range) return false
+    /** The default range re-derived: taken, and true, unless the user picked one, it's the same,
+     *  or the Edit window is open, since sliding past the edited activity would empty its row. */
+    fun offerDefault(next: DateRange, editOpen: Boolean = false): Boolean {
+        if (userPicked || editOpen || next == range) return false
         range = next
         return true
     }

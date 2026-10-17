@@ -27,6 +27,14 @@
       "expected": { "range": { "from": "2026-10-05", "to": "2026-10-16" }, "userPicked": true, "checked": [], "hidden": [], "excludedTypes": [], "flyRequest": false }
     },
     {
+      "name": "the default waits while the Edit window is open",
+      "input": {
+        "state": { "range": { "from": "2026-10-01", "to": "2026-10-16" }, "userPicked": false, "checked": ["a"] },
+        "event": { "type": "defaultRange", "range": { "from": "2026-10-03", "to": "2026-10-16" }, "editOpen": true }
+      },
+      "expected": { "range": { "from": "2026-10-01", "to": "2026-10-16" }, "userPicked": false, "checked": ["a"], "hidden": [], "excludedTypes": [], "flyRequest": false }
+    },
+    {
       "name": "opening a Story keeps the range, resets the selection and flies",
       "input": {
         "state": { "range": { "from": "2026-10-01", "to": "2026-10-16" }, "userPicked": true, "checked": ["a"], "hidden": ["b"] },

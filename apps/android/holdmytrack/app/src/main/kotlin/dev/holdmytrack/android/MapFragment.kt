@@ -530,17 +530,19 @@ class MapFragment : Fragment(R.layout.fragment_map) {
         }
     }
 
-    /**
-     * The slider's window moved or reloaded. A reload re-derives the default range until the
-     * user picks one: the five most recent activity days, through today (`docs/SPEC.md` FR-6.1).
-     */
+    /** The slider's window moved or reloaded; a reload re-derives the default range. */
     private fun onActivityDaysChanged(reloaded: Boolean) {
         dateSlider.setDays(activityDays.visibleDays, activityDays.canPanEarlier, activityDays.canPanLater)
-        if (reloaded) {
-            val range = DefaultRange.of(activityDays.visibleDays.map { it.date }, activityDays.earliest, LocalDate.now().toString())
-            if (session.offerDefault(range)) showRange(reset = false)
-        }
+        if (reloaded) offerDefaultRange()
         renderDateFooter()
+    }
+
+    /** The five most recent activity days, through today (`docs/SPEC.md` FR-6.1), unless the user
+     *  picked a range; held while the Edit window is open, and offered again when it closes. */
+    private fun offerDefaultRange() {
+        if (!activityDays.ready) return
+        val range = DefaultRange.of(activityDays.visibleDays.map { it.date }, activityDays.earliest, LocalDate.now().toString())
+        if (session.offerDefault(range, editOpen = editWindow.isOpen)) showRange(reset = false)
     }
 
     /** Draws the tracks for the session's range and lists its activities; with [reset], the
@@ -658,7 +660,7 @@ class MapFragment : Fragment(R.layout.fragment_map) {
 
     /** The Edit window opened or closed: the chrome steps aside for it or comes back. */
     private fun onEditWindowChanged(open: Boolean) {
-        if (open) chrome.placeEditors()
+        if (open) chrome.placeEditors() else offerDefaultRange()
         renderDateFooter()
         host?.setBottomBarShown(!open && !privacyEditing())
         renderSelectionBar()

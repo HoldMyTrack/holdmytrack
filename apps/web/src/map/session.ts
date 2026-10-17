@@ -39,8 +39,9 @@ export interface MapSession {
 export type MapSessionEvent =
   /** The slider picked a range: a new set of rows, so the selection resets (docs/SPEC.md FR-6.6). */
   | { type: 'rangePicked'; range: DateRange }
-  /** The default range re-derived; ignored once the user has picked one. */
-  | { type: 'defaultRange'; range: DateRange }
+  /** The default range re-derived; ignored once the user has picked one, and held while the Edit
+   *  window is open, since sliding past the edited activity would close it. */
+  | { type: 'defaultRange'; range: DateRange; editOpen?: boolean }
   /** "View on map" for an activity outside the range: its own day, picked, without the range's
    *  flight, since the focus flies to the activity. */
   | { type: 'dayViewed'; day: string }
@@ -74,7 +75,7 @@ export function mapSessionReducer(state: MapSession, event: MapSessionEvent): Ma
     case 'rangePicked':
       return { ...state, range: event.range, userPicked: true, flyRequest: true, selection: emptySelection() };
     case 'defaultRange':
-      return state.userPicked ? state : { ...state, range: event.range };
+      return state.userPicked || event.editOpen ? state : { ...state, range: event.range };
     case 'dayViewed':
       return { ...mapSessionReducer(state, { type: 'rangePicked', range: { from: event.day, to: event.day } }), flyRequest: false };
     case 'storyEntered':

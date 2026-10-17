@@ -147,12 +147,10 @@ export function MapView({ initialPrivateLocationsOpen = false, initialActivity =
   // (`historyGeneration`) until the user picks a range (session.ts ignores it after). Trap: keying
   // on `visibleDays` would also re-pick on Earlier/Later paging, and settling once would freeze a
   // zero-history account (every demo) on `{today, today}` past its first upload.
-  //
-  // Held while the Edit window is open: an import landing newer days would slide the default past
-  // the edited activity and close the window. It catches up when the window closes.
+  // Held while the Edit window is open; it catches up when the window closes.
   useEffect(() => {
-    if (session.userPicked || !daysReady || editOpen) return;
-    dispatch({ type: 'defaultRange', range: defaultRange(visibleDays, earliest, today) });
+    if (session.userPicked || !daysReady) return;
+    dispatch({ type: 'defaultRange', range: defaultRange(visibleDays, earliest, today), editOpen });
     // visibleDays isn't a dependency; see above.
   }, [session.userPicked, daysReady, earliest, historyGeneration, today, editOpen]);
 

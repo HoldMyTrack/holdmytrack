@@ -98,7 +98,7 @@ class MapRulesTest {
             val event = input["event"]!!.jsonObject
             when (val type = event.string("type")) {
                 "rangePicked" -> session.pickRange(range(event["range"]!!.jsonObject))
-                "defaultRange" -> session.offerDefault(range(event["range"]!!.jsonObject))
+                "defaultRange" -> session.offerDefault(range(event["range"]!!.jsonObject), event["editOpen"]?.jsonPrimitive?.booleanOrNull ?: false)
                 "storyEntered" -> session.enterStory(event.string("id")!!)
                 "storyExited" -> session.exitStory()
                 else -> error("no Android event $type")
