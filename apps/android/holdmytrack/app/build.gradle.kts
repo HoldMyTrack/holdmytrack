@@ -40,6 +40,7 @@ android {
         versionCode = gitOutput("rev-list", "--count", "HEAD")?.toIntOrNull() ?: 1
         versionName = "0.14"
         buildConfigField("String", "GIT_SHA", "\"${gitOutput("rev-parse", "--short", "HEAD") ?: "dev"}\"")
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     // The release build is the Play build, signed with the upload key (Play App Signing re-signs
@@ -94,6 +95,7 @@ android {
     }
     sourceSets["main"].java.srcDirs("src/main/kotlin")
     sourceSets["test"].java.srcDirs("src/test/kotlin")
+    sourceSets["androidTest"].java.srcDirs("src/androidTest/kotlin")
 }
 
 // WireContractTest reads the API contract and MapRulesTest the shared map rule cases, both outside
@@ -127,4 +129,7 @@ dependencies {
     implementation(libs.serialization.json)
     testImplementation(libs.junit)
     testImplementation(libs.snakeyaml)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.junit)
+    androidTestImplementation(libs.uiautomator)
 }
